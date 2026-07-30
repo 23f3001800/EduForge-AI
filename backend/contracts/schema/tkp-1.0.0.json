@@ -1,0 +1,2417 @@
+{
+  "$defs": {
+    "Activity": {
+      "additionalProperties": false,
+      "description": "A classroom activity specific enough to run without interpretation (FR-07).",
+      "properties": {
+        "activity_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][\\w.-]*$",
+          "title": "Activity Id",
+          "type": "string"
+        },
+        "concept_ids": {
+          "items": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][\\w.-]*$",
+            "type": "string"
+          },
+          "title": "Concept Ids",
+          "type": "array"
+        },
+        "differentiation": {
+          "$ref": "#/$defs/Differentiation"
+        },
+        "duration_minutes": {
+          "minimum": 1,
+          "title": "Duration Minutes",
+          "type": "integer"
+        },
+        "materials": {
+          "description": "Things a real classroom has. Empty is valid.",
+          "items": {
+            "type": "string"
+          },
+          "title": "Materials",
+          "type": "array"
+        },
+        "period_no": {
+          "minimum": 1,
+          "title": "Period No",
+          "type": "integer"
+        },
+        "student_instructions": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Student Instructions",
+          "type": "array"
+        },
+        "success_criteria": {
+          "description": "Observable in the moment, not after marking.",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Success Criteria",
+          "type": "array"
+        },
+        "teacher_instructions": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Teacher Instructions",
+          "type": "array"
+        },
+        "title": {
+          "minLength": 1,
+          "title": "Title",
+          "type": "string"
+        },
+        "type": {
+          "enum": [
+            "demonstration",
+            "role_play",
+            "experiment",
+            "group_discussion",
+            "think_pair_share",
+            "problem_set",
+            "field_task",
+            "simulation",
+            "debate",
+            "gallery_walk"
+          ],
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "activity_id",
+        "period_no",
+        "type",
+        "title",
+        "duration_minutes",
+        "teacher_instructions",
+        "success_criteria",
+        "differentiation"
+      ],
+      "title": "Activity",
+      "type": "object"
+    },
+    "Application": {
+      "additionalProperties": false,
+      "description": "A real-world use of a concept.\n\nHigh hallucination risk: models readily invent plausible applications that the\nsource never mentions. Grounded by construction for exactly that reason.",
+      "properties": {
+        "concept_ids": {
+          "items": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][\\w.-]*$",
+            "type": "string"
+          },
+          "title": "Concept Ids",
+          "type": "array"
+        },
+        "context": {
+          "minLength": 1,
+          "title": "Context",
+          "type": "string"
+        },
+        "description": {
+          "minLength": 1,
+          "title": "Description",
+          "type": "string"
+        },
+        "evidence": {
+          "description": "At least one supporting span from the source document.",
+          "items": {
+            "$ref": "#/$defs/Evidence"
+          },
+          "minItems": 1,
+          "title": "Evidence",
+          "type": "array"
+        }
+      },
+      "required": [
+        "evidence",
+        "context",
+        "description"
+      ],
+      "title": "Application",
+      "type": "object"
+    },
+    "AssessmentBank": {
+      "additionalProperties": false,
+      "properties": {
+        "blueprint": {
+          "$ref": "#/$defs/AssessmentBlueprint"
+        },
+        "items": {
+          "items": {
+            "$ref": "#/$defs/AssessmentItem"
+          },
+          "minItems": 1,
+          "title": "Items",
+          "type": "array"
+        },
+        "total_marks": {
+          "minimum": 1,
+          "title": "Total Marks",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "items",
+        "total_marks"
+      ],
+      "title": "AssessmentBank",
+      "type": "object"
+    },
+    "AssessmentBlueprint": {
+      "additionalProperties": false,
+      "description": "Coverage plan. Built first, so the bank is designed rather than accumulated.",
+      "properties": {
+        "items_by_bloom": {
+          "additionalProperties": {
+            "type": "integer"
+          },
+          "title": "Items By Bloom",
+          "type": "object"
+        },
+        "items_by_kind": {
+          "additionalProperties": {
+            "type": "integer"
+          },
+          "title": "Items By Kind",
+          "type": "object"
+        },
+        "marks_by_concept": {
+          "additionalProperties": {
+            "type": "integer"
+          },
+          "title": "Marks By Concept",
+          "type": "object"
+        }
+      },
+      "title": "AssessmentBlueprint",
+      "type": "object"
+    },
+    "AssessmentItem": {
+      "additionalProperties": false,
+      "properties": {
+        "answer": {
+          "minLength": 1,
+          "title": "Answer",
+          "type": "string"
+        },
+        "bloom_level": {
+          "enum": [
+            "remember",
+            "understand",
+            "apply",
+            "analyze",
+            "evaluate",
+            "create"
+          ],
+          "title": "Bloom Level",
+          "type": "string"
+        },
+        "concept_ids": {
+          "items": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][\\w.-]*$",
+            "type": "string"
+          },
+          "title": "Concept Ids",
+          "type": "array"
+        },
+        "item_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][\\w.-]*$",
+          "title": "Item Id",
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "mcq",
+            "short_answer",
+            "long_answer",
+            "numerical"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "linked_misconception_id": {
+          "anyOf": [
+            {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9][\\w.-]*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Provenance for a distractor or a diagnostic item.",
+          "title": "Linked Misconception Id"
+        },
+        "marks": {
+          "minimum": 1,
+          "title": "Marks",
+          "type": "integer"
+        },
+        "options": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/MCQOption"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Options"
+        },
+        "rubric": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Rubric"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "stem": {
+          "minLength": 1,
+          "title": "Stem",
+          "type": "string"
+        },
+        "working": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Worked solution. Expected on numerical items.",
+          "title": "Working"
+        }
+      },
+      "required": [
+        "item_id",
+        "kind",
+        "stem",
+        "answer",
+        "marks",
+        "bloom_level"
+      ],
+      "title": "AssessmentItem",
+      "type": "object"
+    },
+    "BlackboardNotes": {
+      "additionalProperties": false,
+      "description": "What ends up written on the board — not a prose summary of the lesson.",
+      "properties": {
+        "bullet_points": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Bullet Points",
+          "type": "array"
+        },
+        "diagrams_to_draw": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Diagrams To Draw",
+          "type": "array"
+        },
+        "formulae_latex": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Formulae Latex",
+          "type": "array"
+        },
+        "headings": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Headings",
+          "type": "array"
+        }
+      },
+      "title": "BlackboardNotes",
+      "type": "object"
+    },
+    "CheckpointQuestion": {
+      "additionalProperties": false,
+      "description": "Mid-lesson comprehension check.",
+      "properties": {
+        "bloom_level": {
+          "enum": [
+            "remember",
+            "understand",
+            "apply",
+            "analyze",
+            "evaluate",
+            "create"
+          ],
+          "title": "Bloom Level",
+          "type": "string"
+        },
+        "concept_ids": {
+          "items": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][\\w.-]*$",
+            "type": "string"
+          },
+          "title": "Concept Ids",
+          "type": "array"
+        },
+        "expected_answer": {
+          "minLength": 1,
+          "title": "Expected Answer",
+          "type": "string"
+        },
+        "question": {
+          "minLength": 1,
+          "title": "Question",
+          "type": "string"
+        }
+      },
+      "required": [
+        "question",
+        "expected_answer",
+        "bloom_level"
+      ],
+      "title": "CheckpointQuestion",
+      "type": "object"
+    },
+    "Citation": {
+      "additionalProperties": false,
+      "description": "A source reference surfaced to the teacher (BR-02).",
+      "properties": {
+        "chunk_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][\\w.-]*$",
+          "title": "Chunk Id",
+          "type": "string"
+        },
+        "page": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Page"
+        },
+        "quote": {
+          "minLength": 1,
+          "title": "Quote",
+          "type": "string"
+        },
+        "referenced_by": {
+          "description": "JSON pointers to the claims citing this span.",
+          "items": {
+            "type": "string"
+          },
+          "title": "Referenced By",
+          "type": "array"
+        },
+        "section_path": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Section Path",
+          "type": "array"
+        }
+      },
+      "required": [
+        "chunk_id",
+        "quote"
+      ],
+      "title": "Citation",
+      "type": "object"
+    },
+    "Classification": {
+      "additionalProperties": false,
+      "description": "What kind of teaching material this document is.",
+      "properties": {
+        "category": {
+          "description": "Document shape, e.g. \"textbook_chapter\", \"research_paper\", \"lecture_notes\", \"handout\".",
+          "minLength": 1,
+          "title": "Category",
+          "type": "string"
+        },
+        "chapter": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Chapter"
+        },
+        "confidences": {
+          "additionalProperties": {
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "type": "number"
+          },
+          "description": "Per-field confidence, keyed by field name.",
+          "title": "Confidences",
+          "type": "object"
+        },
+        "curriculum_alignment": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/CurriculumAlignment"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Present only when a genuine standard match was found. Absent is a valid, honest answer."
+        },
+        "difficulty": {
+          "enum": [
+            "foundational",
+            "intermediate",
+            "advanced"
+          ],
+          "title": "Difficulty",
+          "type": "string"
+        },
+        "grade_band": {
+          "description": "e.g. \"9-10\", \"UG-1\".",
+          "minLength": 1,
+          "title": "Grade Band",
+          "type": "string"
+        },
+        "language": {
+          "description": "BCP-47 tag of the source content.",
+          "minLength": 2,
+          "title": "Language",
+          "type": "string"
+        },
+        "low_confidence_fields": {
+          "description": "Fields scoring below 0.5. Surfaced in the UI rather than silently propagated into six downstream stages.",
+          "items": {
+            "type": "string"
+          },
+          "title": "Low Confidence Fields",
+          "type": "array"
+        },
+        "pedagogy_profile": {
+          "description": "Routing key for all downstream prompt, activity, assessment, and validation strategy. Never branch on `subject` instead.",
+          "enum": [
+            "quantitative",
+            "conceptual",
+            "narrative",
+            "procedural",
+            "mixed"
+          ],
+          "title": "Pedagogy Profile",
+          "type": "string"
+        },
+        "subject": {
+          "description": "e.g. \"Physics\", \"History\".",
+          "minLength": 1,
+          "title": "Subject",
+          "type": "string"
+        },
+        "topic": {
+          "minLength": 1,
+          "title": "Topic",
+          "type": "string"
+        }
+      },
+      "required": [
+        "subject",
+        "grade_band",
+        "difficulty",
+        "topic",
+        "category",
+        "language",
+        "pedagogy_profile"
+      ],
+      "title": "Classification",
+      "type": "object"
+    },
+    "Concept": {
+      "additionalProperties": false,
+      "description": "One teachable idea extracted from the document.",
+      "properties": {
+        "concept_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][\\w.-]*$",
+          "title": "Concept Id",
+          "type": "string"
+        },
+        "evidence": {
+          "description": "At least one supporting span from the source document.",
+          "items": {
+            "$ref": "#/$defs/Evidence"
+          },
+          "minItems": 1,
+          "title": "Evidence",
+          "type": "array"
+        },
+        "importance": {
+          "description": "Drives period-count derivation and time allocation in stage 4.",
+          "enum": [
+            "core",
+            "supporting",
+            "enrichment"
+          ],
+          "title": "Importance",
+          "type": "string"
+        },
+        "name": {
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "summary": {
+          "minLength": 1,
+          "title": "Summary",
+          "type": "string"
+        }
+      },
+      "required": [
+        "evidence",
+        "concept_id",
+        "name",
+        "summary",
+        "importance"
+      ],
+      "title": "Concept",
+      "type": "object"
+    },
+    "ConceptEdge": {
+      "additionalProperties": false,
+      "properties": {
+        "confidence": {
+          "default": 1.0,
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Confidence",
+          "type": "number"
+        },
+        "from_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][\\w.-]*$",
+          "title": "From Id",
+          "type": "string"
+        },
+        "relation": {
+          "enum": [
+            "prerequisite_of",
+            "part_of",
+            "contrasts_with"
+          ],
+          "title": "Relation",
+          "type": "string"
+        },
+        "to_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][\\w.-]*$",
+          "title": "To Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "from_id",
+        "to_id",
+        "relation"
+      ],
+      "title": "ConceptEdge",
+      "type": "object"
+    },
+    "ConceptGraph": {
+      "additionalProperties": false,
+      "description": "Concept dependency structure. The ``prerequisite_of`` subgraph must be a DAG.\n\nCycle-breaking is stage 3's job (drop the lowest-confidence edge, record a\nwarning). By the time a graph reaches this contract it must already be acyclic\n— this validator is the backstop that stops a cyclic graph from silently\nreaching stage 4, where it would produce an arbitrary period ordering.",
+      "properties": {
+        "edges": {
+          "items": {
+            "$ref": "#/$defs/ConceptEdge"
+          },
+          "title": "Edges",
+          "type": "array"
+        },
+        "node_ids": {
+          "items": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][\\w.-]*$",
+            "type": "string"
+          },
+          "title": "Node Ids",
+          "type": "array"
+        }
+      },
+      "title": "ConceptGraph",
+      "type": "object"
+    },
+    "ConsistencyReport": {
+      "additionalProperties": false,
+      "description": "Is the package internally coherent across periods?",
+      "properties": {
+        "dangling_activity_refs": {
+          "items": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][\\w.-]*$",
+            "type": "string"
+          },
+          "title": "Dangling Activity Refs",
+          "type": "array"
+        },
+        "duplicate_concept_ids": {
+          "items": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][\\w.-]*$",
+            "type": "string"
+          },
+          "title": "Duplicate Concept Ids",
+          "type": "array"
+        },
+        "prerequisite_violations": {
+          "description": "Human-readable, e.g. \"concept_force taught in period 3 but its prerequisite concept_mass is taught in period 4\".",
+          "items": {
+            "type": "string"
+          },
+          "title": "Prerequisite Violations",
+          "type": "array"
+        },
+        "timing_ok": {
+          "default": true,
+          "title": "Timing Ok",
+          "type": "boolean"
+        }
+      },
+      "title": "ConsistencyReport",
+      "type": "object"
+    },
+    "CoverageReport": {
+      "additionalProperties": false,
+      "description": "Did the package actually teach and assess what it extracted?",
+      "properties": {
+        "concepts_taught": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Concepts Taught",
+          "type": "integer"
+        },
+        "concepts_total": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Concepts Total",
+          "type": "integer"
+        },
+        "objectives_assessed": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Objectives Assessed",
+          "type": "integer"
+        },
+        "objectives_planned": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Objectives Planned",
+          "type": "integer"
+        },
+        "objectives_total": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Objectives Total",
+          "type": "integer"
+        },
+        "unassessed_objective_ids": {
+          "items": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][\\w.-]*$",
+            "type": "string"
+          },
+          "title": "Unassessed Objective Ids",
+          "type": "array"
+        },
+        "untaught_concept_ids": {
+          "items": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][\\w.-]*$",
+            "type": "string"
+          },
+          "title": "Untaught Concept Ids",
+          "type": "array"
+        }
+      },
+      "title": "CoverageReport",
+      "type": "object"
+    },
+    "CurriculumAlignment": {
+      "additionalProperties": false,
+      "description": "Optional mapping to a named curriculum board (BR-03).",
+      "properties": {
+        "board": {
+          "title": "Board",
+          "type": "string"
+        },
+        "confidence": {
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Confidence",
+          "type": "number"
+        },
+        "mapped_standards": {
+          "items": {
+            "$ref": "#/$defs/StandardRef"
+          },
+          "title": "Mapped Standards",
+          "type": "array"
+        }
+      },
+      "required": [
+        "board",
+        "confidence"
+      ],
+      "title": "CurriculumAlignment",
+      "type": "object"
+    },
+    "Definition": {
+      "additionalProperties": false,
+      "properties": {
+        "concept_ids": {
+          "items": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][\\w.-]*$",
+            "type": "string"
+          },
+          "title": "Concept Ids",
+          "type": "array"
+        },
+        "definition": {
+          "minLength": 1,
+          "title": "Definition",
+          "type": "string"
+        },
+        "evidence": {
+          "description": "At least one supporting span from the source document.",
+          "items": {
+            "$ref": "#/$defs/Evidence"
+          },
+          "minItems": 1,
+          "title": "Evidence",
+          "type": "array"
+        },
+        "term": {
+          "minLength": 1,
+          "title": "Term",
+          "type": "string"
+        }
+      },
+      "required": [
+        "evidence",
+        "term",
+        "definition"
+      ],
+      "title": "Definition",
+      "type": "object"
+    },
+    "DiagnosticQuestion": {
+      "additionalProperties": false,
+      "description": "A question whose wrong answer reveals this specific gap.",
+      "properties": {
+        "expected_wrong_answer": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "What a student holding the misconception would say.",
+          "title": "Expected Wrong Answer"
+        },
+        "question": {
+          "minLength": 1,
+          "title": "Question",
+          "type": "string"
+        },
+        "reveals": {
+          "description": "What a wrong answer tells the teacher — the diagnostic value.",
+          "minLength": 1,
+          "title": "Reveals",
+          "type": "string"
+        }
+      },
+      "required": [
+        "question",
+        "reveals"
+      ],
+      "title": "DiagnosticQuestion",
+      "type": "object"
+    },
+    "Differentiation": {
+      "additionalProperties": false,
+      "properties": {
+        "extension": {
+          "description": "For students who finish early.",
+          "minLength": 1,
+          "title": "Extension",
+          "type": "string"
+        },
+        "support": {
+          "description": "For students who need scaffolding.",
+          "minLength": 1,
+          "title": "Support",
+          "type": "string"
+        }
+      },
+      "required": [
+        "support",
+        "extension"
+      ],
+      "title": "Differentiation",
+      "type": "object"
+    },
+    "DocumentMetadata": {
+      "additionalProperties": false,
+      "properties": {
+        "author": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Author"
+        },
+        "created_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Created At"
+        },
+        "detected_language": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "BCP-47 tag detected from content, e.g. 'en', 'hi'.",
+          "title": "Detected Language"
+        },
+        "filename": {
+          "minLength": 1,
+          "title": "Filename",
+          "type": "string"
+        },
+        "mime": {
+          "minLength": 1,
+          "title": "Mime",
+          "type": "string"
+        },
+        "page_count": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Page Count"
+        },
+        "sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Sha256",
+          "type": "string"
+        },
+        "size_bytes": {
+          "minimum": 0,
+          "title": "Size Bytes",
+          "type": "integer"
+        },
+        "title": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Title"
+        },
+        "word_count": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Word Count"
+        }
+      },
+      "required": [
+        "filename",
+        "mime",
+        "sha256",
+        "size_bytes"
+      ],
+      "title": "DocumentMetadata",
+      "type": "object"
+    },
+    "EntryTicket": {
+      "additionalProperties": false,
+      "description": "Opening diagnostic. Activates prior knowledge; must be answerable in minutes.",
+      "properties": {
+        "duration_minutes": {
+          "default": 5,
+          "maximum": 15,
+          "minimum": 1,
+          "title": "Duration Minutes",
+          "type": "integer"
+        },
+        "expected_response": {
+          "minLength": 1,
+          "title": "Expected Response",
+          "type": "string"
+        },
+        "prompt": {
+          "minLength": 1,
+          "title": "Prompt",
+          "type": "string"
+        }
+      },
+      "required": [
+        "prompt",
+        "expected_response"
+      ],
+      "title": "EntryTicket",
+      "type": "object"
+    },
+    "Evidence": {
+      "additionalProperties": false,
+      "description": "A pointer back into the source document supporting one generated claim.\n\n``quote`` is verbatim source text, not a paraphrase — stage 9 verifies the\nclaim against exactly these characters, so a paraphrase defeats the check.",
+      "properties": {
+        "chunk_id": {
+          "description": "Chunk this claim was drawn from. Must resolve to a real chunk.",
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][\\w.-]*$",
+          "title": "Chunk Id",
+          "type": "string"
+        },
+        "confidence": {
+          "default": 1.0,
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Confidence",
+          "type": "number"
+        },
+        "page": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "1-indexed source page, when known.",
+          "title": "Page"
+        },
+        "quote": {
+          "description": "Verbatim span from the source that supports the claim.",
+          "maxLength": 600,
+          "minLength": 8,
+          "title": "Quote",
+          "type": "string"
+        }
+      },
+      "required": [
+        "chunk_id",
+        "quote"
+      ],
+      "title": "Evidence",
+      "type": "object"
+    },
+    "Example": {
+      "additionalProperties": false,
+      "properties": {
+        "body": {
+          "minLength": 1,
+          "title": "Body",
+          "type": "string"
+        },
+        "concept_ids": {
+          "items": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][\\w.-]*$",
+            "type": "string"
+          },
+          "title": "Concept Ids",
+          "type": "array"
+        },
+        "evidence": {
+          "description": "At least one supporting span from the source document.",
+          "items": {
+            "$ref": "#/$defs/Evidence"
+          },
+          "minItems": 1,
+          "title": "Evidence",
+          "type": "array"
+        },
+        "title": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Title"
+        }
+      },
+      "required": [
+        "evidence",
+        "body"
+      ],
+      "title": "Example",
+      "type": "object"
+    },
+    "ExitTicket": {
+      "additionalProperties": false,
+      "properties": {
+        "duration_minutes": {
+          "default": 5,
+          "maximum": 15,
+          "minimum": 1,
+          "title": "Duration Minutes",
+          "type": "integer"
+        },
+        "prompt": {
+          "minLength": 1,
+          "title": "Prompt",
+          "type": "string"
+        },
+        "success_indicator": {
+          "description": "What a correct response looks like, so it can be marked fast.",
+          "minLength": 1,
+          "title": "Success Indicator",
+          "type": "string"
+        }
+      },
+      "required": [
+        "prompt",
+        "success_indicator"
+      ],
+      "title": "ExitTicket",
+      "type": "object"
+    },
+    "Formula": {
+      "additionalProperties": false,
+      "description": "A formula carried in both renderable and speakable form.\n\n``latex`` is what the PDF renderer typesets; ``plain`` is what a teacher reads\naloud and what search indexes. Both are required — a formula that only exists\nas LaTeX is unusable in half the output artifacts.",
+      "properties": {
+        "concept_ids": {
+          "items": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][\\w.-]*$",
+            "type": "string"
+          },
+          "title": "Concept Ids",
+          "type": "array"
+        },
+        "evidence": {
+          "description": "At least one supporting span from the source document.",
+          "items": {
+            "$ref": "#/$defs/Evidence"
+          },
+          "minItems": 1,
+          "title": "Evidence",
+          "type": "array"
+        },
+        "latex": {
+          "minLength": 1,
+          "title": "Latex",
+          "type": "string"
+        },
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Name"
+        },
+        "plain": {
+          "minLength": 1,
+          "title": "Plain",
+          "type": "string"
+        },
+        "variables": {
+          "items": {
+            "$ref": "#/$defs/VariableDef"
+          },
+          "title": "Variables",
+          "type": "array"
+        }
+      },
+      "required": [
+        "evidence",
+        "latex",
+        "plain"
+      ],
+      "title": "Formula",
+      "type": "object"
+    },
+    "GeneratorInfo": {
+      "additionalProperties": false,
+      "description": "What produced this package. Required for reproducibility (NFR-12) and for\nhonest comparison between eval runs — scores are meaningless without knowing\nwhich provider and models produced them.",
+      "properties": {
+        "app_version": {
+          "minLength": 1,
+          "title": "App Version",
+          "type": "string"
+        },
+        "models_by_stage": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "e.g. {\"knowledge-extraction\": \"claude-opus-5\"}.",
+          "title": "Models By Stage",
+          "type": "object"
+        },
+        "providers_by_stage": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "title": "Providers By Stage",
+          "type": "object"
+        }
+      },
+      "required": [
+        "app_version"
+      ],
+      "title": "GeneratorInfo",
+      "type": "object"
+    },
+    "Homework": {
+      "additionalProperties": false,
+      "properties": {
+        "estimated_minutes": {
+          "minimum": 1,
+          "title": "Estimated Minutes",
+          "type": "integer"
+        },
+        "submission_format": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Submission Format"
+        },
+        "tasks": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Tasks",
+          "type": "array"
+        }
+      },
+      "required": [
+        "tasks",
+        "estimated_minutes"
+      ],
+      "title": "Homework",
+      "type": "object"
+    },
+    "KnowledgeBase": {
+      "additionalProperties": false,
+      "description": "The complete educational representation of one document (FR-04).",
+      "properties": {
+        "applications": {
+          "items": {
+            "$ref": "#/$defs/Application"
+          },
+          "title": "Applications",
+          "type": "array"
+        },
+        "concept_graph": {
+          "$ref": "#/$defs/ConceptGraph"
+        },
+        "concepts": {
+          "items": {
+            "$ref": "#/$defs/Concept"
+          },
+          "title": "Concepts",
+          "type": "array"
+        },
+        "definitions": {
+          "items": {
+            "$ref": "#/$defs/Definition"
+          },
+          "title": "Definitions",
+          "type": "array"
+        },
+        "examples": {
+          "items": {
+            "$ref": "#/$defs/Example"
+          },
+          "title": "Examples",
+          "type": "array"
+        },
+        "formulae": {
+          "description": "Legitimately empty for narrative content. Validation is conditioned on pedagogy_profile and must never require this.",
+          "items": {
+            "$ref": "#/$defs/Formula"
+          },
+          "title": "Formulae",
+          "type": "array"
+        },
+        "keywords": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Keywords",
+          "type": "array"
+        },
+        "learning_objectives": {
+          "items": {
+            "$ref": "#/$defs/LearningObjective"
+          },
+          "title": "Learning Objectives",
+          "type": "array"
+        },
+        "misconceptions": {
+          "items": {
+            "$ref": "#/$defs/Misconception"
+          },
+          "title": "Misconceptions",
+          "type": "array"
+        },
+        "prerequisites": {
+          "items": {
+            "$ref": "#/$defs/Prerequisite"
+          },
+          "title": "Prerequisites",
+          "type": "array"
+        }
+      },
+      "title": "KnowledgeBase",
+      "type": "object"
+    },
+    "LearningGap": {
+      "additionalProperties": false,
+      "properties": {
+        "concept_ids": {
+          "items": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][\\w.-]*$",
+            "type": "string"
+          },
+          "title": "Concept Ids",
+          "type": "array"
+        },
+        "diagnostic_questions": {
+          "items": {
+            "$ref": "#/$defs/DiagnosticQuestion"
+          },
+          "minItems": 1,
+          "title": "Diagnostic Questions",
+          "type": "array"
+        },
+        "evidence": {
+          "description": "Optional: present when the misconception is named in the source.",
+          "items": {
+            "$ref": "#/$defs/Evidence"
+          },
+          "title": "Evidence",
+          "type": "array"
+        },
+        "gap_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][\\w.-]*$",
+          "title": "Gap Id",
+          "type": "string"
+        },
+        "misconception": {
+          "minLength": 1,
+          "title": "Misconception",
+          "type": "string"
+        },
+        "remediation": {
+          "items": {
+            "$ref": "#/$defs/RemediationStep"
+          },
+          "minItems": 1,
+          "title": "Remediation",
+          "type": "array"
+        },
+        "severity": {
+          "description": "Drives remediation priority. `high` means downstream concepts will fail if this is not addressed first.",
+          "enum": [
+            "low",
+            "medium",
+            "high"
+          ],
+          "title": "Severity",
+          "type": "string"
+        }
+      },
+      "required": [
+        "gap_id",
+        "misconception",
+        "severity",
+        "diagnostic_questions",
+        "remediation"
+      ],
+      "title": "LearningGap",
+      "type": "object"
+    },
+    "LearningObjective": {
+      "additionalProperties": false,
+      "description": "An observable, assessable behaviour — not a topic label.\n\n\"Understand photosynthesis\" is not an objective. \"Explain how light intensity\naffects the rate of photosynthesis\" is. The Bloom level must match the verb.",
+      "properties": {
+        "bloom_level": {
+          "enum": [
+            "remember",
+            "understand",
+            "apply",
+            "analyze",
+            "evaluate",
+            "create"
+          ],
+          "title": "Bloom Level",
+          "type": "string"
+        },
+        "concept_ids": {
+          "items": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][\\w.-]*$",
+            "type": "string"
+          },
+          "title": "Concept Ids",
+          "type": "array"
+        },
+        "objective_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][\\w.-]*$",
+          "title": "Objective Id",
+          "type": "string"
+        },
+        "statement": {
+          "minLength": 1,
+          "title": "Statement",
+          "type": "string"
+        }
+      },
+      "required": [
+        "objective_id",
+        "statement",
+        "bloom_level"
+      ],
+      "title": "LearningObjective",
+      "type": "object"
+    },
+    "MCQOption": {
+      "additionalProperties": false,
+      "properties": {
+        "is_correct": {
+          "default": false,
+          "title": "Is Correct",
+          "type": "boolean"
+        },
+        "label": {
+          "description": "e.g. \"A\".",
+          "minLength": 1,
+          "title": "Label",
+          "type": "string"
+        },
+        "rationale": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Why this distractor is tempting. Distractors that trace to a real misconception both teach and diagnose; random wrong answers do neither.",
+          "title": "Rationale"
+        },
+        "text": {
+          "minLength": 1,
+          "title": "Text",
+          "type": "string"
+        }
+      },
+      "required": [
+        "label",
+        "text"
+      ],
+      "title": "MCQOption",
+      "type": "object"
+    },
+    "MentorMoment": {
+      "additionalProperties": false,
+      "description": "Short motivational anecdote tied to the period's concepts.\n\nNot grounded by design. ``grounded`` is a frozen literal rather than a mutable\nflag so no stage can quietly mark other content as exempt from the grounding\ncheck by copying this pattern.",
+      "properties": {
+        "grounded": {
+          "const": false,
+          "default": false,
+          "title": "Grounded",
+          "type": "boolean"
+        },
+        "story": {
+          "minLength": 1,
+          "title": "Story",
+          "type": "string"
+        },
+        "takeaway": {
+          "minLength": 1,
+          "title": "Takeaway",
+          "type": "string"
+        },
+        "title": {
+          "minLength": 1,
+          "title": "Title",
+          "type": "string"
+        }
+      },
+      "required": [
+        "title",
+        "story",
+        "takeaway"
+      ],
+      "title": "MentorMoment",
+      "type": "object"
+    },
+    "Misconception": {
+      "additionalProperties": false,
+      "description": "A predictable student error, with its cause and its correction.",
+      "properties": {
+        "concept_ids": {
+          "items": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][\\w.-]*$",
+            "type": "string"
+          },
+          "title": "Concept Ids",
+          "type": "array"
+        },
+        "correction": {
+          "minLength": 1,
+          "title": "Correction",
+          "type": "string"
+        },
+        "evidence": {
+          "description": "At least one supporting span from the source document.",
+          "items": {
+            "$ref": "#/$defs/Evidence"
+          },
+          "minItems": 1,
+          "title": "Evidence",
+          "type": "array"
+        },
+        "misconception_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][\\w.-]*$",
+          "title": "Misconception Id",
+          "type": "string"
+        },
+        "statement": {
+          "description": "The incorrect belief, stated plainly.",
+          "minLength": 1,
+          "title": "Statement",
+          "type": "string"
+        },
+        "why_it_happens": {
+          "minLength": 1,
+          "title": "Why It Happens",
+          "type": "string"
+        }
+      },
+      "required": [
+        "evidence",
+        "misconception_id",
+        "statement",
+        "why_it_happens",
+        "correction"
+      ],
+      "title": "Misconception",
+      "type": "object"
+    },
+    "Period": {
+      "additionalProperties": false,
+      "description": "One teachable session.",
+      "properties": {
+        "concept_ids": {
+          "description": "Concepts taught in this period. Each concept belongs to exactly one period across the plan — stage 9 enforces that globally.",
+          "items": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][\\w.-]*$",
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Concept Ids",
+          "type": "array"
+        },
+        "objective_ids": {
+          "description": "Subset of the knowledge base's learning objectives.",
+          "items": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][\\w.-]*$",
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Objective Ids",
+          "type": "array"
+        },
+        "period_no": {
+          "minimum": 1,
+          "title": "Period No",
+          "type": "integer"
+        },
+        "sequence_rationale": {
+          "description": "Why this period sits here — what it builds on, what it enables.",
+          "minLength": 1,
+          "title": "Sequence Rationale",
+          "type": "string"
+        },
+        "time_allocation": {
+          "items": {
+            "$ref": "#/$defs/TimeSlot"
+          },
+          "minItems": 1,
+          "title": "Time Allocation",
+          "type": "array"
+        },
+        "title": {
+          "minLength": 1,
+          "title": "Title",
+          "type": "string"
+        }
+      },
+      "required": [
+        "period_no",
+        "title",
+        "objective_ids",
+        "concept_ids",
+        "time_allocation",
+        "sequence_rationale"
+      ],
+      "title": "Period",
+      "type": "object"
+    },
+    "PeriodContent": {
+      "additionalProperties": false,
+      "description": "Everything needed to teach one period (FR-06).",
+      "properties": {
+        "activity_refs": {
+          "description": "Resolve against the package's `activities`.",
+          "items": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][\\w.-]*$",
+            "type": "string"
+          },
+          "title": "Activity Refs",
+          "type": "array"
+        },
+        "blackboard_notes": {
+          "$ref": "#/$defs/BlackboardNotes"
+        },
+        "checkpoint_questions": {
+          "items": {
+            "$ref": "#/$defs/CheckpointQuestion"
+          },
+          "minItems": 1,
+          "title": "Checkpoint Questions",
+          "type": "array"
+        },
+        "entry_ticket": {
+          "$ref": "#/$defs/EntryTicket"
+        },
+        "exit_ticket": {
+          "$ref": "#/$defs/ExitTicket"
+        },
+        "homework": {
+          "$ref": "#/$defs/Homework"
+        },
+        "mentor_moment": {
+          "$ref": "#/$defs/MentorMoment"
+        },
+        "period_no": {
+          "minimum": 1,
+          "title": "Period No",
+          "type": "integer"
+        },
+        "teacher_script": {
+          "items": {
+            "$ref": "#/$defs/ScriptSegment"
+          },
+          "minItems": 1,
+          "title": "Teacher Script",
+          "type": "array"
+        }
+      },
+      "required": [
+        "period_no",
+        "entry_ticket",
+        "teacher_script",
+        "blackboard_notes",
+        "checkpoint_questions",
+        "exit_ticket",
+        "homework",
+        "mentor_moment"
+      ],
+      "title": "PeriodContent",
+      "type": "object"
+    },
+    "Prerequisite": {
+      "additionalProperties": false,
+      "description": "Knowledge assumed by this document but not taught within it.",
+      "properties": {
+        "concept_ids": {
+          "items": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][\\w.-]*$",
+            "type": "string"
+          },
+          "title": "Concept Ids",
+          "type": "array"
+        },
+        "statement": {
+          "minLength": 1,
+          "title": "Statement",
+          "type": "string"
+        }
+      },
+      "required": [
+        "statement"
+      ],
+      "title": "Prerequisite",
+      "type": "object"
+    },
+    "Provenance": {
+      "additionalProperties": false,
+      "properties": {
+        "citations": {
+          "items": {
+            "$ref": "#/$defs/Citation"
+          },
+          "title": "Citations",
+          "type": "array"
+        },
+        "stage_timings": {
+          "items": {
+            "$ref": "#/$defs/StageTiming"
+          },
+          "title": "Stage Timings",
+          "type": "array"
+        },
+        "total_cost_usd": {
+          "default": 0.0,
+          "minimum": 0.0,
+          "title": "Total Cost Usd",
+          "type": "number"
+        },
+        "total_duration_ms": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Total Duration Ms",
+          "type": "integer"
+        },
+        "total_tokens_in": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Total Tokens In",
+          "type": "integer"
+        },
+        "total_tokens_out": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Total Tokens Out",
+          "type": "integer"
+        }
+      },
+      "title": "Provenance",
+      "type": "object"
+    },
+    "RemediationStep": {
+      "additionalProperties": false,
+      "properties": {
+        "action": {
+          "minLength": 1,
+          "title": "Action",
+          "type": "string"
+        },
+        "estimated_minutes": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Estimated Minutes"
+        },
+        "rationale": {
+          "description": "Why this addresses the cause, not the symptom.",
+          "minLength": 1,
+          "title": "Rationale",
+          "type": "string"
+        }
+      },
+      "required": [
+        "action",
+        "rationale"
+      ],
+      "title": "RemediationStep",
+      "type": "object"
+    },
+    "Rubric": {
+      "additionalProperties": false,
+      "properties": {
+        "criteria": {
+          "minLength": 1,
+          "title": "Criteria",
+          "type": "string"
+        },
+        "levels": {
+          "items": {
+            "$ref": "#/$defs/RubricLevel"
+          },
+          "minItems": 2,
+          "title": "Levels",
+          "type": "array"
+        }
+      },
+      "required": [
+        "criteria",
+        "levels"
+      ],
+      "title": "Rubric",
+      "type": "object"
+    },
+    "RubricLevel": {
+      "additionalProperties": false,
+      "properties": {
+        "descriptor": {
+          "description": "What work at this level looks like — must discriminate.",
+          "minLength": 1,
+          "title": "Descriptor",
+          "type": "string"
+        },
+        "label": {
+          "description": "e.g. \"Proficient\".",
+          "minLength": 1,
+          "title": "Label",
+          "type": "string"
+        },
+        "marks": {
+          "minimum": 0,
+          "title": "Marks",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "label",
+        "descriptor",
+        "marks"
+      ],
+      "title": "RubricLevel",
+      "type": "object"
+    },
+    "ScriptSegment": {
+      "additionalProperties": false,
+      "description": "One timed beat of the lesson, usable aloud by a teacher who has not pre-read it.",
+      "properties": {
+        "anticipated_questions": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Anticipated Questions",
+          "type": "array"
+        },
+        "board_action": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "What goes on the board during this segment.",
+          "title": "Board Action"
+        },
+        "heading": {
+          "minLength": 1,
+          "title": "Heading",
+          "type": "string"
+        },
+        "minute_end": {
+          "minimum": 1,
+          "title": "Minute End",
+          "type": "integer"
+        },
+        "minute_start": {
+          "minimum": 0,
+          "title": "Minute Start",
+          "type": "integer"
+        },
+        "speaker_notes": {
+          "description": "What the teacher says or does.",
+          "minLength": 1,
+          "title": "Speaker Notes",
+          "type": "string"
+        }
+      },
+      "required": [
+        "minute_start",
+        "minute_end",
+        "heading",
+        "speaker_notes"
+      ],
+      "title": "ScriptSegment",
+      "type": "object"
+    },
+    "StageTiming": {
+      "additionalProperties": false,
+      "properties": {
+        "attempts": {
+          "default": 1,
+          "minimum": 1,
+          "title": "Attempts",
+          "type": "integer"
+        },
+        "degraded": {
+          "default": false,
+          "title": "Degraded",
+          "type": "boolean"
+        },
+        "duration_ms": {
+          "minimum": 0,
+          "title": "Duration Ms",
+          "type": "integer"
+        },
+        "stage": {
+          "enum": [
+            "document-intelligence",
+            "educational-classification",
+            "knowledge-extraction",
+            "teaching-planner",
+            "lesson-generation",
+            "activity-generation",
+            "assessment-generation",
+            "gap-analysis",
+            "validation",
+            "publishing"
+          ],
+          "title": "Stage",
+          "type": "string"
+        },
+        "tokens_cached": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Tokens Cached",
+          "type": "integer"
+        },
+        "tokens_in": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Tokens In",
+          "type": "integer"
+        },
+        "tokens_out": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Tokens Out",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "stage",
+        "duration_ms"
+      ],
+      "title": "StageTiming",
+      "type": "object"
+    },
+    "StandardRef": {
+      "additionalProperties": false,
+      "description": "A single curriculum standard this document maps to.\n\n``code`` must be a real, verifiable identifier from the named board. A model\nthat cannot find a genuine match must return no alignment at all rather than\ninventing a plausible-looking code — a fabricated standard is worse than an\nabsent one, because it looks authoritative (docs/10 § M3).",
+      "properties": {
+        "code": {
+          "description": "Official standard code, verbatim.",
+          "minLength": 1,
+          "title": "Code",
+          "type": "string"
+        },
+        "confidence": {
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Confidence",
+          "type": "number"
+        },
+        "description": {
+          "minLength": 1,
+          "title": "Description",
+          "type": "string"
+        }
+      },
+      "required": [
+        "code",
+        "description",
+        "confidence"
+      ],
+      "title": "StandardRef",
+      "type": "object"
+    },
+    "TeachingPlan": {
+      "additionalProperties": false,
+      "properties": {
+        "period_duration_minutes": {
+          "maximum": 240,
+          "minimum": 5,
+          "title": "Period Duration Minutes",
+          "type": "integer"
+        },
+        "periods": {
+          "items": {
+            "$ref": "#/$defs/Period"
+          },
+          "minItems": 1,
+          "title": "Periods",
+          "type": "array"
+        },
+        "total_periods": {
+          "maximum": 20,
+          "minimum": 1,
+          "title": "Total Periods",
+          "type": "integer"
+        },
+        "unmapped_objective_ids": {
+          "description": "Objectives no period covers. Reported honestly rather than dropped silently, so the gap is visible in the validation report.",
+          "items": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][\\w.-]*$",
+            "type": "string"
+          },
+          "title": "Unmapped Objective Ids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "total_periods",
+        "period_duration_minutes",
+        "periods"
+      ],
+      "title": "TeachingPlan",
+      "type": "object"
+    },
+    "TimeSlot": {
+      "additionalProperties": false,
+      "properties": {
+        "label": {
+          "description": "e.g. \"Entry ticket\", \"Guided practice\".",
+          "minLength": 1,
+          "title": "Label",
+          "type": "string"
+        },
+        "minutes": {
+          "minimum": 1,
+          "title": "Minutes",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "label",
+        "minutes"
+      ],
+      "title": "TimeSlot",
+      "type": "object"
+    },
+    "UnsupportedClaim": {
+      "additionalProperties": false,
+      "description": "A generated claim its own cited span does not support.",
+      "properties": {
+        "cited_chunk_id": {
+          "anyOf": [
+            {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9][\\w.-]*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Cited Chunk Id"
+        },
+        "claim": {
+          "minLength": 1,
+          "title": "Claim",
+          "type": "string"
+        },
+        "judge_confidence": {
+          "default": 1.0,
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Judge Confidence",
+          "type": "number"
+        },
+        "path": {
+          "minLength": 1,
+          "title": "Path",
+          "type": "string"
+        },
+        "reason": {
+          "minLength": 1,
+          "title": "Reason",
+          "type": "string"
+        }
+      },
+      "required": [
+        "path",
+        "claim",
+        "reason"
+      ],
+      "title": "UnsupportedClaim",
+      "type": "object"
+    },
+    "ValidationIssue": {
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "description": "Stable machine code, e.g. \"COVERAGE_CONCEPT_UNTAUGHT\". Stable so the UI and the eval harness can group issues across runs.",
+          "minLength": 1,
+          "title": "Code",
+          "type": "string"
+        },
+        "message": {
+          "minLength": 1,
+          "title": "Message",
+          "type": "string"
+        },
+        "path": {
+          "description": "JSON pointer into the TKP, e.g. /knowledge/applications/2.",
+          "minLength": 1,
+          "title": "Path",
+          "type": "string"
+        },
+        "severity": {
+          "enum": [
+            "error",
+            "warning",
+            "info"
+          ],
+          "title": "Severity",
+          "type": "string"
+        },
+        "stage": {
+          "description": "Which stage must regenerate to fix this. Drives the repair router.",
+          "enum": [
+            "document-intelligence",
+            "educational-classification",
+            "knowledge-extraction",
+            "teaching-planner",
+            "lesson-generation",
+            "activity-generation",
+            "assessment-generation",
+            "gap-analysis",
+            "validation",
+            "publishing"
+          ],
+          "title": "Stage",
+          "type": "string"
+        }
+      },
+      "required": [
+        "code",
+        "severity",
+        "message",
+        "path",
+        "stage"
+      ],
+      "title": "ValidationIssue",
+      "type": "object"
+    },
+    "ValidationReport": {
+      "additionalProperties": false,
+      "properties": {
+        "attempts": {
+          "default": 1,
+          "minimum": 1,
+          "title": "Attempts",
+          "type": "integer"
+        },
+        "checked_at": {
+          "format": "date-time",
+          "title": "Checked At",
+          "type": "string"
+        },
+        "consistency": {
+          "$ref": "#/$defs/ConsistencyReport"
+        },
+        "coverage": {
+          "$ref": "#/$defs/CoverageReport"
+        },
+        "grounding_score": {
+          "default": 1.0,
+          "description": "Share of groundable claims their cited spans support. Reported even on a pass — a silent 1.0 and a measured 1.0 are different facts.",
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Grounding Score",
+          "type": "number"
+        },
+        "issues": {
+          "items": {
+            "$ref": "#/$defs/ValidationIssue"
+          },
+          "title": "Issues",
+          "type": "array"
+        },
+        "profile_ruleset": {
+          "default": "mixed",
+          "description": "Which pedagogy-profile ruleset ran. Recorded so a reviewer can see that a narrative document was not judged against STEM expectations.",
+          "title": "Profile Ruleset",
+          "type": "string"
+        },
+        "schema_ok": {
+          "title": "Schema Ok",
+          "type": "boolean"
+        },
+        "status": {
+          "enum": [
+            "pass",
+            "pass_with_warnings",
+            "fail"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "unsupported_claims": {
+          "items": {
+            "$ref": "#/$defs/UnsupportedClaim"
+          },
+          "title": "Unsupported Claims",
+          "type": "array"
+        }
+      },
+      "required": [
+        "status",
+        "schema_ok",
+        "checked_at"
+      ],
+      "title": "ValidationReport",
+      "type": "object"
+    },
+    "VariableDef": {
+      "additionalProperties": false,
+      "properties": {
+        "meaning": {
+          "minLength": 1,
+          "title": "Meaning",
+          "type": "string"
+        },
+        "symbol": {
+          "minLength": 1,
+          "title": "Symbol",
+          "type": "string"
+        },
+        "unit": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Unit"
+        }
+      },
+      "required": [
+        "symbol",
+        "meaning"
+      ],
+      "title": "VariableDef",
+      "type": "object"
+    }
+  },
+  "$id": "https://eduforge.ai/schema/tkp-1.0.0.json",
+  "additionalProperties": false,
+  "description": "The complete, classroom-ready output for one source document.",
+  "properties": {
+    "activities": {
+      "items": {
+        "$ref": "#/$defs/Activity"
+      },
+      "title": "Activities",
+      "type": "array"
+    },
+    "assessments": {
+      "$ref": "#/$defs/AssessmentBank"
+    },
+    "classification": {
+      "$ref": "#/$defs/Classification"
+    },
+    "classroom_content": {
+      "items": {
+        "$ref": "#/$defs/PeriodContent"
+      },
+      "title": "Classroom Content",
+      "type": "array"
+    },
+    "generated_at": {
+      "format": "date-time",
+      "title": "Generated At",
+      "type": "string"
+    },
+    "generator": {
+      "$ref": "#/$defs/GeneratorInfo"
+    },
+    "knowledge": {
+      "$ref": "#/$defs/KnowledgeBase"
+    },
+    "learning_gaps": {
+      "items": {
+        "$ref": "#/$defs/LearningGap"
+      },
+      "title": "Learning Gaps",
+      "type": "array"
+    },
+    "provenance": {
+      "$ref": "#/$defs/Provenance"
+    },
+    "schema_version": {
+      "default": "1.0.0",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "source": {
+      "$ref": "#/$defs/DocumentMetadata"
+    },
+    "teaching_plan": {
+      "$ref": "#/$defs/TeachingPlan"
+    },
+    "tkp_id": {
+      "format": "uuid",
+      "title": "Tkp Id",
+      "type": "string"
+    },
+    "validation": {
+      "$ref": "#/$defs/ValidationReport"
+    }
+  },
+  "required": [
+    "tkp_id",
+    "generated_at",
+    "generator",
+    "source",
+    "classification",
+    "knowledge",
+    "teaching_plan",
+    "assessments",
+    "validation"
+  ],
+  "title": "TeacherKnowledgePackage",
+  "type": "object",
+  "version": "1.0.0"
+}

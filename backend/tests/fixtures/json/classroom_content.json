@@ -1,0 +1,198 @@
+[
+  {
+    "activity_refs": [
+      "act_1"
+    ],
+    "blackboard_notes": {
+      "bullet_points": [
+        "Resists change in motion",
+        "Needs an external unbalanced force"
+      ],
+      "diagrams_to_draw": [
+        "Block on a surface with force arrows"
+      ],
+      "formulae_latex": [
+        "\\vec{F} = m\\vec{a}"
+      ],
+      "headings": [
+        "Inertia and the First Law"
+      ]
+    },
+    "checkpoint_questions": [
+      {
+        "bloom_level": "understand",
+        "concept_ids": [
+          "concept_inertia"
+        ],
+        "expected_answer": "Yes — gravity and the normal force, which balance to zero net force.",
+        "question": "A book rests on a table. Is a force acting on it?"
+      }
+    ],
+    "entry_ticket": {
+      "duration_minutes": 5,
+      "expected_response": "Any example of continued motion, e.g. a rolling ball.",
+      "prompt": "Name one situation where something kept moving after you stopped pushing it."
+    },
+    "exit_ticket": {
+      "duration_minutes": 3,
+      "prompt": "In one sentence, why do passengers lurch forward when a bus brakes?",
+      "success_indicator": "Answer refers to continued motion, not to a forward force."
+    },
+    "homework": {
+      "estimated_minutes": 20,
+      "submission_format": "Notebook",
+      "tasks": [
+        "Find two examples of inertia at home and explain each in one sentence."
+      ]
+    },
+    "mentor_moment": {
+      "grounded": false,
+      "story": "Newton developed much of his work on motion while Cambridge was closed during an outbreak, working alone at his family home.",
+      "takeaway": "Progress often comes from steady thinking in unpromising conditions.",
+      "title": "Newton in a plague year"
+    },
+    "period_no": 1,
+    "teacher_script": [
+      {
+        "anticipated_questions": [],
+        "board_action": "Write the three best student examples in a column.",
+        "heading": "Entry ticket",
+        "minute_end": 5,
+        "minute_start": 0,
+        "speaker_notes": "Collect two or three answers without correcting them yet."
+      },
+      {
+        "anticipated_questions": [
+          "Why does a rolling ball eventually stop?"
+        ],
+        "board_action": "Write the formal statement beneath the examples.",
+        "heading": "Inertia and the First Law",
+        "minute_end": 20,
+        "minute_start": 5,
+        "speaker_notes": "Introduce the idea using the student examples already on the board, then state the law formally."
+      },
+      {
+        "anticipated_questions": [],
+        "board_action": null,
+        "heading": "Activity",
+        "minute_end": 32,
+        "minute_start": 20,
+        "speaker_notes": "Run the activity; circulate and listen for the misconception."
+      },
+      {
+        "anticipated_questions": [],
+        "board_action": null,
+        "heading": "Checkpoint",
+        "minute_end": 37,
+        "minute_start": 32,
+        "speaker_notes": "Pose the checkpoint question; take a show of hands before answers."
+      },
+      {
+        "anticipated_questions": [],
+        "board_action": null,
+        "heading": "Exit ticket",
+        "minute_end": 40,
+        "minute_start": 37,
+        "speaker_notes": "Collect exit tickets at the door."
+      }
+    ]
+  },
+  {
+    "activity_refs": [
+      "act_2"
+    ],
+    "blackboard_notes": {
+      "bullet_points": [
+        "Resists change in motion",
+        "Needs an external unbalanced force"
+      ],
+      "diagrams_to_draw": [
+        "Block on a surface with force arrows"
+      ],
+      "formulae_latex": [
+        "\\vec{F} = m\\vec{a}"
+      ],
+      "headings": [
+        "Force, Mass and Acceleration"
+      ]
+    },
+    "checkpoint_questions": [
+      {
+        "bloom_level": "understand",
+        "concept_ids": [
+          "concept_inertia"
+        ],
+        "expected_answer": "Yes — gravity and the normal force, which balance to zero net force.",
+        "question": "A book rests on a table. Is a force acting on it?"
+      }
+    ],
+    "entry_ticket": {
+      "duration_minutes": 5,
+      "expected_response": "Any example of continued motion, e.g. a rolling ball.",
+      "prompt": "Name one situation where something kept moving after you stopped pushing it."
+    },
+    "exit_ticket": {
+      "duration_minutes": 3,
+      "prompt": "In one sentence, why do passengers lurch forward when a bus brakes?",
+      "success_indicator": "Answer refers to continued motion, not to a forward force."
+    },
+    "homework": {
+      "estimated_minutes": 20,
+      "submission_format": "Notebook",
+      "tasks": [
+        "Find two examples of inertia at home and explain each in one sentence."
+      ]
+    },
+    "mentor_moment": {
+      "grounded": false,
+      "story": "Newton developed much of his work on motion while Cambridge was closed during an outbreak, working alone at his family home.",
+      "takeaway": "Progress often comes from steady thinking in unpromising conditions.",
+      "title": "Newton in a plague year"
+    },
+    "period_no": 2,
+    "teacher_script": [
+      {
+        "anticipated_questions": [],
+        "board_action": "Write the three best student examples in a column.",
+        "heading": "Entry ticket",
+        "minute_end": 5,
+        "minute_start": 0,
+        "speaker_notes": "Collect two or three answers without correcting them yet."
+      },
+      {
+        "anticipated_questions": [
+          "Why does a rolling ball eventually stop?"
+        ],
+        "board_action": "Write the formal statement beneath the examples.",
+        "heading": "Force, Mass and Acceleration",
+        "minute_end": 20,
+        "minute_start": 5,
+        "speaker_notes": "Introduce the idea using the student examples already on the board, then state the law formally."
+      },
+      {
+        "anticipated_questions": [],
+        "board_action": null,
+        "heading": "Activity",
+        "minute_end": 32,
+        "minute_start": 20,
+        "speaker_notes": "Run the activity; circulate and listen for the misconception."
+      },
+      {
+        "anticipated_questions": [],
+        "board_action": null,
+        "heading": "Checkpoint",
+        "minute_end": 37,
+        "minute_start": 32,
+        "speaker_notes": "Pose the checkpoint question; take a show of hands before answers."
+      },
+      {
+        "anticipated_questions": [],
+        "board_action": null,
+        "heading": "Exit ticket",
+        "minute_end": 40,
+        "minute_start": 37,
+        "speaker_notes": "Collect exit tickets at the door."
+      }
+    ]
+  }
+]

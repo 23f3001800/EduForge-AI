@@ -1,0 +1,17 @@
+{
+  "category": "textbook_chapter",
+  "chapter": "Chapter 5",
+  "confidences": {
+    "grade_band": 0.88,
+    "subject": 0.97,
+    "topic": 0.95
+  },
+  "curriculum_alignment": null,
+  "difficulty": "intermediate",
+  "grade_band": "9-10",
+  "language": "en",
+  "low_confidence_fields": [],
+  "pedagogy_profile": "quantitative",
+  "subject": "Physics",
+  "topic": "Newton's Laws of Motion"
+}

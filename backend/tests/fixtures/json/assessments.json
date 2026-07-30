@@ -1,0 +1,93 @@
+{
+  "blueprint": {
+    "items_by_bloom": {
+      "apply": 1,
+      "understand": 1
+    },
+    "items_by_kind": {
+      "mcq": 1,
+      "numerical": 1
+    },
+    "marks_by_concept": {
+      "concept_inertia": 1,
+      "concept_second_law": 3
+    }
+  },
+  "items": [
+    {
+      "answer": "B",
+      "bloom_level": "understand",
+      "concept_ids": [
+        "concept_inertia"
+      ],
+      "item_id": "item_1",
+      "kind": "mcq",
+      "linked_misconception_id": "mis_1",
+      "marks": 1,
+      "options": [
+        {
+          "is_correct": false,
+          "label": "A",
+          "rationale": "Targets the belief that motion requires a force.",
+          "text": "A forward force acts on them"
+        },
+        {
+          "is_correct": true,
+          "label": "B",
+          "rationale": null,
+          "text": "They continue moving while the bus slows"
+        },
+        {
+          "is_correct": false,
+          "label": "C",
+          "rationale": "Confuses weight with motion.",
+          "text": "Gravity increases during braking"
+        },
+        {
+          "is_correct": false,
+          "label": "D",
+          "rationale": null,
+          "text": "Air pressure pushes them forward"
+        }
+      ],
+      "rubric": null,
+      "stem": "A bus brakes suddenly and passengers lurch forward. Why?",
+      "working": null
+    },
+    {
+      "answer": "3 m/s^2",
+      "bloom_level": "apply",
+      "concept_ids": [
+        "concept_second_law"
+      ],
+      "item_id": "item_2",
+      "kind": "numerical",
+      "linked_misconception_id": null,
+      "marks": 3,
+      "options": null,
+      "rubric": {
+        "criteria": "Correct method, substitution, and units",
+        "levels": [
+          {
+            "descriptor": "Correct value with units.",
+            "label": "Complete",
+            "marks": 3
+          },
+          {
+            "descriptor": "Correct method, wrong units.",
+            "label": "Partial",
+            "marks": 2
+          },
+          {
+            "descriptor": "Formula stated only.",
+            "label": "Minimal",
+            "marks": 1
+          }
+        ]
+      },
+      "stem": "A 4 kg trolley experiences a net force of 12 N. Find its acceleration.",
+      "working": "a = F/m = 12 N / 4 kg = 3 m/s^2"
+    }
+  ],
+  "total_marks": 4
+}

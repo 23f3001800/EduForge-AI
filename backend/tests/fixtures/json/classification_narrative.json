@@ -1,0 +1,19 @@
+{
+  "category": "textbook_chapter",
+  "chapter": "Chapter 2",
+  "confidences": {
+    "chapter": 0.42,
+    "grade_band": 0.71,
+    "subject": 0.94
+  },
+  "curriculum_alignment": null,
+  "difficulty": "intermediate",
+  "grade_band": "9-10",
+  "language": "en",
+  "low_confidence_fields": [
+    "chapter"
+  ],
+  "pedagogy_profile": "narrative",
+  "subject": "History",
+  "topic": "The Partition of Bengal"
+}
