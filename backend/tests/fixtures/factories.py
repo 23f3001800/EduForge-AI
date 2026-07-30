@@ -245,7 +245,9 @@ def knowledge_base() -> KnowledgeBase:
                 name="Newton's Second Law",
                 summary="Net force equals mass times acceleration.",
                 importance="core",
-                evidence=_ev("c_002", "The acceleration of a body is proportional to the net force", 2),
+                evidence=_ev(
+                    "c_002", "The acceleration of a body is proportional to the net force", 2
+                ),
             ),
         ],
         definitions=[
@@ -292,7 +294,10 @@ def knowledge_base() -> KnowledgeBase:
                 misconception_id="mis_1",
                 statement="A moving object must have a force acting on it to keep moving.",
                 why_it_happens="Everyday motion always involves friction, hiding the ideal case.",
-                correction="Uniform motion needs no net force; friction is what requires opposing it.",
+                correction=(
+                    "Uniform motion needs no net force; friction is "
+                    "what requires opposing it."
+                ),
                 concept_ids=["concept_inertia"],
                 evidence=_ev("c_001", "unless acted upon by an external unbalanced force"),
             )
@@ -455,7 +460,10 @@ def _period_content(period_no: int, title: str, activity_ref: str) -> PeriodCont
         checkpoint_questions=[
             CheckpointQuestion(
                 question="A book rests on a table. Is a force acting on it?",
-                expected_answer="Yes — gravity and the normal force, which balance to zero net force.",
+                expected_answer=(
+                    "Yes — gravity and the normal force, which balance to "
+                    "zero net force."
+                ),
                 bloom_level="understand",
                 concept_ids=["concept_inertia"],
             )
@@ -498,12 +506,21 @@ def assessments() -> AssessmentBank:
             kind="mcq",
             stem="A bus brakes suddenly and passengers lurch forward. Why?",
             options=[
-                MCQOption(label="A", text="A forward force acts on them", is_correct=False,
-                          rationale="Targets the belief that motion requires a force."),
-                MCQOption(label="B", text="They continue moving while the bus slows",
-                          is_correct=True),
-                MCQOption(label="C", text="Gravity increases during braking", is_correct=False,
-                          rationale="Confuses weight with motion."),
+                MCQOption(
+                    label="A",
+                    text="A forward force acts on them",
+                    is_correct=False,
+                    rationale="Targets the belief that motion requires a force.",
+                ),
+                MCQOption(
+                    label="B", text="They continue moving while the bus slows", is_correct=True
+                ),
+                MCQOption(
+                    label="C",
+                    text="Gravity increases during braking",
+                    is_correct=False,
+                    rationale="Confuses weight with motion.",
+                ),
                 MCQOption(label="D", text="Air pressure pushes them forward", is_correct=False),
             ],
             answer="B",
@@ -525,7 +542,9 @@ def assessments() -> AssessmentBank:
                 criteria="Correct method, substitution, and units",
                 levels=[
                     RubricLevel(label="Complete", descriptor="Correct value with units.", marks=3),
-                    RubricLevel(label="Partial", descriptor="Correct method, wrong units.", marks=2),
+                    RubricLevel(
+                        label="Partial", descriptor="Correct method, wrong units.", marks=2
+                    ),
                     RubricLevel(label="Minimal", descriptor="Formula stated only.", marks=1),
                 ],
             ),
@@ -562,7 +581,10 @@ def learning_gaps() -> list[LearningGap]:
             remediation=[
                 RemediationStep(
                     action="Contrast a low-friction and a high-friction surface side by side.",
-                    rationale="Isolates friction as the cause of stopping, not the absence of force.",
+                    rationale=(
+                        "Isolates friction as the cause of stopping, "
+                        "not the absence of force."
+                    ),
                     estimated_minutes=10,
                 )
             ],
@@ -574,7 +596,7 @@ def learning_gaps() -> list[LearningGap]:
 # ----------------------------------------------------------------- stage 9 ---
 
 
-def validation_report() -> "object":
+def validation_report() -> object:
     from contracts import ValidationReport
 
     return ValidationReport(

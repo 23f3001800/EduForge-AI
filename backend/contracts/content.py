@@ -13,6 +13,7 @@ stage 9 does not penalise it as an unsupported claim (docs/01 § SRS-5.2).
 
 from __future__ import annotations
 
+from itertools import pairwise
 from typing import Literal
 
 from pydantic import Field, model_validator
@@ -165,8 +166,7 @@ class PeriodContent(StrictModel):
 
     @model_validator(mode="after")
     def _script_is_monotonic(self) -> PeriodContent:
-        segments = self.teacher_script
-        for prev, nxt in zip(segments, segments[1:], strict=False):
+        for prev, nxt in pairwise(self.teacher_script):
             if nxt.minute_start < prev.minute_end:
                 raise ValueError(
                     f"teacher_script segments overlap: {prev.heading!r} ends at "

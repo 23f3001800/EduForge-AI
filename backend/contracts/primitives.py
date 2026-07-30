@@ -21,6 +21,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 __all__ = [
     "SCHEMA_VERSION",
+    "STAGE_NAMES",
     "BloomLevel",
     "Confidence",
     "Difficulty",
@@ -28,7 +29,6 @@ __all__ = [
     "Grounded",
     "Identifier",
     "PedagogyProfile",
-    "STAGE_NAMES",
     "Severity",
     "StageName",
     "StrictModel",

@@ -177,29 +177,29 @@ class ConceptGraph(StrictModel):
                 adjacency[edge.from_id].append(edge.to_id)
 
         # Iterative three-colour DFS; recursion would blow the stack on a large graph.
-        WHITE, GREY, BLACK = 0, 1, 2
-        colour = dict.fromkeys(adjacency, WHITE)
+        white, grey, black = 0, 1, 2
+        colour = dict.fromkeys(adjacency, white)
         for root in adjacency:
-            if colour[root] != WHITE:
+            if colour[root] != white:
                 continue
             stack: list[tuple[str, bool]] = [(root, False)]
             while stack:
                 node, leaving = stack.pop()
                 if leaving:
-                    colour[node] = BLACK
+                    colour[node] = black
                     continue
-                if colour[node] == GREY:
+                if colour[node] == grey:
                     continue
-                colour[node] = GREY
+                colour[node] = grey
                 stack.append((node, True))
                 for nxt in adjacency[node]:
-                    if colour[nxt] == GREY:
+                    if colour[nxt] == grey:
                         raise ValueError(
                             "prerequisite_of subgraph contains a cycle involving "
                             f"{node!r} -> {nxt!r}; stage 3 must break the "
                             "lowest-confidence edge before emitting the graph"
                         )
-                    if colour[nxt] == WHITE:
+                    if colour[nxt] == white:
                         stack.append((nxt, False))
         return self
 

@@ -23,7 +23,7 @@ against one model and shipping another means the eval numbers do not transfer.
 
 from __future__ import annotations
 
-from typing import Generic, Literal, TypeVar
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
@@ -38,8 +38,6 @@ __all__ = [
     "ProviderRouting",
     "ReasoningConfig",
 ]
-
-T = TypeVar("T", bound=BaseModel)
 
 LLMProvider = Literal["anthropic", "gemini", "replay"]
 
@@ -108,7 +106,7 @@ class LLMUsage(StrictModel):
     latency_ms: int = Field(default=0, ge=0)
 
 
-class LLMResult(BaseModel, Generic[T]):
+class LLMResult[T: BaseModel](BaseModel):
     """Outcome of one structured generation call.
 
     ``degraded=True`` means the schema could not be satisfied even after the repair

@@ -34,7 +34,9 @@ class DiagnosticQuestion(StrictModel):
 
 class RemediationStep(StrictModel):
     action: str = Field(min_length=1)
-    rationale: str = Field(min_length=1, description="Why this addresses the cause, not the symptom.")
+    rationale: str = Field(
+        min_length=1, description="Why this addresses the cause, not the symptom."
+    )
     estimated_minutes: int | None = Field(default=None, ge=1)
 
 
