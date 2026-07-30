@@ -1,0 +1,25 @@
+{
+  "attempts": 1,
+  "checked_at": "2026-07-31T12:00:00Z",
+  "consistency": {
+    "dangling_activity_refs": [],
+    "duplicate_concept_ids": [],
+    "prerequisite_violations": [],
+    "timing_ok": true
+  },
+  "coverage": {
+    "concepts_taught": 2,
+    "concepts_total": 2,
+    "objectives_assessed": 2,
+    "objectives_planned": 2,
+    "objectives_total": 2,
+    "unassessed_objective_ids": [],
+    "untaught_concept_ids": []
+  },
+  "grounding_score": 1.0,
+  "issues": [],
+  "profile_ruleset": "quantitative",
+  "schema_ok": true,
+  "status": "pass",
+  "unsupported_claims": []
+}

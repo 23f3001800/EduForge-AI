@@ -1,0 +1,32 @@
+[
+  {
+    "concept_ids": [
+      "concept_inertia"
+    ],
+    "diagnostic_questions": [
+      {
+        "expected_wrong_answer": "A forward force from the push.",
+        "question": "A puck slides on frictionless ice. What force keeps it moving?",
+        "reveals": "Naming any force shows the misconception is still held."
+      }
+    ],
+    "evidence": [
+      {
+        "chunk_id": "c_001",
+        "confidence": 1.0,
+        "page": 1,
+        "quote": "unless acted upon by an external unbalanced force"
+      }
+    ],
+    "gap_id": "gap_1",
+    "misconception": "Motion requires a continuously applied force.",
+    "remediation": [
+      {
+        "action": "Contrast a low-friction and a high-friction surface side by side.",
+        "estimated_minutes": 10,
+        "rationale": "Isolates friction as the cause of stopping, not the absence of force."
+      }
+    ],
+    "severity": "high"
+  }
+]

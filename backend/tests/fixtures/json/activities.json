@@ -1,0 +1,59 @@
+[
+  {
+    "activity_id": "act_1",
+    "concept_ids": [
+      "concept_inertia"
+    ],
+    "differentiation": {
+      "extension": "Ask what changes if the card is flicked slowly, and why.",
+      "support": "Provide a sentence frame: 'The coin stayed still because...'"
+    },
+    "duration_minutes": 12,
+    "materials": [
+      "A stiff card",
+      "A coin",
+      "A glass"
+    ],
+    "period_no": 1,
+    "student_instructions": [
+      "Predict, then observe, then explain using inertia."
+    ],
+    "success_criteria": [
+      "Student predicts the coin falls into the glass.",
+      "Student explains it using resistance to a change in motion."
+    ],
+    "teacher_instructions": [
+      "Balance the card on the glass with the coin on top.",
+      "Flick the card horizontally and have students predict what happens."
+    ],
+    "title": "Coin and card",
+    "type": "demonstration"
+  },
+  {
+    "activity_id": "act_2",
+    "concept_ids": [
+      "concept_second_law"
+    ],
+    "differentiation": {
+      "extension": "Introduce a two-force problem requiring a net force first.",
+      "support": "Provide the rearranged formula a = F/m on the sheet."
+    },
+    "duration_minutes": 12,
+    "materials": [
+      "Worksheet",
+      "Calculator"
+    ],
+    "period_no": 2,
+    "student_instructions": [
+      "Solve for a given F and m; state units at every step."
+    ],
+    "success_criteria": [
+      "Correct value with correct units on at least three items."
+    ],
+    "teacher_instructions": [
+      "Work the first item aloud, then release students to pairs."
+    ],
+    "title": "Computing acceleration",
+    "type": "problem_set"
+  }
+]

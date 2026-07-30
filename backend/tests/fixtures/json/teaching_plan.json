@@ -1,0 +1,73 @@
+{
+  "period_duration_minutes": 40,
+  "periods": [
+    {
+      "concept_ids": [
+        "concept_inertia"
+      ],
+      "objective_ids": [
+        "obj_1"
+      ],
+      "period_no": 1,
+      "sequence_rationale": "Inertia is the prerequisite for the second law, so it is taught first.",
+      "time_allocation": [
+        {
+          "label": "Entry ticket",
+          "minutes": 5
+        },
+        {
+          "label": "Direct instruction",
+          "minutes": 15
+        },
+        {
+          "label": "Activity",
+          "minutes": 12
+        },
+        {
+          "label": "Checkpoint",
+          "minutes": 5
+        },
+        {
+          "label": "Exit ticket",
+          "minutes": 3
+        }
+      ],
+      "title": "Inertia and the First Law"
+    },
+    {
+      "concept_ids": [
+        "concept_second_law"
+      ],
+      "objective_ids": [
+        "obj_2"
+      ],
+      "period_no": 2,
+      "sequence_rationale": "Builds quantitatively on the qualitative idea of inertia.",
+      "time_allocation": [
+        {
+          "label": "Entry ticket",
+          "minutes": 5
+        },
+        {
+          "label": "Derivation",
+          "minutes": 15
+        },
+        {
+          "label": "Problem set",
+          "minutes": 12
+        },
+        {
+          "label": "Checkpoint",
+          "minutes": 5
+        },
+        {
+          "label": "Exit ticket",
+          "minutes": 3
+        }
+      ],
+      "title": "Force, Mass and Acceleration"
+    }
+  ],
+  "total_periods": 2,
+  "unmapped_objective_ids": []
+}

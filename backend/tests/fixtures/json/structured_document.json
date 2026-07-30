@@ -1,0 +1,70 @@
+{
+  "blocks": [
+    {
+      "block_id": "b_001",
+      "char_end": 24,
+      "char_start": 0,
+      "latex": null,
+      "level": 1,
+      "page": 1,
+      "section_path": [
+        "Chapter 5"
+      ],
+      "table": null,
+      "text": "Newton's Laws of Motion",
+      "type": "heading"
+    },
+    {
+      "block_id": "b_002",
+      "char_end": 160,
+      "char_start": 25,
+      "latex": null,
+      "level": null,
+      "page": 1,
+      "section_path": [
+        "Chapter 5",
+        "5.1 First Law"
+      ],
+      "table": null,
+      "text": "A body continues in its state of rest or uniform motion in a straight line unless acted upon by an external unbalanced force.",
+      "type": "paragraph"
+    },
+    {
+      "block_id": "b_003",
+      "char_end": 168,
+      "char_start": 161,
+      "latex": "\\vec{F} = m\\vec{a}",
+      "level": null,
+      "page": 2,
+      "section_path": [
+        "Chapter 5",
+        "5.2 Second Law"
+      ],
+      "table": null,
+      "text": "F = m a",
+      "type": "equation"
+    }
+  ],
+  "document_id": "11111111-1111-4111-8111-111111111111",
+  "metadata": {
+    "author": "NCERT",
+    "created_at": "2026-07-31T12:00:00Z",
+    "detected_language": "en",
+    "filename": "newtons-laws.pdf",
+    "mime": "application/pdf",
+    "page_count": 12,
+    "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "size_bytes": 184320,
+    "title": "Newton's Laws of Motion",
+    "word_count": 3400
+  },
+  "outline": [],
+  "stats": {
+    "code_blocks": 0,
+    "equations": 1,
+    "figures": 0,
+    "headings": 1,
+    "paragraphs": 1,
+    "tables": 0
+  }
+}

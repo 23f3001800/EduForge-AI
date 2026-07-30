@@ -1,0 +1,32 @@
+[
+  {
+    "block_ids": [
+      "b_002"
+    ],
+    "chunk_id": "c_001",
+    "document_id": "11111111-1111-4111-8111-111111111111",
+    "ordinal": 0,
+    "page": 1,
+    "section_path": [
+      "Chapter 5",
+      "5.1 First Law"
+    ],
+    "text": "A body continues in its state of rest or uniform motion in a straight line unless acted upon by an external unbalanced force.",
+    "token_count": 28
+  },
+  {
+    "block_ids": [
+      "b_003"
+    ],
+    "chunk_id": "c_002",
+    "document_id": "11111111-1111-4111-8111-111111111111",
+    "ordinal": 1,
+    "page": 2,
+    "section_path": [
+      "Chapter 5",
+      "5.2 Second Law"
+    ],
+    "text": "The acceleration of a body is proportional to the net force: F = m a.",
+    "token_count": 18
+  }
+]
