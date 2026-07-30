@@ -1,0 +1,67 @@
+# EduForge AI — per-stage model routing.
+#
+# Model choice is an OPERATOR decision expressed here, never a hardcoded constant
+# inside a stage. Stages ask for a `stage` name; the router hands back a ModelSpec.
+#
+# Select a profile with LLM_PROFILE={production|dev|ci}.
+#
+#   production — Anthropic. The graded output path and the deployed demo.
+#   dev        — Gemini. Cheap iteration while wiring plumbing.
+#   ci         — replay. Recorded cassettes: deterministic, free, offline.
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# RULE: quality evaluation (M11) runs on `production` only.
+#
+# Prompt-tuning against one model and shipping another means the eval numbers do
+# not transfer — you would be optimising for a model you do not deploy. The eval
+# harness refuses to run under any other profile and says why.
+# ─────────────────────────────────────────────────────────────────────────────
+
+profiles:
+
+  production:
+    default:
+      provider: anthropic
+      model: claude-opus-5
+      max_tokens: 16000
+      reasoning: { effort: high }
+      cache_prefix: true
+    stages:
+      educational-classification: { max_tokens: 4000,  reasoning: { effort: medium } }
+      knowledge-extraction:       { max_tokens: 16000, reasoning: { effort: high } }
+      teaching-planner:           { max_tokens: 12000, reasoning: { effort: high } }
+      lesson-generation:          { max_tokens: 16000, reasoning: { effort: high } }
+      activity-generation:        { max_tokens: 8000,  reasoning: { effort: medium } }
+      assessment-generation:      { max_tokens: 12000, reasoning: { effort: high } }
+      gap-analysis:               { max_tokens: 8000,  reasoning: { effort: medium } }
+      # Validation is a judge, not an author. Low effort, and it only sees the
+      # ambiguous middle band of claims the lexical pre-filter could not settle.
+      validation:                 { max_tokens: 4000,  reasoning: { effort: low } }
+
+  dev:
+    # Cheap plumbing iteration. Expect noticeably weaker pedagogical output —
+    # that is fine here, because this profile is for verifying that stages wire
+    # together, not for judging content quality.
+    default:
+      provider: gemini
+      model: gemini-2.5-flash
+      max_tokens: 16000
+      reasoning: { effort: medium }
+      cache_prefix: true
+    stages:
+      knowledge-extraction: { model: gemini-2.5-pro, reasoning: { effort: high } }
+      teaching-planner:     { model: gemini-2.5-pro, reasoning: { effort: high } }
+      lesson-generation:    { model: gemini-2.5-pro, reasoning: { effort: high } }
+      validation:           { max_tokens: 4000, reasoning: { effort: low } }
+
+  ci:
+    # Serves recorded responses from tests/fixtures/llm_cassettes keyed by a hash
+    # of (stage, model, prompt). A cache miss is a hard failure, never a live
+    # call — CI must not depend on a network or a key.
+    default:
+      provider: replay
+      model: cassette
+      max_tokens: 16000
+
+# Stages absent from a profile's `stages` map inherit that profile's `default`.
+# Fields absent from a stage entry inherit the default's value for that field.

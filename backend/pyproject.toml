@@ -1,0 +1,108 @@
+[project]
+name = "eduforge"
+version = "0.1.0"
+description = "EduForge AI — turns raw educational documents into classroom-ready Teacher Knowledge Packages"
+requires-python = ">=3.12"
+dependencies = [
+    "pydantic>=2.9",
+    "pydantic-settings>=2.5",
+]
+
+[project.optional-dependencies]
+# Kept as extras so M0 (contracts) installs with almost nothing. Downstream
+# modules add only what they own; `contracts` must never gain a heavy dep.
+platform_deps = [
+    "sqlalchemy>=2.0",
+    "alembic>=1.13",
+    "psycopg[binary]>=3.2",
+    "pgvector>=0.3",
+    "structlog>=24.4",
+    "prometheus-client>=0.21",
+]
+llm = [
+    "anthropic>=0.40",
+    "langgraph>=0.2",
+]
+api = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.32",
+    "python-multipart>=0.0.12",
+    "sse-starlette>=2.1",
+]
+parsing = [
+    "pypdf>=5.0",
+    "pdfplumber>=0.11",
+    "python-docx>=1.1",
+    "python-pptx>=1.0",
+]
+render = [
+    "jinja2>=3.1",
+    "weasyprint>=62",
+]
+dev = [
+    "pytest>=8.3",
+    "pytest-asyncio>=0.24",
+    "mypy>=1.13",
+    "ruff>=0.7",
+    "import-linter>=2.1",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["contracts", "core", "stages", "orchestration", "worker", "api", "pedagogy"]
+
+# ---------------------------------------------------------------- tooling ---
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "UP", "B", "A", "C4", "SIM", "RUF"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+plugins = ["pydantic.mypy"]
+warn_unreachable = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+
+# --------------------------------------------------------------------------
+# Import boundaries — this is what lets 9 agents build in parallel (docs/07).
+# A stage importing another stage fails CI.
+# --------------------------------------------------------------------------
+[tool.importlinter]
+root_packages = ["contracts", "core", "pedagogy", "stages", "orchestration", "worker", "api"]
+
+[[tool.importlinter.contracts]]
+name = "contracts is a leaf — it may import nothing in-project"
+type = "forbidden"
+source_modules = ["contracts"]
+forbidden_modules = ["core", "pedagogy", "stages", "orchestration", "worker", "api"]
+
+[[tool.importlinter.contracts]]
+name = "stages are independent of each other"
+type = "independence"
+modules = [
+    "stages.s1_document_intelligence",
+    "stages.s2_classification",
+    "stages.s3_knowledge",
+    "stages.s4_planner",
+    "stages.s5_classroom_content",
+    "stages.s6_activities",
+    "stages.s7_assessments",
+    "stages.s8_gaps",
+    "stages.s9_validation",
+    "stages.s10_publishing",
+]
+
+[[tool.importlinter.contracts]]
+name = "layered architecture"
+type = "layers"
+layers = ["api | worker", "orchestration", "stages", "pedagogy", "core", "contracts"]

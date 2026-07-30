@@ -1,0 +1,202 @@
+"""EduForge contracts — the shared vocabulary of the whole system.
+
+This package is a leaf: it imports nothing else in the project and contains no
+behaviour, no I/O, and no prompts. That is what allows nine agents to build
+against it in parallel without coordinating with each other (docs/07).
+
+Import from the package root:
+
+    from contracts import KnowledgeBase, TeacherKnowledgePackage
+"""
+
+from contracts.assessment import (
+    AssessmentBank,
+    AssessmentBlueprint,
+    AssessmentItem,
+    ItemKind,
+    MCQOption,
+    Rubric,
+    RubricLevel,
+)
+from contracts.classification import (
+    Classification,
+    CurriculumAlignment,
+    StandardRef,
+)
+from contracts.content import (
+    Activity,
+    ActivityType,
+    BlackboardNotes,
+    CheckpointQuestion,
+    Differentiation,
+    EntryTicket,
+    ExitTicket,
+    Homework,
+    MentorMoment,
+    PeriodContent,
+    ScriptSegment,
+)
+from contracts.document import (
+    Block,
+    BlockType,
+    Chunk,
+    DocumentMetadata,
+    DocumentStats,
+    OutlineNode,
+    StructuredDocument,
+    TableData,
+)
+from contracts.gaps import DiagnosticQuestion, LearningGap, RemediationStep
+from contracts.jobs import (
+    STAGE_PROGRESS_WEIGHTS,
+    ArtifactKind,
+    JobOptions,
+    JobSnapshot,
+    JobStatus,
+    ProgressEvent,
+)
+from contracts.knowledge import (
+    Application,
+    Concept,
+    ConceptEdge,
+    ConceptGraph,
+    Definition,
+    Example,
+    Formula,
+    KnowledgeBase,
+    LearningObjective,
+    Misconception,
+    Prerequisite,
+    VariableDef,
+)
+from contracts.llm import (
+    Effort,
+    LLMProvider,
+    LLMResult,
+    LLMUsage,
+    ModelSpec,
+    ProviderRouting,
+    ReasoningConfig,
+)
+from contracts.plan import Period, TeachingPlan, TimeSlot
+from contracts.primitives import (
+    SCHEMA_VERSION,
+    STAGE_NAMES,
+    BloomLevel,
+    Confidence,
+    Difficulty,
+    Evidence,
+    Grounded,
+    Identifier,
+    PedagogyProfile,
+    Severity,
+    StageName,
+    StrictModel,
+)
+from contracts.tkp import (
+    Citation,
+    GeneratorInfo,
+    Provenance,
+    StageTiming,
+    TeacherKnowledgePackage,
+)
+from contracts.validation import (
+    ConsistencyReport,
+    CoverageReport,
+    IssueSeverity,
+    UnsupportedClaim,
+    ValidationIssue,
+    ValidationReport,
+    ValidationStatus,
+)
+
+# Resolve forward references in self-referential models (OutlineNode.children).
+OutlineNode.model_rebuild()
+
+__all__ = [
+    "SCHEMA_VERSION",
+    "STAGE_NAMES",
+    "STAGE_PROGRESS_WEIGHTS",
+    "Activity",
+    "ActivityType",
+    "Application",
+    "ArtifactKind",
+    "AssessmentBank",
+    "AssessmentBlueprint",
+    "AssessmentItem",
+    "BlackboardNotes",
+    "Block",
+    "BlockType",
+    "BloomLevel",
+    "CheckpointQuestion",
+    "Chunk",
+    "Citation",
+    "Classification",
+    "Concept",
+    "ConceptEdge",
+    "ConceptGraph",
+    "Confidence",
+    "ConsistencyReport",
+    "CoverageReport",
+    "CurriculumAlignment",
+    "Definition",
+    "DiagnosticQuestion",
+    "Differentiation",
+    "Difficulty",
+    "DocumentMetadata",
+    "DocumentStats",
+    "Effort",
+    "EntryTicket",
+    "Evidence",
+    "Example",
+    "ExitTicket",
+    "Formula",
+    "GeneratorInfo",
+    "Grounded",
+    "Homework",
+    "Identifier",
+    "IssueSeverity",
+    "ItemKind",
+    "JobOptions",
+    "JobSnapshot",
+    "JobStatus",
+    "KnowledgeBase",
+    "LLMProvider",
+    "LLMResult",
+    "LLMUsage",
+    "LearningGap",
+    "LearningObjective",
+    "MCQOption",
+    "MentorMoment",
+    "Misconception",
+    "ModelSpec",
+    "OutlineNode",
+    "PedagogyProfile",
+    "Period",
+    "PeriodContent",
+    "Prerequisite",
+    "ProgressEvent",
+    "Provenance",
+    "ProviderRouting",
+    "ReasoningConfig",
+    "RemediationStep",
+    "Rubric",
+    "RubricLevel",
+    "SCHEMA_VERSION",
+    "ScriptSegment",
+    "Severity",
+    "StageName",
+    "StageTiming",
+    "StandardRef",
+    "StrictModel",
+    "StructuredDocument",
+    "TableData",
+    "TeacherKnowledgePackage",
+    "TeachingPlan",
+    "TimeSlot",
+    "UnsupportedClaim",
+    "ValidationIssue",
+    "ValidationReport",
+    "ValidationStatus",
+    "VariableDef",
+]
