@@ -24,8 +24,8 @@ ROOT = Path(__file__).resolve().parent.parent
 BACKEND = ROOT / "backend"
 sys.path.insert(0, str(BACKEND))
 
-from contracts import SCHEMA_VERSION, TeacherKnowledgePackage  # noqa: E402
-from tests.fixtures import factories  # noqa: E402
+from contracts import SCHEMA_VERSION, TeacherKnowledgePackage
+from tests.fixtures import factories
 
 SCHEMA_DIR = BACKEND / "contracts" / "schema"
 FIXTURE_DIR = BACKEND / "tests" / "fixtures" / "json"

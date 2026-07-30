@@ -182,7 +182,6 @@ __all__ = [
     "RemediationStep",
     "Rubric",
     "RubricLevel",
-    "SCHEMA_VERSION",
     "ScriptSegment",
     "Severity",
     "StageName",

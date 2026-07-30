@@ -18,12 +18,12 @@ from pydantic import Field, model_validator
 from contracts.primitives import StageName, StrictModel
 
 __all__ = [
+    "STAGE_PROGRESS_WEIGHTS",
     "ArtifactKind",
     "JobOptions",
     "JobStatus",
     "ProgressEvent",
     "ProgressLevel",
-    "STAGE_PROGRESS_WEIGHTS",
 ]
 
 JobStatus = Literal["queued", "running", "succeeded", "succeeded_partial", "failed", "cancelled"]
