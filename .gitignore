@@ -1,0 +1,38 @@
+# secrets — never commit
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# node / frontend
+node_modules/
+frontend/dist/
+frontend/.vite/
+
+# local artifacts
+/data/
+/uploads/
+/blob/
+evals/reports/*
+!evals/reports/.gitkeep
+
+# os / editor
+.DS_Store
+Thumbs.db
+*.swp
+.idea/
+.vscode/
+*:Zone.Identifier
