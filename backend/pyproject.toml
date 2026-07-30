@@ -81,6 +81,20 @@ extend-immutable-calls = [
 [tool.ruff.lint.per-file-ignores]
 # Tests assert on private/internal shapes and use fixtures freely.
 "tests/**" = ["S101"]
+# Mathematical notation is the subject matter here, not a typo. RUF001/2/3 flag
+# Greek letters and operators as "ambiguous unicode", which is exactly the
+# content these modules exist to recognise and convert.
+"stages/s1_document_intelligence/equations.py" = ["RUF001", "RUF002", "RUF003"]
+# The en-dash in _LIST_MARKERS is a real bullet character found in real documents,
+# not a mistyped hyphen — replacing it would stop detecting those list items.
+"stages/s1_document_intelligence/parsers.py" = ["RUF001"]
+# N818 wants an Error suffix. These are domain rejections and read better without
+# one at the raise site (`raise DocumentTooLarge(...)`), and "ParseFailureError"
+# is strictly worse than "ParseFailure". All inherit IngestionError, so the
+# hierarchy is unambiguous.
+"stages/s1_document_intelligence/errors.py" = ["N818"]
+"tests/unit/test_document_intelligence.py" = ["RUF001", "RUF002", "RUF003"]
+"tests/fixtures/documents/generate.py" = ["RUF001", "RUF002", "RUF003"]
 
 [tool.mypy]
 python_version = "3.12"
