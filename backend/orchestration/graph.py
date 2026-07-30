@@ -1,0 +1,140 @@
+"""The LangGraph pipeline.
+
+Nodes are stages; edges are the pipeline order. Building the topology from a list
+of stages rather than hand-wiring ten `add_edge` calls means a stage cannot be
+added to the roster and forgotten in the graph — the two cannot drift.
+
+Checkpointing is ours rather than LangGraph's built-in saver. There is exactly one
+source of truth for "what has this job completed": the ``stage_outputs`` store.
+Two checkpoint systems that can disagree is a debugging problem nobody wants at
+minute nine of a twelve-minute run.
+"""
+
+from __future__ import annotations
+
+from collections.abc import Awaitable, Callable
+from itertools import pairwise
+from typing import Any
+from uuid import UUID
+
+from langgraph.graph import END, START, StateGraph
+
+from contracts.primitives import StageName
+from core.storage.base import StageOutput, Store
+from orchestration.state import STAGE_STATE_KEY, GraphState
+from stages.base import StageContext
+
+__all__ = ["PipelineResult", "build_graph", "run_pipeline"]
+
+EmitFn = Callable[..., Awaitable[None]]
+
+
+class PipelineResult:
+    def __init__(self, state: dict[str, Any], executed: list[str], skipped: list[str]) -> None:
+        self.state = state
+        self.executed = executed
+        self.skipped = skipped
+
+    @property
+    def package(self) -> dict[str, Any] | None:
+        return self.state.get("package")
+
+
+def build_graph(stages: list[Any], node_factory: Callable[[Any], Any]) -> Any:
+    """Compile a linear graph over ``stages``.
+
+    ``node_factory`` wraps each stage with checkpointing and progress so the graph
+    itself stays a pure description of order.
+    """
+    graph: StateGraph = StateGraph(GraphState)
+
+    for stage in stages:
+        graph.add_node(stage.name, node_factory(stage))
+
+    graph.add_edge(START, stages[0].name)
+    for current, following in pairwise(stages):
+        graph.add_edge(current.name, following.name)
+    graph.add_edge(stages[-1].name, END)
+
+    return graph.compile()
+
+
+def _make_node(
+    stage: Any,
+    *,
+    job_id: UUID,
+    store: Store,
+    emit: EmitFn,
+    options: dict[str, Any],
+    completed: dict[str, StageOutput],
+    executed: list[str],
+    skipped: list[str],
+) -> Callable[[dict[str, Any]], Awaitable[dict[str, Any]]]:
+    key = STAGE_STATE_KEY[stage.name]
+
+    async def node(state: dict[str, Any]) -> dict[str, Any]:
+        # Resume: a completed stage is restored, never re-executed or re-billed.
+        checkpoint = completed.get(stage.name)
+        if checkpoint is not None:
+            skipped.append(stage.name)
+            await emit(
+                stage=stage.name,
+                progress=_progress_for(stage.name),
+                message="restored from checkpoint",
+            )
+            return {key: checkpoint.output[key]}
+
+        ctx = StageContext(job_id=job_id, options=options, emit=emit)
+        fragment = await stage.run(ctx, state)
+        executed.append(stage.name)
+
+        await store.put_checkpoint(
+            StageOutput(job_id=job_id, stage=stage.name, output=fragment)
+        )
+        return fragment
+
+    return node
+
+
+def _progress_for(stage: StageName) -> int:
+    from stages.base import cumulative_progress
+
+    return cumulative_progress(stage, 1.0)
+
+
+async def run_pipeline(
+    *,
+    job_id: UUID,
+    document_id: UUID,
+    options: dict[str, Any],
+    stages: list[Any],
+    store: Store,
+    emit: EmitFn,
+) -> PipelineResult:
+    """Execute the pipeline for one job, resuming from any existing checkpoints."""
+    completed = await store.get_checkpoints(job_id)
+    executed: list[str] = []
+    skipped: list[str] = []
+
+    compiled = build_graph(
+        stages,
+        lambda stage: _make_node(
+            stage,
+            job_id=job_id,
+            store=store,
+            emit=emit,
+            options=options,
+            completed=completed,
+            executed=executed,
+            skipped=skipped,
+        ),
+    )
+
+    initial: dict[str, Any] = {
+        "job_id": str(job_id),
+        "document_id": str(document_id),
+        "options": options,
+        "warnings": [],
+    }
+    final = await compiled.ainvoke(initial)
+    return PipelineResult(dict(final), executed, skipped)

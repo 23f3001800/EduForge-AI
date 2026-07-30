@@ -63,6 +63,25 @@ target-version = "py312"
 [tool.ruff.lint]
 select = ["E", "F", "I", "N", "UP", "B", "A", "C4", "SIM", "RUF"]
 
+# FastAPI's dependency injection is expressed as function calls in argument
+# defaults. That is the framework's documented idiom, not the mutable-default bug
+# B008 exists to catch, so the DI markers are declared immutable rather than
+# suppressed case by case.
+[tool.ruff.lint.flake8-bugbear]
+extend-immutable-calls = [
+    "fastapi.Depends",
+    "fastapi.Header",
+    "fastapi.File",
+    "fastapi.Form",
+    "fastapi.Query",
+    "fastapi.Path",
+    "fastapi.Body",
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Tests assert on private/internal shapes and use fixtures freely.
+"tests/**" = ["S101"]
+
 [tool.mypy]
 python_version = "3.12"
 strict = true
