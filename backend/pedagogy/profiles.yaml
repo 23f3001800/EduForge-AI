@@ -1,0 +1,108 @@
+# Pedagogy profiles — the versatility mechanism (NFR-01, docs/02 §6).
+#
+# Stage 2 classifies a document into one of these. Every stage after it reads its
+# strategy from here rather than branching on a subject name. That is the whole
+# reason a physics chapter and a poetry chapter can take structurally identical
+# paths through the pipeline without either being a second-class citizen.
+#
+# `validation.requires` is the important field: it is what stops a STEM-shaped
+# validator from failing every humanities document. A narrative profile requiring
+# formulae would destroy the criterion the assignment explicitly grades.
+
+profiles:
+
+  quantitative:
+    description: >-
+      Mathematical or scientific content built on formulae, derivations, and
+      worked problems. Physics, chemistry, mathematics, quantitative economics.
+    emphasis:
+      - Derive results step by step; never assert a formula without showing where it comes from.
+      - Anchor every abstract quantity in a measurable, physical example.
+      - State units explicitly and carry them through every calculation.
+    activity_weights:
+      problem_set: 3
+      experiment: 3
+      demonstration: 2
+      think_pair_share: 1
+      simulation: 1
+    assessment_mix: { mcq: 0.3, short_answer: 0.2, long_answer: 0.1, numerical: 0.4 }
+    validation:
+      requires: [concepts, formulae, examples]
+      expects_numerical_items: true
+
+  conceptual:
+    description: >-
+      Systems, mechanisms, and relationships where understanding matters more
+      than calculation. Biology, earth science, theory-led social science.
+    emphasis:
+      - Build a mental model first; name its parts and how they interact.
+      - Contrast each concept with the one students most often confuse it with.
+      - Use analogies, and state explicitly where each analogy breaks down.
+    activity_weights:
+      group_discussion: 3
+      demonstration: 2
+      think_pair_share: 2
+      gallery_walk: 2
+      simulation: 1
+    assessment_mix: { mcq: 0.4, short_answer: 0.35, long_answer: 0.25, numerical: 0.0 }
+    validation:
+      requires: [concepts, definitions, misconceptions]
+      expects_numerical_items: false
+
+  narrative:
+    description: >-
+      Interpretation of texts, events, and human motivation. History,
+      literature, civics, philosophy.
+    emphasis:
+      - Ground every claim in evidence from the text or the historical record.
+      - Present competing interpretations rather than a single settled answer.
+      - Attend to context, causation, and perspective over memorised dates.
+    activity_weights:
+      debate: 3
+      role_play: 3
+      group_discussion: 3
+      gallery_walk: 2
+      field_task: 1
+    assessment_mix: { mcq: 0.2, short_answer: 0.3, long_answer: 0.5, numerical: 0.0 }
+    validation:
+      # Deliberately no formulae and no numerical items. A narrative package
+      # without them is complete, not deficient.
+      requires: [concepts, examples]
+      expects_numerical_items: false
+
+  procedural:
+    description: >-
+      Skills and processes learned by doing. Laboratory technique, computing,
+      craft, applied method.
+    emphasis:
+      - Present the procedure as an ordered sequence with a checkable outcome per step.
+      - Model the whole procedure once before students attempt any part of it.
+      - Name the failure mode at each step and how to recognise it.
+    activity_weights:
+      demonstration: 3
+      experiment: 3
+      problem_set: 2
+      field_task: 2
+      simulation: 1
+    assessment_mix: { mcq: 0.25, short_answer: 0.35, long_answer: 0.2, numerical: 0.2 }
+    validation:
+      requires: [concepts, examples]
+      expects_numerical_items: false
+
+  mixed:
+    description: >-
+      Content spanning several modes, or a document whose shape is genuinely
+      ambiguous. The safe default — it asserts the least.
+    emphasis:
+      - Match the treatment to each section rather than forcing one style throughout.
+      - Balance conceptual explanation with concrete application.
+    activity_weights:
+      group_discussion: 2
+      demonstration: 2
+      problem_set: 2
+      think_pair_share: 2
+      debate: 1
+    assessment_mix: { mcq: 0.3, short_answer: 0.3, long_answer: 0.25, numerical: 0.15 }
+    validation:
+      requires: [concepts]
+      expects_numerical_items: false

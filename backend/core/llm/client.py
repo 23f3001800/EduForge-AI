@@ -1,0 +1,308 @@
+"""LLMClient — the single choke point for every model call in the system.
+
+No stage talks to a provider SDK. Everything goes through ``parse()``, which owns
+the policy that must be identical everywhere:
+
+* **Structured output** — the response is validated against the stage's Pydantic
+  model. One repair attempt feeds the validation error back; a second failure
+  yields a degraded object so one weak stage cannot discard the other nine.
+* **Retry** — exponential backoff with jitter on retryable provider errors only.
+  Jitter matters: fan-out means several calls fail at the same instant, and
+  without it they all retry at the same instant too.
+* **Budget** — a per-job token ceiling checked before each call. A runaway job
+  stops and publishes what it has rather than billing without limit.
+* **Concurrency** — one semaphore for the whole job. Rate limiting lives here,
+  not in the graph, so there is a single number to tune.
+* **Accounting** — every attempt is recorded, including failures. A retry that
+  cost tokens and produced nothing is exactly what you want visible.
+
+Owning this in one place is what makes the provider port worth having: swap
+Anthropic for Gemini and none of the above changes.
+"""
+
+from __future__ import annotations
+
+import asyncio
+import json
+import random
+import re
+import time
+from dataclasses import dataclass, field
+from typing import Any
+
+from pydantic import BaseModel, ValidationError
+
+from contracts.llm import LLMResult, LLMUsage, ModelSpec, ProviderRouting
+from contracts.primitives import StageName
+from core.llm.base import ContentRefused, LLMProviderError, ProviderAdapter
+
+__all__ = ["BudgetExhausted", "CallRecord", "LLMClient", "TokenBudget"]
+
+MAX_ATTEMPTS = 4
+BACKOFF_CAP_S = 30.0
+_FENCE = re.compile(r"^\s*```(?:json)?\s*|\s*```\s*$", re.MULTILINE)
+
+
+class BudgetExhausted(RuntimeError):
+    """The job's token ceiling was reached. Publish partial rather than continue."""
+
+
+@dataclass(slots=True)
+class TokenBudget:
+    limit: int
+    used: int = 0
+
+    def check(self, projected: int) -> None:
+        if self.used + projected > self.limit:
+            raise BudgetExhausted(
+                f"token budget exhausted: {self.used} used of {self.limit}, "
+                f"next call projected at ~{projected}"
+            )
+
+    def record(self, usage: LLMUsage) -> None:
+        self.used += usage.tokens_in + usage.tokens_out
+
+
+@dataclass(slots=True)
+class CallRecord:
+    """One attempt, successful or not. Written to `llm_calls` for observability."""
+
+    stage: str
+    provider: str
+    model: str
+    attempt: int
+    outcome: str  # ok | repaired | degraded | refused | error
+    usage: LLMUsage
+    error: str | None = None
+
+
+def _strip_fences(text: str) -> str:
+    """Models wrap JSON in code fences even when told not to. Cheaper to strip."""
+    return _FENCE.sub("", text).strip()
+
+
+def _extract_json(text: str) -> str:
+    """Best-effort isolation of the JSON body from surrounding prose."""
+    cleaned = _strip_fences(text)
+    if cleaned.startswith(("{", "[")):
+        return cleaned
+    start = min((i for i in (cleaned.find("{"), cleaned.find("[")) if i != -1), default=-1)
+    if start == -1:
+        return cleaned
+    end = max(cleaned.rfind("}"), cleaned.rfind("]"))
+    return cleaned[start : end + 1] if end > start else cleaned
+
+
+@dataclass
+class LLMClient:
+    routing: ProviderRouting
+    adapters: dict[str, ProviderAdapter]
+    budget: TokenBudget | None = None
+    concurrency: int = 4
+    calls: list[CallRecord] = field(default_factory=list)
+    _semaphore: asyncio.Semaphore | None = None
+
+    def __post_init__(self) -> None:
+        self._semaphore = asyncio.Semaphore(self.concurrency)
+
+    @property
+    def usage(self) -> LLMUsage:
+        """Aggregate across every attempt, including the ones that failed."""
+        total = LLMUsage()
+        for call in self.calls:
+            total.tokens_in += call.usage.tokens_in
+            total.tokens_out += call.usage.tokens_out
+            total.tokens_cached += call.usage.tokens_cached
+            total.cost_usd += call.usage.cost_usd
+        return total
+
+    async def parse[T: BaseModel](
+        self,
+        *,
+        stage: StageName,
+        output_model: type[T],
+        system: str,
+        user_content: str,
+        spec: ModelSpec | None = None,
+    ) -> LLMResult[T]:
+        resolved = spec or self.routing.for_stage(stage)
+        adapter = self.adapters.get(resolved.provider)
+        if adapter is None:
+            raise LLMProviderError(
+                f"no adapter registered for provider {resolved.provider!r}; "
+                f"available: {sorted(self.adapters)}"
+            )
+
+        if self.budget is not None:
+            # Rough projection from prompt size plus the output ceiling. Only has
+            # to be conservative enough to stop a runaway before it runs away.
+            self.budget.check(len(system + user_content) // 4 + resolved.max_tokens)
+
+        assert self._semaphore is not None
+        async with self._semaphore:
+            return await self._attempt_loop(
+                stage=stage,
+                adapter=adapter,
+                spec=resolved,
+                output_model=output_model,
+                system=system,
+                user_content=user_content,
+            )
+
+    async def _attempt_loop[T: BaseModel](
+        self,
+        *,
+        stage: StageName,
+        adapter: ProviderAdapter,
+        spec: ModelSpec,
+        output_model: type[T],
+        system: str,
+        user_content: str,
+    ) -> LLMResult[T]:
+        content = user_content
+        repaired = False
+        total = LLMUsage()
+        last_error: str | None = None
+
+        for attempt in range(1, MAX_ATTEMPTS + 1):
+            started = time.monotonic()
+            try:
+                raw = await adapter.complete(
+                    spec=spec,
+                    system=system,
+                    user_content=content,
+                    output_model=output_model,
+                    extra={"stage": stage},
+                )
+            except ContentRefused as exc:
+                self.calls.append(
+                    CallRecord(stage, adapter.name, spec.model, attempt, "refused",
+                               LLMUsage(), str(exc))
+                )
+                # Not retryable: the same prompt refuses again. Degrade so the
+                # remaining nine stages still produce a package.
+                return self._degraded(
+                    output_model, adapter.name, spec.model, total, attempt,
+                    [f"provider refused: {exc}"],
+                )
+            except LLMProviderError as exc:
+                last_error = str(exc)
+                self.calls.append(
+                    CallRecord(stage, adapter.name, spec.model, attempt, "error",
+                               LLMUsage(), last_error)
+                )
+                if not exc.retryable or attempt == MAX_ATTEMPTS:
+                    raise
+                await asyncio.sleep(min(2**attempt + random.random(), BACKOFF_CAP_S))
+                continue
+
+            raw.usage.latency_ms = int((time.monotonic() - started) * 1000)
+            total.tokens_in += raw.usage.tokens_in
+            total.tokens_out += raw.usage.tokens_out
+            total.tokens_cached += raw.usage.tokens_cached
+            total.cost_usd += raw.usage.cost_usd
+            if self.budget is not None:
+                self.budget.record(raw.usage)
+
+            try:
+                value = output_model.model_validate_json(_extract_json(raw.text))
+            except (ValidationError, ValueError) as exc:
+                last_error = str(exc)
+                self.calls.append(
+                    CallRecord(stage, adapter.name, raw.model, attempt, "error",
+                               raw.usage, last_error)
+                )
+                if repaired or attempt == MAX_ATTEMPTS:
+                    # One repair is the budget. A model that fails the schema twice
+                    # is not going to succeed on a third identical nudge.
+                    return self._degraded(
+                        output_model, adapter.name, raw.model, total, attempt,
+                        [f"schema validation failed: {last_error[:300]}"],
+                    )
+                repaired = True
+                content = self._repair_prompt(user_content, raw.text, last_error)
+                continue
+
+            self.calls.append(
+                CallRecord(stage, adapter.name, raw.model, attempt,
+                           "repaired" if repaired else "ok", raw.usage)
+            )
+            return LLMResult[T](
+                value=value,
+                provider=adapter.name,  # type: ignore[arg-type]
+                model=raw.model,
+                usage=total,
+                attempts=attempt,
+                repaired=repaired,
+            )
+
+        raise LLMProviderError(f"exhausted {MAX_ATTEMPTS} attempts: {last_error}")
+
+    @staticmethod
+    def _repair_prompt(original: str, bad_output: str, error: str) -> str:
+        return (
+            f"{original}\n\n"
+            "--- CORRECTION REQUIRED ---\n"
+            "Your previous response did not satisfy the required JSON schema.\n\n"
+            f"Validator error:\n{error[:1500]}\n\n"
+            f"Your previous output:\n{bad_output[:3000]}\n\n"
+            "Return only corrected JSON matching the schema exactly. "
+            "No prose, no explanation, no code fences."
+        )
+
+    @staticmethod
+    def _degraded[T: BaseModel](
+        output_model: type[T],
+        provider: str,
+        model: str,
+        usage: LLMUsage,
+        attempts: int,
+        issues: list[str],
+    ) -> LLMResult[T]:
+        """Minimal valid instance so the pipeline continues, flagged as degraded.
+
+        The flag propagates into the validation report, so a shortfall is visible
+        in the finished package rather than silently shipped as if it were fine.
+        """
+        try:
+            value = output_model.model_validate({})
+        except ValidationError:
+            value = output_model.model_construct()  # type: ignore[assignment]
+        return LLMResult[T](
+            value=value,
+            provider=provider,  # type: ignore[arg-type]
+            model=model,
+            usage=usage,
+            attempts=attempts,
+            degraded=True,
+            issues=issues,
+        )
+
+
+def build_adapters(
+    *, anthropic_key: str | None, gemini_key: str | None
+) -> dict[str, ProviderAdapter]:
+    """Register only the providers whose credentials are present.
+
+    A missing key means the adapter is absent, so selecting that provider fails
+    with a clear message at call time instead of a cryptic auth error later.
+    """
+    from core.llm.providers.replay_provider import ReplayAdapter
+
+    adapters: dict[str, ProviderAdapter] = {"replay": ReplayAdapter()}
+
+    if anthropic_key:
+        from core.llm.providers.anthropic_provider import AnthropicAdapter
+
+        adapters["anthropic"] = AnthropicAdapter(anthropic_key)
+
+    if gemini_key:
+        from core.llm.providers.gemini_provider import GeminiAdapter
+
+        adapters["gemini"] = GeminiAdapter(gemini_key)
+
+    return adapters
+
+
+def dumps(value: Any) -> str:
+    return json.dumps(value, ensure_ascii=False)
