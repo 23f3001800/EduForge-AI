@@ -180,27 +180,97 @@ def test_repair_summary_is_human_readable() -> None:
 # ───────────────────────────────────────────────────────── merge behaviour
 
 
+def _core(chunk: str) -> object:
+    from stages.s3_knowledge.schemas import CoreKnowledge
+
+    return CoreKnowledge.model_validate(
+        {
+            "concepts": [
+                {
+                    "concept_id": "c1",
+                    "name": "Inertia",
+                    "summary": "Resistance to change in motion.",
+                    "importance": "core",
+                    "evidence": [{"chunk_id": chunk, "quote": "a quote long enough"}],
+                }
+            ]
+        }
+    )
+
+
 def test_merging_sections_unions_evidence_rather_than_replacing_it() -> None:
     """A concept found in two sections is better supported, not duplicated."""
-    from contracts.knowledge import KnowledgeBase
-    from stages.s3_knowledge.stage import _merge_bases
+    from stages.s3_knowledge.stage import _merge_cores
 
-    def base(chunk: str) -> KnowledgeBase:
-        return KnowledgeBase.model_validate(
-            {
-                "concepts": [
-                    {
-                        "concept_id": "c1",
-                        "name": "Inertia",
-                        "summary": "Resistance to change in motion.",
-                        "importance": "core",
-                        "evidence": [{"chunk_id": chunk, "quote": "a quote long enough"}],
-                    }
-                ],
-                "concept_graph": {"node_ids": ["c1"], "edges": []},
-            }
-        )
+    merged = _merge_cores([_core("c_0001"), _core("c_0002")])  # type: ignore[arg-type]
+    assert len(merged.concepts) == 1
+    assert len(merged.concepts[0].evidence) == 2
 
-    merged = _merge_bases([base("c_0001"), base("c_0002")])
+
+# ──────────────────────────────────────────────────── split extraction
+
+
+def test_the_two_halves_recombine_into_one_knowledge_base() -> None:
+    """The split must be invisible downstream — stage output shape is unchanged."""
+    from stages.s3_knowledge.schemas import PedagogicalKnowledge, merge_pair
+
+    pedagogy = PedagogicalKnowledge.model_validate(
+        {
+            "learning_objectives": [
+                {
+                    "objective_id": "o1",
+                    "statement": "Explain why a moving body keeps moving.",
+                    "bloom_level": "understand",
+                    "concept_ids": ["c1"],
+                }
+            ],
+            "concept_edges": [
+                {"from_id": "c1", "to_id": "c1", "relation": "requires", "confidence": 1.7}
+            ],
+        }
+    )
+    merged = merge_pair(_core("c_0001"), pedagogy)  # type: ignore[arg-type]
+
+    assert [c["concept_id"] for c in merged["concepts"]] == ["c1"]
+    assert len(merged["learning_objectives"]) == 1
+    assert merged["concept_graph"]["node_ids"] == ["c1"]
+
+
+def test_an_invented_relation_name_does_not_discard_the_edge() -> None:
+    """Models reach for `requires`/`depends_on`. Losing a real dependency over a
+    vocabulary slip is worse than coercing it to the ordering relation."""
+    from stages.s3_knowledge.schemas import ConceptEdgeDraft
+
+    edge = ConceptEdgeDraft.model_validate(
+        {"from_id": "a", "to_id": "b", "relation": "depends_on", "confidence": 1.4}
+    )
+    assert edge.relation == "prerequisite_of"
+    assert edge.confidence == 1.0  # clamped, not rejected
+
+
+def test_a_degraded_half_does_not_discard_the_other() -> None:
+    """The whole reason for splitting: one weak call costs half, not everything."""
+    from stages.s3_knowledge.schemas import CoreKnowledge, PedagogicalKnowledge, merge_pair
+
+    merged = merge_pair(_core("c_0001"), PedagogicalKnowledge())  # type: ignore[arg-type]
     assert len(merged["concepts"]) == 1
-    assert len(merged["concepts"][0]["evidence"]) == 2
+    assert merged["learning_objectives"] == []
+
+    merged = merge_pair(
+        CoreKnowledge(),
+        PedagogicalKnowledge.model_validate(
+            {
+                "misconceptions": [
+                    {
+                        "misconception_id": "m1",
+                        "statement": "Motion needs a force.",
+                        "why_it_happens": "Friction hides the ideal case.",
+                        "correction": "Uniform motion needs no net force.",
+                        "evidence": [{"chunk_id": "c_0001", "quote": "a quote long enough"}],
+                    }
+                ]
+            }
+        ),
+    )
+    assert merged["concepts"] == []
+    assert len(merged["misconceptions"]) == 1
