@@ -158,9 +158,7 @@ class DocumentIntelligenceStage:
                 max_pages=self._max_pages,
                 timeout_s=self._timeout_s,
             )
-            await span.progress(
-                0.8, message=f"{len(document.blocks)} blocks, {len(chunks)} chunks"
-            )
+            await span.progress(0.8, message=f"{len(document.blocks)} blocks, {len(chunks)} chunks")
             if document.stats.equations:
                 span.warn(f"{document.stats.equations} equations detected")
             return {

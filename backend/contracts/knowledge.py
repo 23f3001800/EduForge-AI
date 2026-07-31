@@ -163,10 +163,7 @@ class ConceptGraph(StrictModel):
     def _edges_resolve_and_prereqs_are_acyclic(self) -> ConceptGraph:
         nodes = set(self.node_ids)
         dangling = {
-            e_id
-            for edge in self.edges
-            for e_id in (edge.from_id, edge.to_id)
-            if e_id not in nodes
+            e_id for edge in self.edges for e_id in (edge.from_id, edge.to_id) if e_id not in nodes
         }
         if dangling:
             raise ValueError(f"edges reference unknown concept ids: {sorted(dangling)[:5]}")

@@ -295,8 +295,7 @@ def knowledge_base() -> KnowledgeBase:
                 statement="A moving object must have a force acting on it to keep moving.",
                 why_it_happens="Everyday motion always involves friction, hiding the ideal case.",
                 correction=(
-                    "Uniform motion needs no net force; friction is "
-                    "what requires opposing it."
+                    "Uniform motion needs no net force; friction is what requires opposing it."
                 ),
                 concept_ids=["concept_inertia"],
                 evidence=_ev("c_001", "unless acted upon by an external unbalanced force"),
@@ -461,8 +460,7 @@ def _period_content(period_no: int, title: str, activity_ref: str) -> PeriodCont
             CheckpointQuestion(
                 question="A book rests on a table. Is a force acting on it?",
                 expected_answer=(
-                    "Yes — gravity and the normal force, which balance to "
-                    "zero net force."
+                    "Yes — gravity and the normal force, which balance to zero net force."
                 ),
                 bloom_level="understand",
                 concept_ids=["concept_inertia"],
@@ -582,8 +580,7 @@ def learning_gaps() -> list[LearningGap]:
                 RemediationStep(
                     action="Contrast a low-friction and a high-friction surface side by side.",
                     rationale=(
-                        "Isolates friction as the cause of stopping, "
-                        "not the absence of force."
+                        "Isolates friction as the cause of stopping, not the absence of force."
                     ),
                     estimated_minutes=10,
                 )

@@ -77,7 +77,9 @@ def build() -> dict[Path, str]:
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--check", action="store_true", help="Fail if generated output differs from disk."
+        "--check",
+        action="store_true",
+        help="Fail if generated output differs from disk.",
     )
     args = parser.parse_args()
 
@@ -106,7 +108,9 @@ def main() -> int:
         return 1
 
     verb = "would update" if args.check else "wrote"
-    print(f"{verb} {len(drifted) if drifted else 0} of {len(generated)} generated files")
+    print(
+        f"{verb} {len(drifted) if drifted else 0} of {len(generated)} generated files"
+    )
     return 0
 
 

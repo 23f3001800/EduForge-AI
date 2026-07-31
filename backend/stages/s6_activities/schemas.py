@@ -15,29 +15,11 @@ field a model drops first when it is running out of output budget.
 
 from __future__ import annotations
 
-from typing import Any
+from pydantic import Field
 
-from pydantic import Field, model_validator
+from stages.base import Draft
 
-from contracts.primitives import StrictModel
-
-__all__ = ["ActivityDraft", "Draft"]
-
-
-class Draft(StrictModel):
-    """Base for model-facing draft types: lenient in, strict out.
-
-    Unknown keys are dropped rather than rejected — models echo the ids and types
-    they were shown, and losing a whole activity to a courtesy key is a bad trade.
-    Everything survives to be re-validated against ``contracts.content.Activity``.
-    """
-
-    @model_validator(mode="before")
-    @classmethod
-    def _drop_unknown_keys(cls, value: Any) -> Any:
-        if isinstance(value, dict):
-            return {key: item for key, item in value.items() if key in cls.model_fields}
-        return value
+__all__ = ["ActivityDraft"]
 
 
 class ActivityDraft(Draft):

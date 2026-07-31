@@ -65,9 +65,7 @@ class EvidenceAudit:
 
     @property
     def dropped(self) -> int:
-        return (
-            self.dropped_no_evidence + self.dropped_unknown_chunk + self.dropped_quote_absent
-        )
+        return self.dropped_no_evidence + self.dropped_unknown_chunk + self.dropped_quote_absent
 
     def summary(self) -> str:
         return (

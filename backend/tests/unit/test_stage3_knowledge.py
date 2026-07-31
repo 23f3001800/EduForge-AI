@@ -103,7 +103,7 @@ def test_audit_reports_what_it_removed() -> None:
 
 
 def test_normalisation_folds_smart_punctuation() -> None:
-    assert normalise("The teacher's “note” — here") == normalise("The teacher's \"note\" - here")
+    assert normalise("The teacher's “note” — here") == normalise('The teacher\'s "note" - here')
 
 
 # ───────────────────────────────────────────────────── concept graph repair
@@ -121,9 +121,7 @@ def test_an_acyclic_graph_passes_through_unchanged() -> None:
 
 def test_a_two_node_cycle_is_broken_at_the_weakest_edge() -> None:
     """Models emit these constantly — both directions are defensible sentences."""
-    graph, repair = build_concept_graph(
-        ["a", "b"], [_edge("a", "b", 0.9), _edge("b", "a", 0.4)]
-    )
+    graph, repair = build_concept_graph(["a", "b"], [_edge("a", "b", 0.9), _edge("b", "a", 0.4)])
     assert len(graph["edges"]) == 1
     assert graph["edges"][0]["from_id"] == "a"
     assert repair.dropped_edges == [("b", "a")]

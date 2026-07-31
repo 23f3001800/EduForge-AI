@@ -31,8 +31,10 @@ EVAL_PROFILE = "production"
 def _merge(default: dict[str, Any], override: dict[str, Any]) -> dict[str, Any]:
     merged = dict(default)
     for key, value in override.items():
-        if key == "reasoning" and isinstance(value, dict) and isinstance(
-            merged.get("reasoning"), dict
+        if (
+            key == "reasoning"
+            and isinstance(value, dict)
+            and isinstance(merged.get("reasoning"), dict)
         ):
             merged["reasoning"] = {**merged["reasoning"], **value}
         else:
@@ -61,9 +63,7 @@ def load_routing(path: Path, profile: str) -> ProviderRouting:
 
     if profile not in profiles:
         available = ", ".join(sorted(profiles)) or "<none>"
-        raise ValueError(
-            f"LLM profile {profile!r} not found in {path}. Available: {available}"
-        )
+        raise ValueError(f"LLM profile {profile!r} not found in {path}. Available: {available}")
 
     block = profiles[profile]
     default_raw = block.get("default")

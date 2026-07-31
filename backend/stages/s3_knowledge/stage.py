@@ -188,9 +188,10 @@ class KnowledgeExtractionStage:
         """Call 2 — what a teacher does with it. Needs call 1's concept ids."""
         await span.progress(0.45, message="extracting objectives and misconceptions")
 
-        inventory = "\n".join(
-            f"- {c.concept_id}: {c.name} — {c.summary[:110]}" for c in core.concepts
-        ) or "- (no concepts were extracted; infer them from the document)"
+        inventory = (
+            "\n".join(f"- {c.concept_id}: {c.name} — {c.summary[:110]}" for c in core.concepts)
+            or "- (no concepts were extracted; infer them from the document)"
+        )
 
         result = await self._llm.parse(
             stage=self.name,

@@ -263,20 +263,26 @@ class LLMClient:
                 )
             except ContentRefused as exc:
                 self.calls.append(
-                    CallRecord(stage, adapter.name, spec.model, attempt, "refused",
-                               LLMUsage(), str(exc))
+                    CallRecord(
+                        stage, adapter.name, spec.model, attempt, "refused", LLMUsage(), str(exc)
+                    )
                 )
                 # Not retryable: the same prompt refuses again. Degrade so the
                 # remaining nine stages still produce a package.
                 return self._degraded(
-                    output_model, adapter.name, spec.model, total, attempt,
+                    output_model,
+                    adapter.name,
+                    spec.model,
+                    total,
+                    attempt,
                     [f"provider refused: {exc}"],
                 )
             except LLMProviderError as exc:
                 last_error = str(exc)
                 self.calls.append(
-                    CallRecord(stage, adapter.name, spec.model, attempt, "error",
-                               LLMUsage(), last_error)
+                    CallRecord(
+                        stage, adapter.name, spec.model, attempt, "error", LLMUsage(), last_error
+                    )
                 )
                 if not exc.retryable or attempt == MAX_ATTEMPTS:
                     raise
@@ -308,14 +314,19 @@ class LLMClient:
             except (ValidationError, ValueError) as exc:
                 last_error = str(exc)
                 self.calls.append(
-                    CallRecord(stage, adapter.name, raw.model, attempt, "error",
-                               raw.usage, last_error)
+                    CallRecord(
+                        stage, adapter.name, raw.model, attempt, "error", raw.usage, last_error
+                    )
                 )
                 if repaired or attempt == MAX_ATTEMPTS:
                     # One repair is the budget. A model that fails the schema twice
                     # is not going to succeed on a third identical nudge.
                     return self._degraded(
-                        output_model, adapter.name, raw.model, total, attempt,
+                        output_model,
+                        adapter.name,
+                        raw.model,
+                        total,
+                        attempt,
                         [f"schema validation failed: {last_error[:300]}"],
                     )
                 repaired = True
@@ -323,8 +334,14 @@ class LLMClient:
                 continue
 
             self.calls.append(
-                CallRecord(stage, adapter.name, raw.model, attempt,
-                           "repaired" if repaired else "ok", raw.usage)
+                CallRecord(
+                    stage,
+                    adapter.name,
+                    raw.model,
+                    attempt,
+                    "repaired" if repaired else "ok",
+                    raw.usage,
+                )
             )
             return LLMResult[T](
                 value=value,

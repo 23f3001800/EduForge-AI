@@ -260,9 +260,7 @@ def parse_pptx(payload: bytes, *, max_pages: int = 300, **_: Any) -> list[Block]
                 if shape is title:
                     continue
                 if getattr(shape, "has_table", False):
-                    rows = [
-                        [cell.text.strip() for cell in row.cells] for row in shape.table.rows
-                    ]
+                    rows = [[cell.text.strip() for cell in row.cells] for row in shape.table.rows]
                     _add_table(builder, rows, page=index)
                     continue
                 if not getattr(shape, "has_text_frame", False):

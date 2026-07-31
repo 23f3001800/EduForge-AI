@@ -54,9 +54,7 @@ class ProfileStrategy:
         the correct output, not a gap to be filled.
         """
         counts = {
-            kind: round(total * share)
-            for kind, share in self.assessment_mix.items()
-            if share > 0
+            kind: round(total * share) for kind, share in self.assessment_mix.items() if share > 0
         }
         return {k: v for k, v in counts.items() if v > 0}
 

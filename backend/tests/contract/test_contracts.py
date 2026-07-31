@@ -148,13 +148,16 @@ def test_period_count_is_bounded_not_fixed_at_five() -> None:
 
 
 def test_mcq_must_have_exactly_one_correct_option() -> None:
-    opts = [
-        c.MCQOption(label=lbl, text="t", is_correct=lbl in ("A", "B")) for lbl in "ABCD"
-    ]
+    opts = [c.MCQOption(label=lbl, text="t", is_correct=lbl in ("A", "B")) for lbl in "ABCD"]
     with pytest.raises(ValidationError, match="exactly one correct"):
         c.AssessmentItem(
-            item_id="i1", kind="mcq", stem="s", options=opts,
-            answer="A", marks=1, bloom_level="apply",
+            item_id="i1",
+            kind="mcq",
+            stem="s",
+            options=opts,
+            answer="A",
+            marks=1,
+            bloom_level="apply",
         )
 
 
@@ -162,8 +165,13 @@ def test_mcq_must_have_exactly_four_options() -> None:
     opts = [c.MCQOption(label=lbl, text="t", is_correct=lbl == "A") for lbl in "ABC"]
     with pytest.raises(ValidationError, match="exactly 4 options"):
         c.AssessmentItem(
-            item_id="i1", kind="mcq", stem="s", options=opts,
-            answer="A", marks=1, bloom_level="apply",
+            item_id="i1",
+            kind="mcq",
+            stem="s",
+            options=opts,
+            answer="A",
+            marks=1,
+            bloom_level="apply",
         )
 
 
@@ -171,8 +179,12 @@ def test_non_mcq_items_require_a_rubric() -> None:
     """Without one the item cannot be marked consistently, so the bank is decorative."""
     with pytest.raises(ValidationError, match="requires a rubric"):
         c.AssessmentItem(
-            item_id="i1", kind="long_answer", stem="Discuss.",
-            answer="a", marks=5, bloom_level="evaluate",
+            item_id="i1",
+            kind="long_answer",
+            stem="Discuss.",
+            answer="a",
+            marks=5,
+            bloom_level="evaluate",
         )
 
 
@@ -249,8 +261,11 @@ def test_schema_failure_cannot_be_a_pass() -> None:
 def test_every_issue_names_the_stage_that_must_regenerate() -> None:
     """The field that turns validation from a report into a repair loop."""
     issue = c.ValidationIssue(
-        code="COVERAGE_CONCEPT_UNTAUGHT", severity="error",
-        message="m", path="/knowledge/concepts/0", stage="knowledge-extraction",
+        code="COVERAGE_CONCEPT_UNTAUGHT",
+        severity="error",
+        message="m",
+        path="/knowledge/concepts/0",
+        stage="knowledge-extraction",
     )
     assert issue.stage in c.STAGE_NAMES
 
@@ -267,8 +282,10 @@ def test_a_narrative_package_needs_no_formulae() -> None:
     kb = c.KnowledgeBase(
         concepts=[
             c.Concept(
-                concept_id="concept_partition", name="Partition of Bengal",
-                summary="The 1905 division of the province.", importance="core",
+                concept_id="concept_partition",
+                name="Partition of Bengal",
+                summary="The 1905 division of the province.",
+                importance="core",
                 evidence=[c.Evidence(chunk_id="c_001", quote="Bengal was divided in 1905.")],
             )
         ],
@@ -285,18 +302,30 @@ def test_low_confidence_fields_are_derived_not_trusted() -> None:
     repair attempt every time it slipped, which happened on real runs.
     """
     classification = c.Classification(
-        subject="Physics", grade_band="9", difficulty="intermediate", topic="t",
-        category="textbook_chapter", language="en", pedagogy_profile="quantitative",
-        confidences={"subject": 0.2, "topic": 0.9}, low_confidence_fields=[],
+        subject="Physics",
+        grade_band="9",
+        difficulty="intermediate",
+        topic="t",
+        category="textbook_chapter",
+        language="en",
+        pedagogy_profile="quantitative",
+        confidences={"subject": 0.2, "topic": 0.9},
+        low_confidence_fields=[],
     )
     assert classification.low_confidence_fields == ["subject"]
 
 
 def test_a_wrong_low_confidence_list_is_corrected() -> None:
     classification = c.Classification(
-        subject="Physics", grade_band="9", difficulty="intermediate", topic="t",
-        category="textbook_chapter", language="en", pedagogy_profile="quantitative",
-        confidences={"subject": 0.9}, low_confidence_fields=["subject", "topic"],
+        subject="Physics",
+        grade_band="9",
+        difficulty="intermediate",
+        topic="t",
+        category="textbook_chapter",
+        language="en",
+        pedagogy_profile="quantitative",
+        confidences={"subject": 0.9},
+        low_confidence_fields=["subject", "topic"],
     )
     assert classification.low_confidence_fields == []
 
@@ -328,7 +357,9 @@ def test_progress_is_bounded(bad: int) -> None:
 def test_succeeded_job_must_expose_a_package() -> None:
     with pytest.raises(ValidationError, match="requires a package_id"):
         c.JobSnapshot(
-            job_id=uuid4(), document_id=uuid4(), status="succeeded",
+            job_id=uuid4(),
+            document_id=uuid4(),
+            status="succeeded",
             created_at=datetime.now(UTC),
         )
 
@@ -345,14 +376,22 @@ def test_tables_survive_as_structure_not_prose() -> None:
 def test_heading_blocks_must_declare_depth() -> None:
     with pytest.raises(ValidationError, match="must carry `level`"):
         c.Block(
-            block_id="b1", type="heading", text="T", char_start=0, char_end=1,
+            block_id="b1",
+            type="heading",
+            text="T",
+            char_start=0,
+            char_end=1,
         )
 
 
 def test_table_payload_only_on_table_blocks() -> None:
     with pytest.raises(ValidationError, match="only valid on a block of type"):
         c.Block(
-            block_id="b1", type="paragraph", text="T", char_start=0, char_end=1,
+            block_id="b1",
+            type="paragraph",
+            text="T",
+            char_start=0,
+            char_end=1,
             table=c.TableData(headers=["a"], rows=[["1"]]),
         )
 
@@ -373,8 +412,13 @@ def test_contracts_import_nothing_else_in_the_project() -> None:
 def test_provider_routing_falls_back_to_default() -> None:
     routing = c.ProviderRouting(
         default=c.ModelSpec(provider="anthropic", model="claude-opus-5"),
-        stages={"validation": c.ModelSpec(provider="anthropic", model="claude-opus-5",
-                                          reasoning=c.ReasoningConfig(effort="low"))},
+        stages={
+            "validation": c.ModelSpec(
+                provider="anthropic",
+                model="claude-opus-5",
+                reasoning=c.ReasoningConfig(effort="low"),
+            )
+        },
     )
     assert routing.for_stage("validation").reasoning is not None
     assert routing.for_stage("knowledge-extraction").model == "claude-opus-5"

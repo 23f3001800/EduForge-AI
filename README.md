@@ -17,20 +17,27 @@ clarifications in [`FAQ.md`](FAQ.md) folded into the design.
 
 | Stage | Status |
 |---|---|
-| 1 · Document Intelligence | ✅ real — PDF/DOCX/PPTX/TXT, structure-preserving |
-| 2 · Educational Classification | ✅ real — verified live |
-| 3 · Knowledge Extraction | ✅ real — verified live, evidence-verified |
-| 4–8 · Planning → Gap Analysis | 🟡 code written, not yet wired into the graph |
-| 9 · Validation | 🟡 code written, not yet wired |
+| 1 · Document Intelligence | ✅ wired — PDF/DOCX/PPTX/TXT, structure-preserving |
+| 2 · Educational Classification | ✅ wired — verified live |
+| 3 · Knowledge Extraction | ✅ wired — verified live, evidence-verified |
+| 4 · Teaching Planner | ✅ wired — period count derived, not fixed |
+| 5 · Classroom Content | ✅ wired — per-period fan-out |
+| 6 · Activity Generation | ✅ wired — profile-weighted activity mix |
+| 7 · Assessment Generation | ✅ wired — blueprint-first, rubrics enforced |
+| 8 · Gap Analysis | ✅ wired — severity from the concept graph |
+| 9 · Validation | 🟡 rules written, not yet wired |
 | 10 · Publishing | 🟡 fonts only (multilingual PDF rendering not written) |
 | Orchestration, worker, SSE API | ✅ real, end-to-end |
 | Frontend | 🟡 scaffold + API/SSE client |
 | Deployment | ⛔ not yet |
 
-Stages not yet wired run as **stubs returning reference fixtures**, so the
-pipeline walks end to end today and each stage is swapped in independently.
+Stages 9 and 10 still run as **stubs returning reference fixtures**, so the
+pipeline walks end to end today and each remaining stage is swapped in
+independently. The roster lives in one place — [`orchestration/pipeline.py`](backend/orchestration/pipeline.py)
+— and `REMAINING_STUBS` there is what the tests assert against, so a stub cannot
+quietly survive its milestone.
 
-`make check` — **167 tests, lint clean, schema drift clean.**
+`make check` — **201 tests, lint clean, schema drift clean, 3/3 boundary contracts kept.**
 
 ---
 
@@ -203,12 +210,44 @@ never a fixed 5. Absent content is correct content: a history chapter yields
 **zero formulae and zero numerical questions**, and the validator is
 profile-conditioned so it passes rather than flagging a gap.
 
+The same mechanism runs through generation. Every stage that produces classroom
+material splits into a **deterministic half that decides structure** and a model
+call that writes prose:
+
+| Stage | Decided in Python | Written by the model |
+|---|---|---|
+| 6 · Activities | how many, what type, how long, which concepts | the activity itself |
+| 7 · Assessments | item count, kinds, Bloom levels, marks, coverage | stems, distractors, answers, rubrics |
+| 8 · Gaps | which gaps exist, and their severity | the misconception, diagnostic, remediation |
+
+So a narrative profile weights `numerical` at zero and **no numerical item is
+ever requested** — zero numerical questions on a poetry chapter is the designed
+outcome, not a prompt that happened to behave. Assessment `total_marks` is exact
+by construction, and gap severity comes from transitive downstream load in the
+concept DAG rather than from a model asked to rate its own output (it answers
+"medium" almost every time).
+
+Two policies differ deliberately from the rest of the pipeline, both in stage 7:
+an item whose **answer key** came back empty is *dropped, never repaired* — a
+plausible invented answer key is worse than a shorter bank, because a teacher
+marks thirty scripts against it. And an MCQ that returns fewer than four distinct
+options is **reissued as a short answer** rather than discarded, since the
+question is usually sound and only the distractors failed.
+
 Verified live on the free tier:
 
 | Document | Subject | Profile | Concepts | Formulae | Misconceptions |
 |---|---|---|---|---|---|
 | `physics.pdf` | Physics | quantitative | 3 | 1 | 2 |
 | `history.docx` | History | narrative | 6 | **0** | 2 |
+
+To reproduce against a live provider — this makes real calls and is not part of
+`make check`:
+
+```bash
+./.venv/bin/python scripts/smoke_pipeline.py --doc physics
+./.venv/bin/python scripts/smoke_pipeline.py --doc history
+```
 
 ---
 
@@ -220,7 +259,7 @@ backend/
   core/           LLM client & providers, storage, progress, config
   stages/         s1…s10, one package each — never import one another
   pedagogy/       profile registry: prompt emphasis, activity weights, validation rules
-  orchestration/  LangGraph topology, state, checkpointing
+  orchestration/  LangGraph topology, state, checkpointing, the stage roster
   worker/         job execution and resume
   api/            FastAPI routes incl. resumable SSE
   tests/          contract · unit · integration, with real document fixtures
@@ -256,10 +295,12 @@ Tests worth knowing about:
 
 ## Known limitations
 
-- **Stages 4–10 are not wired in yet.** Written but running as stubs.
+- **Stages 9 and 10 are not wired in yet.** The validation rules are written;
+  publishing is fonts only. Both run as stubs.
 - **Not deployed.** The mandatory live URL is outstanding.
 - Storage is in-memory; the Postgres implementation sits behind the same
-  interface and is not written yet.
+  interface and is not written yet. Uploaded bytes live in the same in-memory
+  store, so a restart loses documents and any job retry that depended on them.
 - Scanned PDFs are rejected with a clear error rather than OCR'd.
 - Quality is bounded by free-tier models. Per-stage routing in
   `config/models.yaml` is the single place to upgrade.
