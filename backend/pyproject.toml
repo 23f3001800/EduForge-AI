@@ -88,6 +88,9 @@ extend-immutable-calls = [
 # The en-dash in _LIST_MARKERS is a real bullet character found in real documents,
 # not a mistyped hyphen — replacing it would stop detecting those list items.
 "stages/s1_document_intelligence/parsers.py" = ["RUF001"]
+# The smart-quote and dash mappings ARE the data: this table exists to fold
+# those exact characters, which PDF extraction produces constantly.
+"stages/s3_knowledge/grounding.py" = ["RUF001"]
 # N818 wants an Error suffix. These are domain rejections and read better without
 # one at the raise site (`raise DocumentTooLarge(...)`), and "ParseFailureError"
 # is strictly worse than "ParseFailure". All inherit IngestionError, so the
