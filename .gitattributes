@@ -1,0 +1,21 @@
+# This repo is developed from Windows against a Linux venv in WSL and ships in a
+# Linux container. Without this, a file written by a Windows-side tool comes back
+# CRLF and shows up as a whole-file diff with no content change — which is how
+# frontend/src/fixtures/teacher_knowledge_package.json once turned into a
+# 722-line diff that changed nothing.
+#
+# scripts/generate_schema.py cannot catch this on its own: it compares with
+# read_text(), which translates CRLF to LF on read, so a CRLF-on-disk generated
+# artifact reads back as identical and is never reported as drift.
+
+* text=auto eol=lf
+
+*.png  binary
+*.jpg  binary
+*.pdf  binary
+*.ttf  binary
+*.otf  binary
+*.woff binary
+*.woff2 binary
+*.docx binary
+*.pptx binary
