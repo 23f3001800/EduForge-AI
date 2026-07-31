@@ -409,10 +409,68 @@ def test_every_configured_profile_resolves_every_stage() -> None:
             assert routing.for_stage(stage).model
 
 
-def test_production_profile_uses_anthropic_and_dev_does_not() -> None:
+def test_each_profile_targets_its_intended_provider() -> None:
     """The graded output path and the cheap iteration path must not be confused."""
-    production = load_routing(REPO / "config" / "models.yaml", "production")
-    dev = load_routing(REPO / "config" / "models.yaml", "dev")
-    assert production.for_stage("knowledge-extraction").provider == "anthropic"
-    assert dev.for_stage("knowledge-extraction").provider == "gemini"
-    assert load_routing(REPO / "config" / "models.yaml", "ci").default.provider == "replay"
+    config = REPO / "config" / "models.yaml"
+    assert load_routing(config, "production").for_stage("knowledge-extraction").provider == "aipipe"
+    assert load_routing(config, "dev").for_stage("knowledge-extraction").provider == "gemini"
+    assert load_routing(config, "ci").default.provider == "replay"
+
+
+def test_no_default_profile_routes_to_anthropic() -> None:
+    """Anthropic is opt-in only. It must not be reachable by picking a profile."""
+    config = REPO / "config" / "models.yaml"
+    from contracts.primitives import STAGE_NAMES
+
+    for profile in ("production", "dev", "ci"):
+        routing = load_routing(config, profile)
+        providers = {routing.for_stage(stage).provider for stage in STAGE_NAMES}
+        assert "anthropic" not in providers, f"{profile} routes to anthropic"
+
+
+# ─────────────────────────────────────────────────── provider permissioning
+
+
+def test_anthropic_is_not_callable_merely_because_a_key_exists() -> None:
+    """An explicit instruction encoded as a test.
+
+    A credential sitting in the environment must not be sufficient to bill
+    against it. Enabling that provider has to be a deliberate act, not a side
+    effect of a config typo or a copied .env.
+    """
+    from core.llm.client import build_adapters
+
+    adapters = build_adapters(anthropic_key="sk-ant-looks-real", aipipe_key="tok")
+    assert "anthropic" not in adapters
+    assert "aipipe" in adapters
+
+
+def test_anthropic_becomes_callable_only_on_explicit_opt_in() -> None:
+    from core.llm.client import build_adapters
+
+    adapters = build_adapters(anthropic_key="sk-ant-looks-real", allow_anthropic=True)
+    assert "anthropic" in adapters
+
+
+def test_a_provider_without_credentials_is_absent_rather_than_broken() -> None:
+    """Naming it then fails with a clear message instead of a cryptic auth error."""
+    from core.llm.client import build_adapters
+
+    adapters = build_adapters()
+    assert sorted(adapters) == ["replay"]
+
+
+def test_production_profile_routes_to_aipipe_not_anthropic() -> None:
+    routing = load_routing(REPO / "config" / "models.yaml", "production")
+    providers = {routing.for_stage(s).provider for s in ("knowledge-extraction", "validation")}
+    assert providers == {"aipipe"}
+
+
+def test_aipipe_schema_rewrite_satisfies_openai_strict_mode() -> None:
+    """Strict mode requires every property to appear in the schema's `required`
+    list; Pydantic omits optional ones, which strict mode rejects outright."""
+    from core.llm.providers.aipipe_provider import _strip_unsupported
+
+    cleaned = _strip_unsupported(Classification.model_json_schema())
+    assert set(cleaned["required"]) == set(cleaned["properties"])
+    assert cleaned["additionalProperties"] is False
