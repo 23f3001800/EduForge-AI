@@ -22,11 +22,20 @@ __all__ = ["ContentRefused", "LLMProviderError", "ProviderAdapter", "RawCompleti
 
 
 class LLMProviderError(RuntimeError):
-    """A provider call failed. ``retryable`` decides whether backoff applies."""
+    """A provider call failed.
 
-    def __init__(self, message: str, *, retryable: bool = False) -> None:
+    ``retryable`` decides whether backoff applies. ``retry_after`` carries the
+    provider's own stated delay when it gives one — a rate limiter knows exactly
+    when its window reopens, and guessing with exponential backoff either wastes
+    time or retries too early and burns another attempt.
+    """
+
+    def __init__(
+        self, message: str, *, retryable: bool = False, retry_after: float | None = None
+    ) -> None:
         super().__init__(message)
         self.retryable = retryable
+        self.retry_after = retry_after
 
 
 class ContentRefused(LLMProviderError):
