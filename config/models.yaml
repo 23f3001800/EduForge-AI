@@ -42,6 +42,11 @@ profiles:
     # Cheap plumbing iteration. Expect noticeably weaker pedagogical output —
     # that is fine here, because this profile is for verifying that stages wire
     # together, not for judging content quality.
+    #
+    # Flash everywhere on purpose. gemini-2.5-pro reports `limit: 0` on the free
+    # tier — it is not throttled, it is unavailable — so routing the heavy stages
+    # to it fails outright rather than running slowly. If you are on a paid tier,
+    # promoting knowledge-extraction and lesson-generation to pro is worthwhile.
     default:
       provider: gemini
       model: gemini-2.5-flash
@@ -49,9 +54,9 @@ profiles:
       reasoning: { effort: medium }
       cache_prefix: true
     stages:
-      knowledge-extraction: { model: gemini-2.5-pro, reasoning: { effort: high } }
-      teaching-planner:     { model: gemini-2.5-pro, reasoning: { effort: high } }
-      lesson-generation:    { model: gemini-2.5-pro, reasoning: { effort: high } }
+      knowledge-extraction: { reasoning: { effort: high } }
+      teaching-planner:     { reasoning: { effort: high } }
+      lesson-generation:    { reasoning: { effort: high } }
       validation:           { max_tokens: 4000, reasoning: { effort: low } }
 
   ci:
