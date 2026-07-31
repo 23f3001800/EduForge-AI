@@ -13,9 +13,13 @@ is the usual way a multi-provider layer quietly costs more than it saves.
 
 Provider selection policy (docs/02 ADR #11):
 
-* ``anthropic`` — production and the deployed demo. The graded output path.
+* ``aipipe``    — production and the deployed demo. An OpenAI-compatible proxy
+  fronting OpenRouter, so one credential reaches many models.
 * ``gemini``    — local development and manual pipeline runs. Cheap iteration.
 * ``replay``    — CI. Serves recorded cassettes: deterministic, free, offline.
+* ``anthropic`` — implemented but **disabled by default**. Calling it requires
+  ``ALLOW_ANTHROPIC=true``, because billing against that key is an explicit
+  decision rather than something a config typo should be able to trigger.
 
 Quality evaluation (M11) is pinned to the production provider. Tuning prompts
 against one model and shipping another means the eval numbers do not transfer.
@@ -39,7 +43,7 @@ __all__ = [
     "ReasoningConfig",
 ]
 
-LLMProvider = Literal["anthropic", "gemini", "replay"]
+LLMProvider = Literal["aipipe", "anthropic", "gemini", "replay"]
 
 #: Reasoning depth, expressed provider-neutrally. Each provider maps it to its own
 #: native control: Anthropic to ``output_config.effort`` with adaptive thinking,

@@ -280,26 +280,40 @@ class LLMClient:
 
 
 def build_adapters(
-    *, anthropic_key: str | None, gemini_key: str | None
+    *,
+    aipipe_key: str | None = None,
+    aipipe_base_url: str | None = None,
+    gemini_key: str | None = None,
+    anthropic_key: str | None = None,
+    allow_anthropic: bool = False,
 ) -> dict[str, ProviderAdapter]:
-    """Register only the providers whose credentials are present.
+    """Register only the providers that are both credentialled and permitted.
 
-    A missing key means the adapter is absent, so selecting that provider fails
-    with a clear message at call time instead of a cryptic auth error later.
+    A missing key means the adapter is absent, so naming that provider fails with
+    a clear message at call time rather than a cryptic auth error later.
+
+    Anthropic is deliberately gated on allow_anthropic rather than on key
+    presence alone. A key sitting in the environment should not be sufficient to
+    bill against it — that has to be an explicit decision.
     """
     from core.llm.providers.replay_provider import ReplayAdapter
 
     adapters: dict[str, ProviderAdapter] = {"replay": ReplayAdapter()}
 
-    if anthropic_key:
-        from core.llm.providers.anthropic_provider import AnthropicAdapter
+    if aipipe_key:
+        from core.llm.providers.aipipe_provider import DEFAULT_BASE_URL, AIPipeAdapter
 
-        adapters["anthropic"] = AnthropicAdapter(anthropic_key)
+        adapters["aipipe"] = AIPipeAdapter(aipipe_key, aipipe_base_url or DEFAULT_BASE_URL)
 
     if gemini_key:
         from core.llm.providers.gemini_provider import GeminiAdapter
 
         adapters["gemini"] = GeminiAdapter(gemini_key)
+
+    if anthropic_key and allow_anthropic:
+        from core.llm.providers.anthropic_provider import AnthropicAdapter
+
+        adapters["anthropic"] = AnthropicAdapter(anthropic_key)
 
     return adapters
 

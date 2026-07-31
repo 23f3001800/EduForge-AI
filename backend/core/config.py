@@ -26,8 +26,15 @@ class Settings(BaseSettings):
 
     # ── LLM provider selection ──────────────────────────────────────────────
     llm_profile: LLMProfile = "production"
-    anthropic_api_key: str | None = None
+    aipipe_api_key: str | None = None
+    aipipe_base_url: str = "https://aipipe.org/openrouter/v1"
     gemini_api_key: str | None = None
+
+    # Anthropic is implemented but off by default. A key being present in the
+    # environment must not be enough to bill against it — enabling the provider
+    # is a deliberate act, not a side effect of a config typo.
+    anthropic_api_key: str | None = None
+    allow_anthropic: bool = False
     models_config_path: Path = REPO_ROOT / "config" / "models.yaml"
 
     # ── storage ─────────────────────────────────────────────────────────────
@@ -56,12 +63,12 @@ class Settings(BaseSettings):
         `ci` needs none by design — the replay provider serves recorded cassettes,
         so CI never depends on a network or a key.
         """
-        required = {"production": "ANTHROPIC_API_KEY", "dev": "GEMINI_API_KEY"}.get(
+        required = {"production": "AIPipe_API_KEY", "dev": "GEMINI_API_KEY"}.get(
             self.llm_profile
         )
         if required is None:
             return self
-        value = self.anthropic_api_key if self.llm_profile == "production" else self.gemini_api_key
+        value = self.aipipe_api_key if self.llm_profile == "production" else self.gemini_api_key
         if not value:
             raise ValueError(
                 f"LLM_PROFILE={self.llm_profile!r} requires {required} to be set. "

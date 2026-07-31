@@ -20,6 +20,37 @@
 profiles:
 
   production:
+    # AI Pipe: an OpenAI-compatible proxy fronting OpenRouter, so switching model
+    # is a config edit rather than a new integration.
+    #
+    # BUDGET: the free tier is about $0.10/week and one full run is 20-60 calls,
+    # so the defaults here are the cheap models and the heavier ones are used only
+    # where reasoning quality actually decides output quality. Check the reported
+    # per-call cost before promoting any stage.
+    default:
+      provider: aipipe
+      model: openai/gpt-4.1-nano
+      max_tokens: 16000
+      reasoning: { effort: high }
+      cache_prefix: true
+    stages:
+      # Cheap: a short judgement over a sample of the document.
+      educational-classification: { max_tokens: 4000, reasoning: { effort: medium } }
+      # Worth the larger model: everything downstream teaches what this produces,
+      # and a hallucinated concept propagates through six stages.
+      knowledge-extraction: { model: openai/gpt-4.1-mini, max_tokens: 16000 }
+      teaching-planner:     { model: openai/gpt-4.1-mini, max_tokens: 12000 }
+      lesson-generation:    { model: openai/gpt-4.1-mini, max_tokens: 16000 }
+      activity-generation:  { max_tokens: 8000,  reasoning: { effort: medium } }
+      assessment-generation: { model: openai/gpt-4.1-mini, max_tokens: 12000 }
+      gap-analysis:         { max_tokens: 8000,  reasoning: { effort: medium } }
+      # Validation is a judge, not an author, and it only sees the ambiguous
+      # middle band of claims the lexical pre-filter could not settle.
+      validation:           { max_tokens: 4000, reasoning: { effort: low } }
+
+  # Anthropic profile is defined but NOT selected anywhere. Running it also
+  # requires ALLOW_ANTHROPIC=true; a key in the environment is not sufficient.
+  anthropic:
     default:
       provider: anthropic
       model: claude-opus-5
@@ -27,16 +58,8 @@ profiles:
       reasoning: { effort: high }
       cache_prefix: true
     stages:
-      educational-classification: { max_tokens: 4000,  reasoning: { effort: medium } }
-      knowledge-extraction:       { max_tokens: 16000, reasoning: { effort: high } }
-      teaching-planner:           { max_tokens: 12000, reasoning: { effort: high } }
-      lesson-generation:          { max_tokens: 16000, reasoning: { effort: high } }
-      activity-generation:        { max_tokens: 8000,  reasoning: { effort: medium } }
-      assessment-generation:      { max_tokens: 12000, reasoning: { effort: high } }
-      gap-analysis:               { max_tokens: 8000,  reasoning: { effort: medium } }
-      # Validation is a judge, not an author. Low effort, and it only sees the
-      # ambiguous middle band of claims the lexical pre-filter could not settle.
-      validation:                 { max_tokens: 4000,  reasoning: { effort: low } }
+      educational-classification: { max_tokens: 4000, reasoning: { effort: medium } }
+      validation:                 { max_tokens: 4000, reasoning: { effort: low } }
 
   dev:
     # Cheap plumbing iteration. Expect noticeably weaker pedagogical output —
