@@ -17,18 +17,31 @@ from typing import Any
 import httpx
 import pytest
 
-from api.deps import set_store
+from api.deps import set_roster_builder, set_store
 from api.main import create_app
 from contracts import TeacherKnowledgePackage
 from contracts.primitives import STAGE_NAMES
 from core.storage.memory import InMemoryStore
+from stages.stubs import STUB_STAGES
 
 PDF = b"%PDF-1.7\n" + b"x" * 512
+
+
+async def _stub_roster(*_args: Any) -> Any:
+    """Every stage served from a fixture.
+
+    These tests are about the plumbing — upload, enqueue, progress, replay,
+    package read — and that has to be provable with no network, no API key, and
+    no real document. The production roster is exercised against real documents
+    in the stage suites and against live providers in the smoke script.
+    """
+    return STUB_STAGES
 
 
 @pytest.fixture
 async def client() -> Any:
     set_store(InMemoryStore())
+    set_roster_builder(_stub_roster)
     app = create_app()
     transport = httpx.ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as c:
@@ -94,9 +107,7 @@ async def test_full_evaluator_path(client: httpx.AsyncClient) -> None:
 
 async def test_validation_report_is_exposed(client: httpx.AsyncClient) -> None:
     document_id = await _upload(client)
-    job_id = (
-        await client.post("/api/v1/jobs", json={"document_id": document_id})
-    ).json()["job_id"]
+    job_id = (await client.post("/api/v1/jobs", json={"document_id": document_id})).json()["job_id"]
     job = await _await_job(client, job_id)
 
     report = await client.get(f"/api/v1/packages/{job['package_id']}/validation")
@@ -112,9 +123,7 @@ async def test_sse_replays_the_whole_timeline_for_a_finished_job(
 ) -> None:
     """A client arriving after the job finished still renders a complete run."""
     document_id = await _upload(client)
-    job_id = (
-        await client.post("/api/v1/jobs", json={"document_id": document_id})
-    ).json()["job_id"]
+    job_id = (await client.post("/api/v1/jobs", json={"document_id": document_id})).json()["job_id"]
     await _await_job(client, job_id)
 
     stream = await client.get(f"/api/v1/jobs/{job_id}/events")
@@ -130,9 +139,7 @@ async def test_sse_replays_the_whole_timeline_for_a_finished_job(
 async def test_every_sse_frame_has_stage_and_progress(client: httpx.AsyncClient) -> None:
     """The exact wire shape the assignment specifies."""
     document_id = await _upload(client)
-    job_id = (
-        await client.post("/api/v1/jobs", json={"document_id": document_id})
-    ).json()["job_id"]
+    job_id = (await client.post("/api/v1/jobs", json={"document_id": document_id})).json()["job_id"]
     await _await_job(client, job_id)
 
     for frame in _parse_sse((await client.get(f"/api/v1/jobs/{job_id}/events")).text):
@@ -149,9 +156,7 @@ async def test_last_event_id_resumes_without_gap_or_duplicate(
     and assert the two halves join exactly — no event lost, none repeated.
     """
     document_id = await _upload(client)
-    job_id = (
-        await client.post("/api/v1/jobs", json={"document_id": document_id})
-    ).json()["job_id"]
+    job_id = (await client.post("/api/v1/jobs", json={"document_id": document_id})).json()["job_id"]
     await _await_job(client, job_id)
 
     full = _parse_sse((await client.get(f"/api/v1/jobs/{job_id}/events")).text)
@@ -175,9 +180,7 @@ async def test_malformed_last_event_id_replays_rather_than_failing(
 ) -> None:
     """Losing the timeline is worse than re-sending events a client can dedupe."""
     document_id = await _upload(client)
-    job_id = (
-        await client.post("/api/v1/jobs", json={"document_id": document_id})
-    ).json()["job_id"]
+    job_id = (await client.post("/api/v1/jobs", json={"document_id": document_id})).json()["job_id"]
     await _await_job(client, job_id)
 
     response = await client.get(
@@ -252,12 +255,8 @@ async def test_idempotency_key_prevents_a_duplicate_run(client: httpx.AsyncClien
     document_id = await _upload(client)
     headers = {"Idempotency-Key": "abc-123"}
 
-    first = await client.post(
-        "/api/v1/jobs", json={"document_id": document_id}, headers=headers
-    )
-    second = await client.post(
-        "/api/v1/jobs", json={"document_id": document_id}, headers=headers
-    )
+    first = await client.post("/api/v1/jobs", json={"document_id": document_id}, headers=headers)
+    second = await client.post("/api/v1/jobs", json={"document_id": document_id}, headers=headers)
 
     assert first.json()["job_id"] == second.json()["job_id"]
     assert second.json()["deduplicated"] is True

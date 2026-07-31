@@ -29,16 +29,37 @@ _SUPERSCRIPT = str.maketrans("⁰¹²³⁴⁵⁶⁷⁸⁹", "0123456789")
 _SUBSCRIPT = str.maketrans("₀₁₂₃₄₅₆₇₈₉", "0123456789")
 
 _GREEK_TO_LATEX = {
-    "α": r"\alpha", "β": r"\beta", "γ": r"\gamma", "δ": r"\delta",
-    "θ": r"\theta", "λ": r"\lambda", "μ": r"\mu", "π": r"\pi",
-    "σ": r"\sigma", "ω": r"\omega", "Δ": r"\Delta", "Ω": r"\Omega",
+    "α": r"\alpha",
+    "β": r"\beta",
+    "γ": r"\gamma",
+    "δ": r"\delta",
+    "θ": r"\theta",
+    "λ": r"\lambda",
+    "μ": r"\mu",
+    "π": r"\pi",
+    "σ": r"\sigma",
+    "ω": r"\omega",
+    "Δ": r"\Delta",
+    "Ω": r"\Omega",
 }
 
 _OPERATOR_TO_LATEX = {
-    "×": r"\times", "÷": r"\div", "±": r"\pm", "≠": r"\neq",
-    "≈": r"\approx", "≤": r"\leq", "≥": r"\geq", "√": r"\sqrt",
-    "∑": r"\sum", "∏": r"\prod", "∫": r"\int", "∞": r"\infty",
-    "∂": r"\partial", "∇": r"\nabla", "→": r"\to", "⇒": r"\Rightarrow",
+    "×": r"\times",
+    "÷": r"\div",
+    "±": r"\pm",
+    "≠": r"\neq",
+    "≈": r"\approx",
+    "≤": r"\leq",
+    "≥": r"\geq",
+    "√": r"\sqrt",
+    "∑": r"\sum",
+    "∏": r"\prod",
+    "∫": r"\int",
+    "∞": r"\infty",
+    "∂": r"\partial",
+    "∇": r"\nabla",
+    "→": r"\to",
+    "⇒": r"\Rightarrow",
 }
 
 _WORDY = re.compile(r"\b(the|is|are|and|of|to|in|that|this|which|when)\b", re.IGNORECASE)

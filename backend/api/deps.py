@@ -7,13 +7,34 @@ dependency signature does not change, so no route is rewritten.
 
 from __future__ import annotations
 
-from core.config import Settings, get_settings
-from core.storage.base import Store
-from core.storage.memory import InMemoryStore
+from collections.abc import Awaitable, Callable
+from typing import Any
 
-__all__ = ["get_app_settings", "get_store", "set_store"]
+from core.config import Settings, get_settings
+from core.storage.base import JobRecord, Store
+from core.storage.memory import InMemoryStore
+from orchestration.pipeline import roster_for_job
+
+__all__ = [
+    "RosterBuilder",
+    "get_app_settings",
+    "get_roster_builder",
+    "get_store",
+    "set_roster_builder",
+    "set_store",
+]
+
+#: Produces the ordered stage list for one job.
+RosterBuilder = Callable[[Store, JobRecord, Settings], Awaitable[list[Any]]]
 
 _store: Store = InMemoryStore()
+
+# Injectable for the same reason the store is: the API integration tests prove
+# the evaluator path — upload, enqueue, progress, package — and that path must be
+# provable without a network, a key, or a real document. Swapping the roster for
+# stubs tests the plumbing; swapping the store for Postgres tests persistence.
+# Neither should require touching a route.
+_roster_builder: RosterBuilder = roster_for_job
 
 
 def get_store() -> Store:
@@ -24,6 +45,16 @@ def set_store(store: Store) -> None:
     """Swap the backing store. Used by tests and by startup wiring."""
     global _store
     _store = store
+
+
+def get_roster_builder() -> RosterBuilder:
+    return _roster_builder
+
+
+def set_roster_builder(builder: RosterBuilder) -> None:
+    """Swap how a job's stage list is built. Used by tests and by startup wiring."""
+    global _roster_builder
+    _roster_builder = builder
 
 
 def get_app_settings() -> Settings:

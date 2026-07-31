@@ -143,9 +143,7 @@ class ClassificationStage:
             if result.degraded:
                 span.warn("classification degraded; downstream strategy defaults to 'mixed'")
             if classification.low_confidence_fields:
-                span.warn(
-                    "low confidence: " + ", ".join(classification.low_confidence_fields)
-                )
+                span.warn("low confidence: " + ", ".join(classification.low_confidence_fields))
 
             await span.progress(
                 0.9,

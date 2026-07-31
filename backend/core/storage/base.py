@@ -119,6 +119,18 @@ class Store(ABC):
     @abstractmethod
     async def get_document(self, document_id: UUID) -> DocumentRecord | None: ...
 
+    # ── blobs ───────────────────────────────────────────────────────────────
+    # The uploaded bytes, kept separately from the metadata record. Stage 1 reads
+    # them at job time rather than at upload time: the job outlives the request
+    # that created it (H-01), so the payload cannot be held in the request scope,
+    # and re-running a failed job must not require the teacher to upload again.
+    @abstractmethod
+    async def put_blob(self, uri: str, payload: bytes) -> None:
+        """Store bytes under ``DocumentRecord.blob_uri``. Idempotent by uri."""
+
+    @abstractmethod
+    async def get_blob(self, uri: str) -> bytes | None: ...
+
     # ── jobs ────────────────────────────────────────────────────────────────
     @abstractmethod
     async def create_job(self, record: JobRecord) -> JobRecord:

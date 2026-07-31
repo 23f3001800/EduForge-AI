@@ -52,9 +52,7 @@ def _event_name(stage: str, level: str) -> str:
     return "warning" if level in {"warning", "error"} else "progress"
 
 
-async def _stream(
-    store: Store, job_id: UUID, cursor: int, request: Request
-) -> AsyncIterator[str]:
+async def _stream(store: Store, job_id: UUID, cursor: int, request: Request) -> AsyncIterator[str]:
     while True:
         if await request.is_disconnected():
             return

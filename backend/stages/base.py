@@ -20,10 +20,33 @@ from dataclasses import dataclass, field
 from typing import Any, Protocol, runtime_checkable
 from uuid import UUID
 
-from contracts.jobs import STAGE_PROGRESS_WEIGHTS
-from contracts.primitives import STAGE_NAMES, StageName
+from pydantic import model_validator
 
-__all__ = ["Stage", "StageContext", "StageSpan", "cumulative_progress"]
+from contracts.jobs import STAGE_PROGRESS_WEIGHTS
+from contracts.primitives import STAGE_NAMES, StageName, StrictModel
+
+__all__ = ["Draft", "Stage", "StageContext", "StageSpan", "cumulative_progress"]
+
+
+class Draft(StrictModel):
+    """Base for model-facing draft types: lenient in, strict out.
+
+    Unknown keys are dropped rather than rejected — models echo back the ids and
+    types they were shown, and losing a whole generated item to a courtesy key is
+    a bad trade. Everything here survives to be re-validated against the real
+    contract, which is where strictness belongs.
+
+    It lives in ``stages.base`` rather than in whichever stage needed it first,
+    because the alternative is one stage importing another's schemas module and
+    the independence rule exists precisely to stop that.
+    """
+
+    @model_validator(mode="before")
+    @classmethod
+    def _drop_unknown_keys(cls, value: Any) -> Any:
+        if isinstance(value, dict):
+            return {key: item for key, item in value.items() if key in cls.model_fields}
+        return value
 
 
 def cumulative_progress(stage: StageName, fraction: float = 1.0) -> int:

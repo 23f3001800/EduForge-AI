@@ -38,8 +38,7 @@ def document_block(text: str) -> str:
 
 #: Appended to stages that must return strict JSON.
 OUTPUT_DISCIPLINE = (
-    "Return only JSON matching the schema. No prose before or after, no code "
-    "fences, no commentary."
+    "Return only JSON matching the schema. No prose before or after, no code fences, no commentary."
 )
 
 

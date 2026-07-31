@@ -149,9 +149,7 @@ class ProgressEvent(StrictModel):
     seq: int = Field(default=0, ge=0, description="Monotonic per job; the SSE event id.")
     level: ProgressLevel = "info"
     message: str | None = None
-    substage: str | None = Field(
-        default=None, description='Fan-out detail, e.g. "period 3 of 5".'
-    )
+    substage: str | None = Field(default=None, description='Fan-out detail, e.g. "period 3 of 5".')
     ts: datetime | None = None
     data: dict[str, str | int | float | bool] = Field(default_factory=dict)
 

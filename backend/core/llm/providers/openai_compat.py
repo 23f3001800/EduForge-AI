@@ -368,6 +368,4 @@ class OpenAICompatibleAdapter:
                 retry_after=_stated_retry_delay(exc),
             ) from exc
         except openai.APIConnectionError as exc:
-            raise LLMProviderError(
-                f"{self.name} connection error: {exc}", retryable=True
-            ) from exc
+            raise LLMProviderError(f"{self.name} connection error: {exc}", retryable=True) from exc

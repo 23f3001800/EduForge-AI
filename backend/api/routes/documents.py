@@ -105,6 +105,10 @@ async def upload_document(
         blob_uri=f"mem://{digest}",
     )
     stored = await store.add_document(candidate)
+    # Keyed on the stored record's uri, not the candidate's: on a deduplicated
+    # upload those are the same content anyway, and writing the candidate's uri
+    # would orphan bytes nothing ever reads.
+    await store.put_blob(stored.blob_uri, payload)
 
     return {
         "document_id": str(stored.id),

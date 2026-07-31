@@ -21,7 +21,7 @@ from langgraph.graph import END, START, StateGraph
 
 from contracts.primitives import StageName
 from core.storage.base import StageOutput, Store
-from orchestration.state import STAGE_STATE_KEY, GraphState
+from orchestration.state import GraphState
 from stages.base import StageContext
 
 __all__ = ["PipelineResult", "build_graph", "run_pipeline"]
@@ -70,8 +70,6 @@ def _make_node(
     executed: list[str],
     skipped: list[str],
 ) -> Callable[[dict[str, Any]], Awaitable[dict[str, Any]]]:
-    key = STAGE_STATE_KEY[stage.name]
-
     async def node(state: dict[str, Any]) -> dict[str, Any]:
         # Resume: a completed stage is restored, never re-executed or re-billed.
         checkpoint = completed.get(stage.name)
@@ -82,15 +80,20 @@ def _make_node(
                 progress=_progress_for(stage.name),
                 message="restored from checkpoint",
             )
-            return {key: checkpoint.output[key]}
+            # The WHOLE fragment, not just STAGE_STATE_KEY[stage.name]. Most
+            # stages write one key and the difference is invisible, but stage 1
+            # writes `structured_document` AND `chunks`; restoring only the
+            # mapped key silently drops the chunks, and stage 3 then verifies
+            # citations against nothing. STAGE_STATE_KEY names the key a stage
+            # *owns* for invalidation — it was never the full list of what a
+            # stage writes.
+            return dict(checkpoint.output)
 
         ctx = StageContext(job_id=job_id, options=options, emit=emit)
         fragment = await stage.run(ctx, state)
         executed.append(stage.name)
 
-        await store.put_checkpoint(
-            StageOutput(job_id=job_id, stage=stage.name, output=fragment)
-        )
+        await store.put_checkpoint(StageOutput(job_id=job_id, stage=stage.name, output=fragment))
         return fragment
 
     return node

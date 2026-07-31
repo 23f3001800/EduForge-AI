@@ -14,15 +14,17 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, Header, HTTPException
 
-from api.deps import get_store
+from api.deps import RosterBuilder, get_app_settings, get_roster_builder, get_store
 from contracts.jobs import JobOptions
+from core.config import Settings
+from core.progress.emitter import ProgressEmitter
 from core.storage.base import JobRecord, Store
-from stages.stubs import STUB_STAGES
 from worker.runner import run_job
 
 router = APIRouter(tags=["jobs"])
@@ -36,12 +38,35 @@ class _CreateJob(JobOptions):
     document_id: UUID
 
 
-def _spawn(store: Store, job_id: UUID) -> None:
+async def _fail_job(store: Store, job_id: UUID, exc: Exception) -> None:
+    """Record a pre-pipeline failure the same way ``run_job`` records its own."""
+    job = await store.get_job(job_id)
+    if job is None:
+        return
+    job.status = "failed"
+    job.error = {"type": type(exc).__name__, "message": str(exc)}
+    job.finished_at = datetime.now(UTC)
+    await store.update_job(job)
+    await ProgressEmitter(store, job_id)(
+        stage="failed", progress=0, level="error", message=f"{type(exc).__name__}: {exc}"
+    )
+
+
+def _spawn(store: Store, job: JobRecord, settings: Settings, roster: RosterBuilder) -> None:
     async def _run() -> None:
-        # Failures are already recorded on the job record by run_job; swallowing
-        # here only stops an unretrieved-exception warning on the task.
+        try:
+            stages = await roster(store, job, settings)
+        except Exception as exc:
+            # Roster construction happens before run_job, so nothing else would
+            # record this. Left unhandled it is the worst failure mode available:
+            # the job sits at `queued` forever and the client's SSE stream waits
+            # on events that will never arrive.
+            await _fail_job(store, job.id, exc)
+            return
+        # From here run_job owns the lifecycle and records its own failures;
+        # suppressing only silences an unretrieved-exception warning.
         with contextlib.suppress(Exception):
-            await run_job(store=store, job_id=job_id, stages=STUB_STAGES)
+            await run_job(store=store, job_id=job.id, stages=stages)
 
     task = asyncio.create_task(_run())
     # Hold a reference; without one the event loop may garbage-collect a running
@@ -55,6 +80,8 @@ async def create_job(
     body: _CreateJob,
     idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
     store: Store = Depends(get_store),
+    settings: Settings = Depends(get_app_settings),
+    roster: RosterBuilder = Depends(get_roster_builder),
 ) -> dict[str, Any]:
     if await store.get_document(body.document_id) is None:
         raise HTTPException(404, detail={"code": "document_not_found"})
@@ -69,7 +96,7 @@ async def create_job(
     job = await store.create_job(candidate)
 
     if job.id == candidate.id:
-        _spawn(store, job.id)
+        _spawn(store, job, settings, roster)
 
     return {
         "job_id": str(job.id),
@@ -109,6 +136,8 @@ async def retry_job(
     job_id: UUID,
     from_stage: str | None = None,
     store: Store = Depends(get_store),
+    settings: Settings = Depends(get_app_settings),
+    roster: RosterBuilder = Depends(get_roster_builder),
 ) -> dict[str, Any]:
     """Resume from the first incomplete stage.
 
@@ -138,7 +167,7 @@ async def retry_job(
     job.status = "queued"
     job.error = None
     await store.update_job(job)
-    _spawn(store, job.id)
+    _spawn(store, job, settings, roster)
 
     return {"job_id": str(job.id), "status": job.status}
 

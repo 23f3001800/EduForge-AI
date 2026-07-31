@@ -35,6 +35,7 @@ class InMemoryStore(Store):
         self._events: dict[UUID, list[JobEvent]] = {}
         self._checkpoints: dict[UUID, dict[str, StageOutput]] = {}
         self._packages: dict[UUID, PackageRecord] = {}
+        self._blobs: dict[str, bytes] = {}
         self._seq = 0
         self._lock = asyncio.Lock()
         # One condition per job; SSE readers wait on it instead of polling.
@@ -58,6 +59,16 @@ class InMemoryStore(Store):
 
     async def get_document(self, document_id: UUID) -> DocumentRecord | None:
         return self._documents.get(document_id)
+
+    # ── blobs ───────────────────────────────────────────────────────────────
+
+    async def put_blob(self, uri: str, payload: bytes) -> None:
+        # Keyed by uri, which is content-addressed upstream, so a re-upload of an
+        # identical file overwrites with identical bytes.
+        self._blobs[uri] = payload
+
+    async def get_blob(self, uri: str) -> bytes | None:
+        return self._blobs.get(uri)
 
     # ── jobs ────────────────────────────────────────────────────────────────
 
