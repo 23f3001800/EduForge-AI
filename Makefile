@@ -9,11 +9,14 @@
 
 PY      := ./.venv/bin/python
 PIP     := $(PY) -m pip
+# NB: `python -m importlinter.cli` silently exits 0 without checking anything.
+# Only the console script actually runs the contracts.
+IMPORTS := ./.venv/bin/lint-imports
 BACKEND := backend
 export PYTHONPATH := $(BACKEND)
 
 .DEFAULT_GOAL := help
-.PHONY: help venv install test test-contract lint fmt typecheck schema fixtures check clean
+.PHONY: help venv install dev test test-contract lint boundaries fmt typecheck schema fixtures check clean
 
 help:  ## Show available targets
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) \
@@ -26,6 +29,9 @@ venv:  ## Create the virtual environment
 install: venv  ## Install runtime + dev dependencies
 	$(PIP) install -q -e "$(BACKEND)[dev]"
 
+dev:  ## Run the API with reload at http://localhost:8000
+	$(PY) -m uvicorn api.main:app --reload --app-dir $(BACKEND) --port 8000
+
 test:  ## Run the full test suite
 	$(PY) -m pytest $(BACKEND)/tests -q
 
@@ -34,6 +40,9 @@ test-contract:  ## Run only the contract suite (the MS-0 gate)
 
 lint:  ## Lint
 	$(PY) -m ruff check $(BACKEND) scripts
+
+boundaries:  ## Enforce module boundaries (a stage importing a stage fails here)
+	$(IMPORTS) --config $(BACKEND)/pyproject.toml
 
 fmt:  ## Auto-format and fix
 	$(PY) -m ruff format $(BACKEND) scripts
@@ -48,6 +57,7 @@ schema:  ## Regenerate the published JSON Schema and fixtures
 check:  ## Everything CI runs
 	$(PY) scripts/generate_schema.py --check
 	$(PY) -m ruff check $(BACKEND) scripts
+	$(IMPORTS) --config $(BACKEND)/pyproject.toml
 	$(PY) -m pytest $(BACKEND)/tests -q
 
 clean:  ## Remove caches and build artifacts

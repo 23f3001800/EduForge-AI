@@ -144,7 +144,16 @@ modules = [
     "stages.s10_publishing",
 ]
 
+# `api` sits ABOVE `worker`, not beside it. Until the Postgres store lands there
+# is no separate worker process to hand off to — the in-memory store cannot be
+# shared across processes — so the API enqueues and then drives run_job itself as
+# a background task. Declaring them siblings would describe an architecture that
+# does not exist and force an ignore_import for the one edge that does.
+#
+# The dependency points the right way regardless: api -> worker, never the
+# reverse. When the worker becomes its own process this tightens back to
+# "api | worker" and the only edge that must disappear is the one named here.
 [[tool.importlinter.contracts]]
 name = "layered architecture"
 type = "layers"
-layers = ["api | worker", "orchestration", "stages", "pedagogy", "core", "contracts"]
+layers = ["api", "worker", "orchestration", "stages", "pedagogy", "core", "contracts"]
