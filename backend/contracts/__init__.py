@@ -50,10 +50,12 @@ from contracts.gaps import DiagnosticQuestion, LearningGap, RemediationStep
 from contracts.jobs import (
     STAGE_PROGRESS_WEIGHTS,
     ArtifactKind,
+    DocumentKind,
     JobOptions,
     JobSnapshot,
     JobStatus,
     ProgressEvent,
+    TeachingStyle,
 )
 from contracts.knowledge import (
     Application,
@@ -143,6 +145,7 @@ __all__ = [
     "DiagnosticQuestion",
     "Differentiation",
     "Difficulty",
+    "DocumentKind",
     "DocumentMetadata",
     "DocumentStats",
     "Effort",
@@ -192,6 +195,7 @@ __all__ = [
     "TableData",
     "TeacherKnowledgePackage",
     "TeachingPlan",
+    "TeachingStyle",
     "TimeSlot",
     "UnsupportedClaim",
     "ValidationIssue",
