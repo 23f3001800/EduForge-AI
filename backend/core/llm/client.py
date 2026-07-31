@@ -39,7 +39,14 @@ from core.llm.base import ContentRefused, LLMProviderError, ProviderAdapter
 __all__ = ["BudgetExhausted", "CallRecord", "LLMClient", "TokenBudget"]
 
 MAX_ATTEMPTS = 4
+#: Cap for *guessed* exponential backoff.
 BACKOFF_CAP_S = 30.0
+#: Separate, higher cap for a delay the provider stated itself. Truncating that
+#: to the guess cap is actively harmful: we retry before the window reopens and
+#: burn an attempt on a failure we were told the exact timing of. Per-minute rate
+#: limits routinely ask for 50s+, and this pipeline is built for long-running
+#: jobs, so waiting is cheap and a wasted attempt is not.
+STATED_DELAY_CAP_S = 120.0
 _FENCE = re.compile(r"^\s*```(?:json)?\s*|\s*```\s*$", re.MULTILINE)
 
 
@@ -81,16 +88,30 @@ def _strip_fences(text: str) -> str:
     return _FENCE.sub("", text).strip()
 
 
-def _extract_json(text: str) -> str:
-    """Best-effort isolation of the JSON body from surrounding prose."""
+def _extract_json(text: str, *, expects_object: bool = True) -> str:
+    """Best-effort isolation of the JSON body from surrounding prose.
+
+    Also unwraps ``[ {...} ]`` when a single object was expected. Models wrap
+    their answer in an array often enough that rejecting it would spend a repair
+    attempt on a formatting slip rather than on a content problem — and repair
+    attempts are the scarce resource.
+    """
     cleaned = _strip_fences(text)
-    if cleaned.startswith(("{", "[")):
-        return cleaned
-    start = min((i for i in (cleaned.find("{"), cleaned.find("[")) if i != -1), default=-1)
-    if start == -1:
-        return cleaned
-    end = max(cleaned.rfind("}"), cleaned.rfind("]"))
-    return cleaned[start : end + 1] if end > start else cleaned
+    if not cleaned.startswith(("{", "[")):
+        start = min((i for i in (cleaned.find("{"), cleaned.find("[")) if i != -1), default=-1)
+        if start == -1:
+            return cleaned
+        end = max(cleaned.rfind("}"), cleaned.rfind("]"))
+        cleaned = cleaned[start : end + 1] if end > start else cleaned
+
+    if expects_object and cleaned.startswith("["):
+        try:
+            parsed = json.loads(cleaned)
+        except ValueError:
+            return cleaned
+        if isinstance(parsed, list) and len(parsed) == 1 and isinstance(parsed[0], dict):
+            return json.dumps(parsed[0])
+    return cleaned
 
 
 @dataclass
@@ -193,7 +214,15 @@ class LLMClient:
                 )
                 if not exc.retryable or attempt == MAX_ATTEMPTS:
                     raise
-                await asyncio.sleep(min(2**attempt + random.random(), BACKOFF_CAP_S))
+                # Prefer the provider's stated reopen time over a guess. Jitter is
+                # still added: under fan-out several calls fail at the same
+                # instant, and without it they all retry at the same instant too.
+                stated = getattr(exc, "retry_after", None)
+                if stated is not None:
+                    delay = min(stated + random.random(), STATED_DELAY_CAP_S)
+                else:
+                    delay = min(2**attempt + random.random(), BACKOFF_CAP_S)
+                await asyncio.sleep(delay)
                 continue
 
             raw.usage.latency_ms = int((time.monotonic() - started) * 1000)
@@ -205,7 +234,11 @@ class LLMClient:
                 self.budget.record(raw.usage)
 
             try:
-                value = output_model.model_validate_json(_extract_json(raw.text))
+                payload = _extract_json(
+                    raw.text,
+                    expects_object=output_model.model_json_schema().get("type") == "object",
+                )
+                value = output_model.model_validate_json(payload)
             except (ValidationError, ValueError) as exc:
                 last_error = str(exc)
                 self.calls.append(
@@ -281,8 +314,8 @@ class LLMClient:
 
 def build_adapters(
     *,
-    aipipe_key: str | None = None,
-    aipipe_base_url: str | None = None,
+    groq_key: str | None = None,
+    groq_base_url: str | None = None,
     gemini_key: str | None = None,
     anthropic_key: str | None = None,
     allow_anthropic: bool = False,
@@ -300,10 +333,10 @@ def build_adapters(
 
     adapters: dict[str, ProviderAdapter] = {"replay": ReplayAdapter()}
 
-    if aipipe_key:
-        from core.llm.providers.aipipe_provider import DEFAULT_BASE_URL, AIPipeAdapter
+    if groq_key:
+        from core.llm.providers.groq_provider import DEFAULT_BASE_URL, GroqAdapter
 
-        adapters["aipipe"] = AIPipeAdapter(aipipe_key, aipipe_base_url or DEFAULT_BASE_URL)
+        adapters["groq"] = GroqAdapter(groq_key, groq_base_url or DEFAULT_BASE_URL)
 
     if gemini_key:
         from core.llm.providers.gemini_provider import GeminiAdapter
