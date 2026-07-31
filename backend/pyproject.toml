@@ -93,6 +93,12 @@ extend-immutable-calls = [
 # is strictly worse than "ParseFailure". All inherit IngestionError, so the
 # hierarchy is unambiguous.
 "stages/s1_document_intelligence/errors.py" = ["N818"]
+# Same reasoning for the LLM layer: `raise ContentRefused(...)` and
+# `raise BudgetExhausted(...)` read as the conditions they describe, and the
+# Error-suffixed alternatives are strictly worse names.
+"core/llm/base.py" = ["N818"]
+"core/llm/client.py" = ["N818"]
+"core/llm/providers/replay_provider.py" = ["N818"]
 "tests/unit/test_document_intelligence.py" = ["RUF001", "RUF002", "RUF003"]
 "tests/fixtures/documents/generate.py" = ["RUF001", "RUF002", "RUF003"]
 
