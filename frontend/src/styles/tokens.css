@@ -1,0 +1,134 @@
+/*
+ * Design tokens for EduForge AI.
+ *
+ * No design-token file was supplied with the spec (docs/ has none), so this
+ * file is the single source of truth for colour, spacing, radius and type.
+ * Every component consumes these custom properties rather than hardcoding
+ * values. If a case needs a token that doesn't exist here, add it here first.
+ */
+
+:root {
+  color-scheme: light dark;
+
+  /* ---- Colour: neutrals ---- */
+  --ef-color-bg: #ffffff;
+  --ef-color-bg-subtle: #f6f7f9;
+  --ef-color-bg-raised: #ffffff;
+  --ef-color-border: #d9dce1;
+  --ef-color-border-strong: #b7bcc4;
+  --ef-color-text: #1a1d21;
+  --ef-color-text-muted: #565c66;
+  --ef-color-text-faint: #7b818c;
+
+  /* ---- Colour: brand / accent ---- */
+  --ef-color-accent: #2952cc;
+  --ef-color-accent-strong: #1d3d99;
+  --ef-color-accent-bg: #eaefff;
+  --ef-color-accent-contrast: #ffffff;
+
+  /* ---- Colour: semantic ---- */
+  --ef-color-success: #157a45;
+  --ef-color-success-bg: #e6f6ec;
+  --ef-color-success-border: #a9dfc0;
+  --ef-color-warning: #8a5a00;
+  --ef-color-warning-bg: #fff4dc;
+  --ef-color-warning-border: #f0cd7f;
+  --ef-color-danger: #b3261e;
+  --ef-color-danger-bg: #fdeceb;
+  --ef-color-danger-border: #f2b8b5;
+  --ef-color-info: #0b5fa5;
+  --ef-color-info-bg: #e8f2fb;
+  --ef-color-info-border: #a9cdea;
+
+  /* ---- Focus ---- */
+  --ef-color-focus-ring: #1d3d99;
+
+  /* ---- Spacing scale (4px base) ---- */
+  --ef-space-1: 0.25rem;
+  --ef-space-2: 0.5rem;
+  --ef-space-3: 0.75rem;
+  --ef-space-4: 1rem;
+  --ef-space-5: 1.5rem;
+  --ef-space-6: 2rem;
+  --ef-space-7: 3rem;
+  --ef-space-8: 4rem;
+
+  /* ---- Radius ---- */
+  --ef-radius-sm: 4px;
+  --ef-radius-md: 8px;
+  --ef-radius-lg: 14px;
+  --ef-radius-pill: 999px;
+
+  /* ---- Shadow ---- */
+  --ef-shadow-sm: 0 1px 2px rgba(20, 22, 26, 0.08);
+  --ef-shadow-md: 0 4px 16px rgba(20, 22, 26, 0.12);
+  --ef-shadow-popover: 0 8px 28px rgba(20, 22, 26, 0.22);
+
+  /* ---- Type ---- */
+  --ef-font-sans:
+    "Inter", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --ef-font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+
+  --ef-font-size-xs: clamp(0.72rem, 0.68rem + 0.15vw, 0.78rem);
+  --ef-font-size-sm: clamp(0.82rem, 0.78rem + 0.15vw, 0.88rem);
+  --ef-font-size-md: clamp(0.92rem, 0.88rem + 0.2vw, 1rem);
+  --ef-font-size-lg: clamp(1.05rem, 1rem + 0.3vw, 1.2rem);
+  --ef-font-size-xl: clamp(1.3rem, 1.2rem + 0.6vw, 1.6rem);
+  --ef-font-size-2xl: clamp(1.6rem, 1.4rem + 1vw, 2.1rem);
+
+  --ef-line-height: 1.5;
+  --ef-line-height-tight: 1.25;
+
+  /* ---- Motion ---- */
+  --ef-duration-fast: 120ms;
+  --ef-duration-med: 220ms;
+  --ef-easing: cubic-bezier(0.2, 0, 0, 1);
+
+  /* ---- Layout ---- */
+  --ef-max-width: 1180px;
+  --ef-header-height: 60px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --ef-color-bg: #14161a;
+    --ef-color-bg-subtle: #1b1e23;
+    --ef-color-bg-raised: #21252b;
+    --ef-color-border: #33383f;
+    --ef-color-border-strong: #464c55;
+    --ef-color-text: #eef0f3;
+    --ef-color-text-muted: #a8afba;
+    --ef-color-text-faint: #7d848f;
+
+    --ef-color-accent: #7d9dff;
+    --ef-color-accent-strong: #a8beff;
+    --ef-color-accent-bg: #1e2a4d;
+    --ef-color-accent-contrast: #0b1020;
+
+    --ef-color-success: #4fd18b;
+    --ef-color-success-bg: #103322;
+    --ef-color-success-border: #1f6e46;
+    --ef-color-warning: #e8b64b;
+    --ef-color-warning-bg: #3a2c0b;
+    --ef-color-warning-border: #7a5a13;
+    --ef-color-danger: #f2867e;
+    --ef-color-danger-bg: #3a1613;
+    --ef-color-danger-border: #7a2c26;
+    --ef-color-info: #7fc0f2;
+    --ef-color-info-bg: #0f2a3d;
+    --ef-color-info-border: #1f557a;
+
+    --ef-color-focus-ring: #a8beff;
+
+    --ef-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+    --ef-shadow-md: 0 4px 16px rgba(0, 0, 0, 0.5);
+    --ef-shadow-popover: 0 8px 28px rgba(0, 0, 0, 0.6);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --ef-duration-fast: 0ms;
+    --ef-duration-med: 0ms;
+  }
+}

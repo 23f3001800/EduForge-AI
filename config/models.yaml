@@ -5,8 +5,8 @@
 #
 # Select a profile with LLM_PROFILE={production|dev|ci}.
 #
-#   production — Anthropic. The graded output path and the deployed demo.
-#   dev        — Gemini. Cheap iteration while wiring plumbing.
+#   production — OpenRouter free models. Graded output path and deployed demo.
+#   dev        — OpenRouter, smallest model. Single-stage iteration.
 #   ci         — replay. Recorded cassettes: deterministic, free, offline.
 #
 # ─────────────────────────────────────────────────────────────────────────────
@@ -20,6 +20,38 @@
 profiles:
 
   production:
+    # OpenRouter free tier. Model ids were chosen from a live query of
+    # /api/v1/models filtered to `:free` AND advertising response_format support —
+    # only 5 of the 14 free models do, and a model that cannot honour a schema
+    # falls back to prompt-only JSON, which is materially less reliable.
+    #
+    # Context here is 128k-262k with 32k+ output ceilings, so the tight per-call
+    # budgets the previous provider forced are gone. The two-call split in stage 3
+    # stays regardless: it is better failure isolation, not just a size workaround.
+    default:
+      provider: openrouter
+      model: nvidia/nemotron-3-super-120b-a12b:free
+      max_tokens: 8000
+      reasoning: { effort: high }
+      cache_prefix: true
+    stages:
+      # Short judgement over a document sample — the small model is plenty.
+      educational-classification: { model: nvidia/nemotron-3-super-120b-a12b:free, max_tokens: 4000 }
+      # Everything downstream teaches what extraction produces, and a hallucinated
+      # concept propagates through six stages before anyone reads it. Largest
+      # free model available.
+      knowledge-extraction:  { model: nvidia/nemotron-3-super-120b-a12b:free, max_tokens: 12000 }
+      teaching-planner:      { model: nvidia/nemotron-3-super-120b-a12b:free, max_tokens: 10000 }
+      lesson-generation:     { model: nvidia/nemotron-3-super-120b-a12b:free, max_tokens: 12000 }
+      activity-generation:   { max_tokens: 8000, reasoning: { effort: medium } }
+      assessment-generation: { model: nvidia/nemotron-3-super-120b-a12b:free, max_tokens: 10000 }
+      gap-analysis:          { max_tokens: 8000, reasoning: { effort: medium } }
+      # Validation is a judge, not an author, and only sees the ambiguous middle
+      # band of claims the lexical pre-filter could not settle.
+      validation:            { model: openai/gpt-oss-20b:free, max_tokens: 4000,
+                               reasoning: { effort: low } }
+
+  groq:
     # Groq. Fast, and the free tier is generous enough to run all ten stages
     # repeatedly — which matters more than it sounds: a pipeline you cannot
     # afford to run end to end is one whose integration bugs surface during the
@@ -76,6 +108,16 @@ profiles:
       validation:                 { max_tokens: 4000, reasoning: { effort: low } }
 
   dev:
+    # Single-stage iteration on the cheapest capable free model.
+    default:
+      provider: openrouter
+      model: openai/gpt-oss-20b:free
+      max_tokens: 6000
+      reasoning: { effort: medium }
+    stages:
+      validation: { max_tokens: 3000, reasoning: { effort: low } }
+
+  gemini_dev:
     # Cheap plumbing iteration. Expect noticeably weaker pedagogical output —
     # that is fine here, because this profile is for verifying that stages wire
     # together, not for judging content quality.

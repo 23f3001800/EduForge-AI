@@ -13,8 +13,10 @@ is the usual way a multi-provider layer quietly costs more than it saves.
 
 Provider selection policy (docs/02 ADR #11):
 
-* ``groq``      — production, the deployed demo, and end-to-end runs. Fast, and
-  its free tier is generous enough to run all ten stages repeatedly.
+* ``openrouter`` — production, the deployed demo, and end-to-end runs. One
+  credential reaches many vendors, and the ``:free`` models are enough to
+  run all ten stages repeatedly.
+* ``groq``      — alternative fast provider, used when a key is present.
 * ``gemini``    — local development and single-stage iteration.
 * ``replay``    — CI. Serves recorded cassettes: deterministic, free, offline.
 * ``anthropic`` — implemented but **disabled by default**. Calling it requires
@@ -43,7 +45,7 @@ __all__ = [
     "ReasoningConfig",
 ]
 
-LLMProvider = Literal["anthropic", "gemini", "groq", "replay"]
+LLMProvider = Literal["anthropic", "gemini", "groq", "openrouter", "replay"]
 
 #: Reasoning depth, expressed provider-neutrally. Each provider maps it to its own
 #: native control: Anthropic to ``output_config.effort`` with adaptive thinking,
