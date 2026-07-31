@@ -413,8 +413,8 @@ def test_each_profile_targets_its_intended_provider() -> None:
     """The graded output path and the cheap iteration path must not be confused."""
     config = REPO / "config" / "models.yaml"
     production = load_routing(config, "production")
-    assert production.for_stage("knowledge-extraction").provider == "groq"
-    assert load_routing(config, "dev").for_stage("knowledge-extraction").provider == "gemini"
+    assert production.for_stage("knowledge-extraction").provider == "openrouter"
+    assert load_routing(config, "dev").for_stage("knowledge-extraction").provider == "openrouter"
     assert load_routing(config, "ci").default.provider == "replay"
 
 
@@ -441,9 +441,9 @@ def test_anthropic_is_not_callable_merely_because_a_key_exists() -> None:
     """
     from core.llm.client import build_adapters
 
-    adapters = build_adapters(anthropic_key="sk-ant-looks-real", groq_key="tok")
+    adapters = build_adapters(anthropic_key="sk-ant-looks-real", openrouter_key="tok")
     assert "anthropic" not in adapters
-    assert "groq" in adapters
+    assert "openrouter" in adapters
 
 
 def test_anthropic_becomes_callable_only_on_explicit_opt_in() -> None:
@@ -461,10 +461,10 @@ def test_a_provider_without_credentials_is_absent_rather_than_broken() -> None:
     assert sorted(adapters) == ["replay"]
 
 
-def test_production_profile_routes_to_groq_not_anthropic() -> None:
+def test_production_profile_routes_to_openrouter_not_anthropic() -> None:
     routing = load_routing(REPO / "config" / "models.yaml", "production")
     providers = {routing.for_stage(s).provider for s in ("knowledge-extraction", "validation")}
-    assert providers == {"groq"}
+    assert providers == {"openrouter"}
 
 
 def test_openai_compatible_schema_rewrite_satisfies_strict_mode() -> None:

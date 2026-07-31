@@ -26,6 +26,8 @@ class Settings(BaseSettings):
 
     # ── LLM provider selection ──────────────────────────────────────────────
     llm_profile: LLMProfile = "production"
+    open_router_api_key: str | None = None
+    open_router_base_url: str = "https://openrouter.ai/api/v1"
     groq_api_key: str | None = None
     groq_base_url: str = "https://api.groq.com/openai/v1"
     gemini_api_key: str | None = None
@@ -63,12 +65,13 @@ class Settings(BaseSettings):
         `ci` needs none by design — the replay provider serves recorded cassettes,
         so CI never depends on a network or a key.
         """
-        required = {"production": "GROQ_API_KEY", "dev": "GEMINI_API_KEY"}.get(
-            self.llm_profile
-        )
+        required = {
+            "production": "Open_Router_API_KEY",
+            "dev": "Open_Router_API_KEY",
+        }.get(self.llm_profile)
         if required is None:
             return self
-        value = self.groq_api_key if self.llm_profile == "production" else self.gemini_api_key
+        value = self.open_router_api_key
         if not value:
             raise ValueError(
                 f"LLM_PROFILE={self.llm_profile!r} requires {required} to be set. "

@@ -28,7 +28,7 @@ import random
 import re
 import time
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, ValidationError
 
@@ -112,6 +112,72 @@ def _extract_json(text: str, *, expects_object: bool = True) -> str:
         if isinstance(parsed, list) and len(parsed) == 1 and isinstance(parsed[0], dict):
             return json.dumps(parsed[0])
     return cleaned
+
+
+def _validate_tolerantly[T: BaseModel](payload: str, model: type[T]) -> T:
+    """Validate, retrying once with unknown keys removed.
+
+    Our contract models set ``extra="forbid"``, which is right internally — a
+    stage inventing a field should fail loudly rather than have data silently
+    dropped. At the *provider* boundary it is wrong: a model that returns every
+    required field correctly plus one invented extra would lose the entire
+    result, and spend a repair attempt on it.
+
+    So unknown keys are stripped and validation retried locally. This costs
+    nothing, consumes no attempt, and cannot mask a real problem — every
+    remaining error still surfaces.
+    """
+    try:
+        return model.model_validate_json(payload)
+    except ValidationError as first:
+        extra_keys = {
+            str(err["loc"][-1])
+            for err in first.errors()
+            if err["type"] == "extra_forbidden" and err.get("loc")
+        }
+        if not extra_keys or len(extra_keys) != len(first.errors()):
+            raise
+
+        data = json.loads(payload)
+        if not isinstance(data, dict):
+            raise
+        return model.model_validate({k: v for k, v in data.items() if k not in extra_keys})
+
+
+def _placeholders(model: type[BaseModel]) -> dict[str, Any]:
+    """Typed empty values for every field, for a degraded instance.
+
+    Constraints are deliberately ignored — validation has already failed, and the
+    point is an object downstream code can read without exploding, clearly marked
+    degraded, rather than one that satisfies constraints it never earned.
+    """
+    from typing import get_args, get_origin
+
+    values: dict[str, Any] = {}
+    for name, info in model.model_fields.items():
+        if not info.is_required():
+            values[name] = info.get_default(call_default_factory=True)
+            continue
+
+        annotation = info.annotation
+        origin = get_origin(annotation) or annotation
+
+        if origin in (list, set, tuple):
+            values[name] = []
+        elif origin is dict:
+            values[name] = {}
+        elif annotation is bool:
+            values[name] = False
+        elif annotation in (int, float):
+            values[name] = 0
+        elif get_origin(annotation) is Literal:
+            args = get_args(annotation)
+            values[name] = args[0] if args else ""
+        elif isinstance(annotation, type) and issubclass(annotation, BaseModel):
+            values[name] = annotation.model_construct(**_placeholders(annotation))
+        else:
+            values[name] = ""
+    return values
 
 
 @dataclass
@@ -238,7 +304,7 @@ class LLMClient:
                     raw.text,
                     expects_object=output_model.model_json_schema().get("type") == "object",
                 )
-                value = output_model.model_validate_json(payload)
+                value = _validate_tolerantly(payload, output_model)
             except (ValidationError, ValueError) as exc:
                 last_error = str(exc)
                 self.calls.append(
@@ -300,7 +366,13 @@ class LLMClient:
         try:
             value = output_model.model_validate({})
         except ValidationError:
-            value = output_model.model_construct()  # type: ignore[assignment]
+            # model_construct() with no values yields an object that looks valid
+            # and then raises AttributeError on the first field access — which
+            # would turn "degrade gracefully" into a crash two lines later, in a
+            # different module, with a misleading traceback. Supply a typed
+            # placeholder for every required field so the object is genuinely
+            # usable and the `degraded` flag is what callers react to.
+            value = output_model.model_construct(**_placeholders(output_model))
         return LLMResult[T](
             value=value,
             provider=provider,  # type: ignore[arg-type]
@@ -314,6 +386,8 @@ class LLMClient:
 
 def build_adapters(
     *,
+    openrouter_key: str | None = None,
+    openrouter_base_url: str | None = None,
     groq_key: str | None = None,
     groq_base_url: str | None = None,
     gemini_key: str | None = None,
@@ -332,6 +406,16 @@ def build_adapters(
     from core.llm.providers.replay_provider import ReplayAdapter
 
     adapters: dict[str, ProviderAdapter] = {"replay": ReplayAdapter()}
+
+    if openrouter_key:
+        from core.llm.providers.openrouter_provider import (
+            DEFAULT_BASE_URL,
+            OpenRouterAdapter,
+        )
+
+        adapters["openrouter"] = OpenRouterAdapter(
+            openrouter_key, openrouter_base_url or DEFAULT_BASE_URL
+        )
 
     if groq_key:
         from core.llm.providers.groq_provider import DEFAULT_BASE_URL, GroqAdapter

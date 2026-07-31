@@ -58,8 +58,13 @@ for most of the content. If the material contains formulae, derivations, units, 
 or worked calculations as a central activity, it is `quantitative`, even if it \
 also explains concepts in prose — nearly all quantitative material does both.
 
+`subject` is the academic discipline — "Physics", "History", "Biology". It is \
+NOT the filename, the chapter title, or the topic. Judge it from the content; a \
+filename is a naming accident and is frequently misleading.
+
 For `confidences`, give an honest per-field score in [0,1]. Do not inflate them; \
-a low score is useful information and is surfaced to the teacher.
+a low score is useful information and is surfaced to the teacher. Leave \
+`low_confidence_fields` empty — it is derived automatically from `confidences`.
 
 For `curriculum_alignment`: include it ONLY if you can name real, verifiable \
 standard codes from the stated board. If you cannot, omit the field entirely. \
@@ -81,7 +86,9 @@ def build_sample(structured_document: dict[str, Any], limit: int = MAX_SAMPLE_CH
     stats = structured_document.get("stats", {})
 
     parts: list[str] = [
-        f"FILENAME: {metadata.get('filename', 'unknown')}",
+        # Filename deliberately omitted. It is weak evidence and models latch onto
+        # it — a live run classified `subject` as "history.docx". The outline and
+        # content below carry every signal that actually matters.
         f"PAGES: {metadata.get('page_count')}  WORDS: {metadata.get('word_count')}",
         f"STRUCTURE: {json.dumps(stats)}",
         "",

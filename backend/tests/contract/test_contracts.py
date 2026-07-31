@@ -278,13 +278,27 @@ def test_a_narrative_package_needs_no_formulae() -> None:
     assert f.narrative_classification().pedagogy_profile == "narrative"
 
 
-def test_classification_low_confidence_is_derived_not_asserted() -> None:
-    with pytest.raises(ValidationError, match="low_confidence_fields must be exactly"):
-        c.Classification(
-            subject="Physics", grade_band="9", difficulty="intermediate", topic="t",
-            category="textbook_chapter", language="en", pedagogy_profile="quantitative",
-            confidences={"subject": 0.2}, low_confidence_fields=[],
-        )
+def test_low_confidence_fields_are_derived_not_trusted() -> None:
+    """The model is not asked to compute this correctly — we derive it.
+
+    Demanding the model match a fully-derivable field bought nothing and cost a
+    repair attempt every time it slipped, which happened on real runs.
+    """
+    classification = c.Classification(
+        subject="Physics", grade_band="9", difficulty="intermediate", topic="t",
+        category="textbook_chapter", language="en", pedagogy_profile="quantitative",
+        confidences={"subject": 0.2, "topic": 0.9}, low_confidence_fields=[],
+    )
+    assert classification.low_confidence_fields == ["subject"]
+
+
+def test_a_wrong_low_confidence_list_is_corrected() -> None:
+    classification = c.Classification(
+        subject="Physics", grade_band="9", difficulty="intermediate", topic="t",
+        category="textbook_chapter", language="en", pedagogy_profile="quantitative",
+        confidences={"subject": 0.9}, low_confidence_fields=["subject", "topic"],
+    )
+    assert classification.low_confidence_fields == []
 
 
 # ------------------------------------------------------ progress & job wiring

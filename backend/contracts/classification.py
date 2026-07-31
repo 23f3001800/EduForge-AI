@@ -85,11 +85,16 @@ class Classification(StrictModel):
     )
 
     @model_validator(mode="after")
-    def _low_confidence_is_derived_consistently(self) -> Classification:
-        expected = sorted(k for k, v in self.confidences.items() if v < 0.5)
-        if sorted(self.low_confidence_fields) != expected:
-            raise ValueError(
-                "low_confidence_fields must be exactly the fields with confidence < 0.5; "
-                f"expected {expected}, got {sorted(self.low_confidence_fields)}"
-            )
+    def _derive_low_confidence_fields(self) -> Classification:
+        """Recompute rather than reject.
+
+        This field is fully derivable from ``confidences``, so demanding the model
+        compute it correctly buys nothing and costs a repair attempt every time it
+        slips — which was happening on real runs. Deriving it here guarantees the
+        invariant the UI depends on (low-confidence fields are surfaced, never
+        silently propagated) without spending a round trip to enforce it.
+        """
+        derived = sorted(k for k, v in self.confidences.items() if v < 0.5)
+        if sorted(self.low_confidence_fields) != derived:
+            object.__setattr__(self, "low_confidence_fields", derived)
         return self
