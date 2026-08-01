@@ -35,6 +35,7 @@ from pydantic import BaseModel, ValidationError
 from contracts.llm import LLMResult, LLMUsage, ModelSpec, ProviderRouting
 from contracts.primitives import StageName
 from core.llm.base import ContentRefused, LLMProviderError, ProviderAdapter
+from core.obs import metrics
 
 __all__ = ["BudgetExhausted", "CallRecord", "LLMClient", "TokenBudget"]
 
@@ -192,6 +193,26 @@ class LLMClient:
     def __post_init__(self) -> None:
         self._semaphore = asyncio.Semaphore(self.concurrency)
 
+    def _record(self, record: CallRecord) -> None:
+        """Log one attempt and export it as a metric.
+
+        A single choke point so a new call site cannot record an attempt and
+        forget the metric — the four existing ones each handle a different
+        failure mode, and they will not stay four forever. Failures are exported
+        too: a stage that succeeds on its third try costs three calls, and a
+        climbing retry rate is the earliest sign a provider or a prompt has
+        degraded.
+        """
+        self.calls.append(record)
+        metrics.record_llm_call(
+            stage=record.stage,
+            provider=record.provider,
+            outcome=record.outcome,
+            tokens_in=record.usage.tokens_in,
+            tokens_out=record.usage.tokens_out,
+            cost_usd=record.usage.cost_usd,
+        )
+
     @property
     def usage(self) -> LLMUsage:
         """Aggregate across every attempt, including the ones that failed."""
@@ -262,7 +283,7 @@ class LLMClient:
                     extra={"stage": stage},
                 )
             except ContentRefused as exc:
-                self.calls.append(
+                self._record(
                     CallRecord(
                         stage, adapter.name, spec.model, attempt, "refused", LLMUsage(), str(exc)
                     )
@@ -279,7 +300,7 @@ class LLMClient:
                 )
             except LLMProviderError as exc:
                 last_error = str(exc)
-                self.calls.append(
+                self._record(
                     CallRecord(
                         stage, adapter.name, spec.model, attempt, "error", LLMUsage(), last_error
                     )
@@ -313,7 +334,7 @@ class LLMClient:
                 value = _validate_tolerantly(payload, output_model)
             except (ValidationError, ValueError) as exc:
                 last_error = str(exc)
-                self.calls.append(
+                self._record(
                     CallRecord(
                         stage, adapter.name, raw.model, attempt, "error", raw.usage, last_error
                     )
@@ -333,7 +354,7 @@ class LLMClient:
                 content = self._repair_prompt(user_content, raw.text, last_error)
                 continue
 
-            self.calls.append(
+            self._record(
                 CallRecord(
                     stage,
                     adapter.name,

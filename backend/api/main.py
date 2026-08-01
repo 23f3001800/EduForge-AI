@@ -15,14 +15,18 @@ from typing import Any
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
+from api.middleware import ObservabilityMiddleware
 from api.routes import documents, events, jobs, options
 from api.samples import seed_samples
 from contracts.primitives import SCHEMA_VERSION
 from core.config import REPO_ROOT, get_settings
+from core.obs import metrics
+from core.obs.context import request_id_var
+from core.obs.logging import configure_logging
 
 API_PREFIX = "/api/v1"
 
@@ -52,8 +56,19 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     """
     from api.deps import get_store
 
+    configure_logging(get_settings().log_level, json_output=get_settings().log_json)
     await seed_samples(get_store())
     yield
+
+
+def _with_trace(error: dict[str, Any]) -> dict[str, Any]:
+    """Attach the request id so a reported failure is findable in the log.
+
+    The frontend's ``ApiError`` has always read ``trace_id``; nothing ever
+    set it. A user quoting the id on their screen can now have it found.
+    """
+    request_id = request_id_var.get()
+    return {**error, "trace_id": request_id} if request_id else error
 
 
 def create_app() -> FastAPI:
@@ -68,6 +83,8 @@ def create_app() -> FastAPI:
         docs_url=f"{API_PREFIX}/docs",
         lifespan=lifespan,
     )
+
+    app.add_middleware(ObservabilityMiddleware)
 
     app.include_router(documents.router, prefix=API_PREFIX)
     app.include_router(jobs.router, prefix=API_PREFIX)
@@ -97,7 +114,7 @@ def create_app() -> FastAPI:
             }
         else:
             error = {"code": "http_error", "message": str(detail)}
-        return JSONResponse(status_code=exc.status_code, content={"error": error})
+        return JSONResponse(status_code=exc.status_code, content={"error": _with_trace(error)})
 
     @app.exception_handler(RequestValidationError)
     async def invalid_request(_: Request, exc: RequestValidationError) -> JSONResponse:
@@ -114,11 +131,13 @@ def create_app() -> FastAPI:
         return JSONResponse(
             status_code=422,
             content={
-                "error": {
-                    "code": "invalid_request",
-                    "message": f"{field}: {reason}" if field else reason,
-                    "details": {"errors": jsonable_encoder(errors)},
-                }
+                "error": _with_trace(
+                    {
+                        "code": "invalid_request",
+                        "message": f"{field}: {reason}" if field else reason,
+                        "details": {"errors": jsonable_encoder(errors)},
+                    }
+                )
             },
         )
 
@@ -128,13 +147,25 @@ def create_app() -> FastAPI:
         return JSONResponse(
             status_code=500,
             content={
-                "error": {
-                    "code": "internal_error",
-                    "message": "An unexpected error occurred.",
-                    "details": {"type": type(exc).__name__},
-                }
+                "error": _with_trace(
+                    {
+                        "code": "internal_error",
+                        "message": "An unexpected error occurred.",
+                        "details": {"type": type(exc).__name__},
+                    }
+                )
             },
         )
+
+    @app.get("/metrics", tags=["ops"], include_in_schema=False)
+    async def prometheus_metrics() -> Response:
+        """Prometheus exposition. Deliberately unauthenticated and cheap.
+
+        In-process, so the numbers reset with the app and would be
+        per-instance if this ever ran more than one. Both are fine while the
+        store is in-memory and one instance is the only correct topology.
+        """
+        return Response(metrics.render(), media_type="text/plain; version=0.0.4")
 
     @app.get("/healthz", tags=["ops"])
     async def healthz() -> dict[str, str]:

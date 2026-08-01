@@ -20,6 +20,9 @@ from uuid import UUID
 from langgraph.graph import END, START, StateGraph
 
 from contracts.primitives import StageName
+from core.obs import metrics
+from core.obs.context import bind
+from core.obs.logging import get_logger
 from core.storage.base import StageOutput, Store
 from orchestration.state import GraphState
 from stages.base import StageContext
@@ -27,6 +30,8 @@ from stages.base import StageContext
 __all__ = ["PipelineResult", "build_graph", "run_pipeline"]
 
 EmitFn = Callable[..., Awaitable[None]]
+
+logger = get_logger("orchestration.graph")
 
 
 class PipelineResult:
@@ -101,8 +106,13 @@ def _make_node(
             return uri
 
         ctx = StageContext(job_id=job_id, options=options, emit=emit, put_artifact=put_artifact)
-        fragment = await stage.run(ctx, state)
+        # Every log line and metric emitted anywhere inside this stage — including
+        # from the LLM client several frames down — carries the job and stage
+        # without either being threaded through a signature.
+        with bind(job_id=str(job_id), stage=stage.name), metrics.observe_stage(stage.name):
+            fragment = await stage.run(ctx, state)
         executed.append(stage.name)
+        logger.info("stage completed", extra={"keys": sorted(fragment)})
 
         await store.put_checkpoint(StageOutput(job_id=job_id, stage=stage.name, output=fragment))
         return fragment
