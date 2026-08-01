@@ -1,0 +1,54 @@
+# Local container smoke test — builds the same image the deploy platform
+# builds and runs it against the .env you already use for `make dev`.
+#
+#   docker compose up --build
+#   curl localhost:8000/healthz
+#
+# This is NOT how the app is deployed (see docs/12-deployment.md for the
+# platform target); it exists so "does the Dockerfile actually work" is a
+# one-line question to answer locally.
+#
+# Postgres is defined but not started by default. Nothing in the app connects
+# to it yet — storage is in-memory (backend/core/storage/memory.py) and the
+# Postgres implementation behind the same Store interface is unwritten. Bring
+# it up explicitly with `--profile with-db` once that lands; until then it
+# would just be a container nothing talks to.
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "${PORT:-8000}:8000"
+    env_file:
+      - .env
+    environment:
+      # `docker run`/compose always binds container-internal port 8000;
+      # the host-side mapping above is what changes.
+      - PORT=8000
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/healthz', timeout=3)"]
+      interval: 30s
+      timeout: 5s
+      start_period: 15s
+      retries: 3
+    restart: unless-stopped
+
+  # Not wired to the app yet — provisioned here so the compose file matches
+  # the target architecture in README.md and doesn't need rewriting when
+  # core/storage/postgres.py lands. `docker compose --profile with-db up`.
+  postgres:
+    image: postgres:16-alpine
+    profiles: ["with-db"]
+    environment:
+      POSTGRES_USER: eduforge
+      POSTGRES_PASSWORD: eduforge
+      POSTGRES_DB: eduforge
+    ports:
+      - "5432:5432"
+    volumes:
+      - eduforge-pg:/var/lib/postgresql/data
+
+volumes:
+  eduforge-pg:

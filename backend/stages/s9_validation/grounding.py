@@ -18,11 +18,31 @@ depending on stage 3's internals would also be the wrong coupling even if it wer
 allowed: stage 3 verifies a quote against one chunk; this verifies a claim against
 a chunk's *content*, a different comparison with a different pair of thresholds.
 
-Two thresholds keep the judge off most claims (LLD § 4.4):
+The pre-filter keeps the judge off most claims (LLD § 4.4), but only in the one
+direction where skipping it is safe:
 
 * overlap ``>= TAU_HIGH``  -> supported, no model call.
-* overlap ``<  TAU_LOW``   -> unsupported, no model call.
-* otherwise                -> the ambiguous middle, batched to the judge.
+* anything else            -> batched to the judge.
+
+The asymmetry is deliberate and was originally got wrong. High overlap means the
+claim nearly restates its chunk, and text that near-copies its source cannot be a
+fabrication, so resolving it without a model call risks nothing. Low overlap means
+only that the claim is *worded differently* from the chunk — which is what a good
+summary, worked example, or misconception looks like. Deciding "unsupported" from
+that signal alone reports a hallucination on the basis of paraphrase.
+
+That is not hypothetical: the reference physics package has an example
+("when a bus brakes suddenly, passengers continue moving forward") that scores
+0.08 against the law it illustrates, and a misconception that scores 0.16, both
+carrying a verbatim quote stage 3 already verified against that same chunk. Under
+the old ``overlap < TAU_LOW -> unsupported`` rule, four of its seven claims were
+declared fabrications without any model ever reading them.
+
+``TAU_LOW`` survives as a *reporting* signal — it separates "the judge had to
+work for this" from "the judge confirmed something close to the text" — and no
+longer decides anything on its own. The only deterministic failure left is a
+citation whose chunk id does not resolve, which is dispositive: there is no
+source to be entailed by.
 """
 
 from __future__ import annotations
@@ -190,11 +210,9 @@ def prefilter(
         overlap = lexical_overlap(claim.text, span)
         if overlap >= TAU_HIGH:
             decided.append(Verdicted(claim, "supported", f"lexical overlap {overlap:.2f}"))
-        elif overlap < TAU_LOW:
-            decided.append(
-                Verdicted(claim, "unsupported", f"lexical overlap {overlap:.2f} below threshold")
-            )
         else:
+            # Everything else needs a real read. Low overlap is a paraphrase
+            # signal, not a fabrication signal — see the module docstring.
             ambiguous.append(claim)
 
     return decided, ambiguous

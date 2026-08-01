@@ -37,9 +37,9 @@ def test_the_roster_covers_every_stage_exactly_once_in_order() -> None:
     assert [stage.name for stage in _roster()] == list(STAGE_NAMES)
 
 
-def test_stages_one_to_eight_are_real() -> None:
+def test_every_stage_is_real() -> None:
     real = [stage for stage in _roster() if not isinstance(stage, StubStage)]
-    assert [stage.name for stage in real] == list(STAGE_NAMES[:8])
+    assert [stage.name for stage in real] == list(STAGE_NAMES)
 
 
 def test_only_the_declared_stubs_remain() -> None:

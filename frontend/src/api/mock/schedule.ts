@@ -1,48 +1,14 @@
+import { STAGE_ORDER } from "../stages";
 import type { JobEventName } from "../types";
 import { FIXTURE_PACKAGE_ID } from "./fixtureData";
 
 /**
- * Stage identifiers for the ten-stage pipeline (docs/05-agent-graph.md §2:
- * parse, classify, extract, plan, period, activities, assess, gaps,
- * validate, publish).
- *
- * Six of these strings are given verbatim in the docs (marked ✓ below, from
- * docs/06-api-spec.md's `GET /jobs/{id}` example and the SSE example). The
- * other four are this module's best inference from the same naming
- * convention used for the first six — the API spec never shows a `stages[]`
- * entry or SSE frame for S7/S8/S9/S10. **This should be confirmed against
- * the worker's actual emitted strings once M4/M8 land**; the timeline UI
- * keys off `stage` string equality, so a mismatch here would just show an
- * "unknown stage" pill rather than break anything, but the labels would be
- * wrong. See the module report for the full flag.
+ * Scheduling for the demo-mode job timeline. Stage identifiers themselves
+ * now live in `api/stages.ts` (mirrored from `backend/contracts/primitives.py`
+ * and `backend/contracts/jobs.py`), shared with the real-mode progress UI so
+ * the two never show a different stage list.
  */
-export const STAGE_ORDER = [
-  "document-intelligence", // ✓ spec (S1)
-  "educational-classification", // ✓ spec (S2)
-  "knowledge-extraction", // ✓ spec (S3)
-  "teaching-planner", // ✓ spec (S4)
-  "lesson-generation", // ✓ spec (S5 — per-period fan-out, weight 25)
-  "activity-generation", // ✓ spec (S6)
-  "assessment-generation", // inferred (S7)
-  "gap-analysis", // inferred (S8)
-  "validation", // inferred (S9)
-  "publishing", // inferred (S10)
-] as const;
-
-export type StageKey = (typeof STAGE_ORDER)[number];
-
-export const STAGE_LABELS: Record<StageKey, string> = {
-  "document-intelligence": "Document Intelligence",
-  "educational-classification": "Classification",
-  "knowledge-extraction": "Knowledge Extraction",
-  "teaching-planner": "Teaching Planner",
-  "lesson-generation": "Lesson Generation",
-  "activity-generation": "Activity Generation",
-  "assessment-generation": "Assessment Generation",
-  "gap-analysis": "Gap Analysis",
-  validation: "Validation",
-  publishing: "Publishing",
-};
+export { STAGE_ORDER };
 
 export interface ScheduledFrame {
   atMs: number;

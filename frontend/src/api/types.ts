@@ -444,6 +444,9 @@ export type JobStatus =
 
 export type StageStatus = "pending" | "running" | "completed" | "failed" | "skipped";
 
+/** Kept for the demo-mode timeline visualisation only — the real
+ * `GET /jobs/{id}` response does not return a per-stage status list, just
+ * `completed_stages` (see `JobSnapshot` below). */
 export interface JobStageSnapshot {
   stage: string;
   status: StageStatus;
@@ -452,30 +455,39 @@ export interface JobStageSnapshot {
   total_items?: number;
 }
 
+/** Mirrors the literal dict `jobs.py::get_job` returns — `{tokens, cost_usd}`,
+ * not the richer token breakdown a `JobOptions`-shaped usage object might
+ * suggest. */
 export interface JobUsage {
-  tokens_in: number;
-  tokens_out: number;
-  cache_read: number;
+  tokens: number;
   cost_usd: number;
 }
 
+/** Mirrors `JobRecord.error` (`core/storage/base.py`): `{type, message}`,
+ * set verbatim from `type(exc).__name__` and `str(exc)`. There is no
+ * `code`/`details` envelope on this path — that shape only exists on the
+ * HTTP `ApiErrorBody` for request-time failures. */
 export interface JobErrorInfo {
-  code: string;
+  type: string;
   message: string;
-  details?: Record<string, unknown>;
 }
 
+/** Wire shape of `GET /jobs/{id}` (`backend/api/routes/jobs.py::get_job`). */
 export interface JobSnapshot {
   job_id: string;
   document_id: string;
   status: JobStatus;
   current_stage: string | null;
   progress: number;
-  stages: JobStageSnapshot[];
+  /** Stage names with a persisted checkpoint — order not guaranteed, the
+   * route sorts alphabetically, not pipeline order. */
+  completed_stages: string[];
   package_id: string | null;
   usage: JobUsage;
   warnings: string[];
   error: JobErrorInfo | null;
+  created_at: string;
+  finished_at: string | null;
 }
 
 export interface CreateJobResponse {
@@ -599,10 +611,34 @@ export class ApiError extends Error {
 
 // ------------------------------------------------------------------- options
 
+/** Mirrors `backend/contracts/jobs.py::TeachingStyle`. */
+export type TeachingStyle =
+  | "balanced"
+  | "lecture_led"
+  | "discussion_led"
+  | "activity_led"
+  | "inquiry_led"
+  | "exam_focused";
+
+/** Mirrors `backend/contracts/jobs.py::DocumentKind`. */
+export type DocumentKind =
+  | "mostly_text"
+  | "text_with_tables"
+  | "text_with_diagrams"
+  | "text_with_equations"
+  | "scanned_pdf"
+  | "unknown";
+
+/** Mirrors `backend/contracts/jobs.py::JobOptions`. Every field is optional
+ * with a server-side default — the point of the contract (FAQ Q5) is that a
+ * teacher who answers nothing still gets a good package. */
 export interface JobOptions {
   period_duration_minutes?: number;
+  teaching_style?: TeachingStyle;
+  learning_goals?: string[];
+  document_kind?: DocumentKind;
   target_period_count?: number | null;
   output_language?: string;
-  curriculum_board?: string;
+  curriculum_board?: string | null;
   include_artifacts?: ArtifactKind[];
 }

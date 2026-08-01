@@ -1,0 +1,38 @@
+# Render Blueprint — https://render.com/docs/blueprint-spec
+#
+# Chosen over Railway (dropped its free-forever tier; a card is required now)
+# and Fly.io (also requires a card on file). Render runs a single free web
+# service from a Dockerfile with no card, gives it a public HTTPS URL, and
+# reads secrets from its dashboard's env var store rather than the repo — see
+# docs/12-deployment.md for the exact click-by-click steps.
+#
+# This file only describes the service; nothing here deploys anything. A
+# human applies it from the Render dashboard ("New +" -> "Blueprint",
+# pointing at this repo) or configures the same service by hand.
+
+services:
+  - type: web
+    name: eduforge-ai
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    plan: free
+    region: oregon
+    healthCheckPath: /healthz
+    autoDeploy: true
+    envVars:
+      # Free-tier OpenRouter models — the profile this repo is built and
+      # tested against. See backend/core/config.py for the full list of
+      # profiles; `production` is the only one meant to run in this service.
+      - key: LLM_PROFILE
+        value: production
+      # Secret — never in this file or the repo. `sync: false` tells Render
+      # to leave it blank on blueprint apply; set the real value once by hand
+      # in the dashboard (Environment tab). Required whenever LLM_PROFILE is
+      # production or dev (backend/core/config.py: Settings._required_key_for_profile).
+      - key: Open_Router_API_KEY
+        sync: false
+      # Render injects PORT itself; the image's CMD already binds to
+      # ${PORT:-8000}, so nothing to set here — listed for visibility only.
+      # - key: PORT
+      #   value: (set by Render)

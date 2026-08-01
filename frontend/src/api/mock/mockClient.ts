@@ -5,14 +5,14 @@ import type {
   DocumentDetail,
   JobOptions,
   JobSnapshot,
-  JobStageSnapshot,
   SamplesResponse,
   TeacherKnowledgePackage,
   UploadDocumentResponse,
   ValidationReport,
 } from "../types";
+import { STAGE_ORDER } from "../stages";
 import { FIXTURE_DOCUMENT_ID, FIXTURE_SAMPLE, FIXTURE_TKP } from "./fixtureData";
-import { STAGE_ORDER, getScriptFor, type MockScenario } from "./schedule";
+import { getScriptFor, type MockScenario } from "./schedule";
 import {
   findDocumentBySha,
   findJobByIdempotencyKey,
@@ -184,23 +184,19 @@ export async function mockCreateJob(
   };
 }
 
-function deriveStages(scenario: MockScenario, elapsedMs: number): JobStageSnapshot[] {
+/** Stage names with a persisted checkpoint, i.e. strictly *before* the
+ * currently-running stage — mirrors what `store.get_checkpoints` would
+ * return on the real backend. The stage a terminal "completed" event lands
+ * on counts as completed too. */
+function deriveCompletedStages(scenario: MockScenario, elapsedMs: number): string[] {
   const script = getScriptFor(scenario);
   const frames = script.filter((f) => f.atMs <= elapsedMs);
   const lastFrame = frames[frames.length - 1];
   const reachedIdx = lastFrame ? STAGE_ORDER.indexOf(lastFrame.stage as (typeof STAGE_ORDER)[number]) : -1;
-
-  return STAGE_ORDER.map((stage, idx) => {
-    if (lastFrame?.event === "failed" && stage === lastFrame.stage) {
-      return { stage, status: "failed" as const };
-    }
-    if (idx < reachedIdx) return { stage, status: "completed" as const };
-    if (idx === reachedIdx) {
-      const terminal = lastFrame?.event === "completed" || lastFrame?.event === "failed";
-      return { stage, status: terminal ? ("completed" as const) : ("running" as const) };
-    }
-    return { stage, status: "pending" as const };
-  });
+  if (reachedIdx < 0) return [];
+  const terminal = lastFrame?.event === "completed" || lastFrame?.event === "failed";
+  const cutoff = terminal && lastFrame?.event === "completed" ? reachedIdx + 1 : reachedIdx;
+  return STAGE_ORDER.slice(0, cutoff).sort();
 }
 
 export async function mockGetJob(jobId: string): Promise<JobSnapshot> {
@@ -226,19 +222,23 @@ export async function mockGetJob(jobId: string): Promise<JobSnapshot> {
     status = "running";
   }
 
+  const rawError = lastFrame?.event === "failed" ? (lastFrame.extra?.error as Record<string, string> | undefined) : undefined;
+
   return {
     job_id: state.jobId,
     document_id: state.documentId,
     status,
     current_stage: currentStage,
     progress,
-    stages: deriveStages(state.scenario, elapsed),
+    completed_stages: deriveCompletedStages(state.scenario, elapsed),
     package_id: state.packageId,
-    usage: { tokens_in: 184_300, tokens_out: 41_200, cache_read: 121_000, cost_usd: 2.14 },
+    usage: { tokens: 225_500, cost_usd: 2.14 },
     warnings: state.scenario === "partial" ? ["assessment-generation degraded — token budget low"] : [],
-    error:
-      lastFrame?.event === "failed"
-        ? ((lastFrame.extra?.error as JobSnapshot["error"]) ?? null)
+    error: rawError ? { type: rawError.code ?? "PipelineError", message: rawError.message } : null,
+    created_at: new Date(state.createdAtMs).toISOString(),
+    finished_at:
+      status === "succeeded" || status === "succeeded_partial" || status === "failed" || status === "cancelled"
+        ? new Date(state.createdAtMs + elapsed).toISOString()
         : null,
   };
 }

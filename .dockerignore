@@ -1,0 +1,53 @@
+# Keep the build context small and never ship local secrets or caches into
+# the image. Mirrors .gitignore where the two overlap.
+
+# secrets — never bake into an image
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# git / ci
+.git/
+.github/
+
+# python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+.import_linter_cache/
+.coverage
+htmlcov/
+
+# node / frontend (frontend-build stage installs its own node_modules)
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+
+# local artifacts / dev-only files
+/data/
+/uploads/
+/blob/
+evals/reports/*
+!evals/reports/.gitkeep
+Task Intern-2.pdf
+FAQ.md
+*.md
+!README.md
+
+# os / editor
+.DS_Store
+Thumbs.db
+*.swp
+.idea/
+.vscode/
+*:Zone.Identifier
+
+# deploy configs themselves don't need to be in the build context
+docker-compose.yml

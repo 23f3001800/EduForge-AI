@@ -1,0 +1,722 @@
+{
+  "activities": [
+    {
+      "activity_id": "act_1",
+      "concept_ids": [
+        "concept_inertia"
+      ],
+      "differentiation": {
+        "extension": "Ask what changes if the card is flicked slowly, and why.",
+        "support": "Provide a sentence frame: 'The coin stayed still because...'"
+      },
+      "duration_minutes": 12,
+      "materials": [
+        "A stiff card",
+        "A coin",
+        "A glass"
+      ],
+      "period_no": 1,
+      "student_instructions": [
+        "Predict, then observe, then explain using inertia."
+      ],
+      "success_criteria": [
+        "Student predicts the coin falls into the glass.",
+        "Student explains it using resistance to a change in motion."
+      ],
+      "teacher_instructions": [
+        "Balance the card on the glass with the coin on top.",
+        "Flick the card horizontally and have students predict what happens."
+      ],
+      "title": "Coin and card",
+      "type": "demonstration"
+    },
+    {
+      "activity_id": "act_2",
+      "concept_ids": [
+        "concept_second_law"
+      ],
+      "differentiation": {
+        "extension": "Introduce a two-force problem requiring a net force first.",
+        "support": "Provide the rearranged formula a = F/m on the sheet."
+      },
+      "duration_minutes": 12,
+      "materials": [
+        "Worksheet",
+        "Calculator"
+      ],
+      "period_no": 2,
+      "student_instructions": [
+        "Solve for a given F and m; state units at every step."
+      ],
+      "success_criteria": [
+        "Correct value with correct units on at least three items."
+      ],
+      "teacher_instructions": [
+        "Work the first item aloud, then release students to pairs."
+      ],
+      "title": "Computing acceleration",
+      "type": "problem_set"
+    }
+  ],
+  "assessments": {
+    "blueprint": {
+      "items_by_bloom": {
+        "apply": 1,
+        "understand": 1
+      },
+      "items_by_kind": {
+        "mcq": 1,
+        "numerical": 1
+      },
+      "marks_by_concept": {
+        "concept_inertia": 1,
+        "concept_second_law": 3
+      }
+    },
+    "items": [
+      {
+        "answer": "B",
+        "bloom_level": "understand",
+        "concept_ids": [
+          "concept_inertia"
+        ],
+        "item_id": "item_1",
+        "kind": "mcq",
+        "linked_misconception_id": "mis_1",
+        "marks": 1,
+        "options": [
+          {
+            "is_correct": false,
+            "label": "A",
+            "rationale": "Targets the belief that motion requires a force.",
+            "text": "A forward force acts on them"
+          },
+          {
+            "is_correct": true,
+            "label": "B",
+            "rationale": null,
+            "text": "They continue moving while the bus slows"
+          },
+          {
+            "is_correct": false,
+            "label": "C",
+            "rationale": "Confuses weight with motion.",
+            "text": "Gravity increases during braking"
+          },
+          {
+            "is_correct": false,
+            "label": "D",
+            "rationale": null,
+            "text": "Air pressure pushes them forward"
+          }
+        ],
+        "rubric": null,
+        "stem": "A bus brakes suddenly and passengers lurch forward. Why?",
+        "working": null
+      },
+      {
+        "answer": "3 m/s^2",
+        "bloom_level": "apply",
+        "concept_ids": [
+          "concept_second_law"
+        ],
+        "item_id": "item_2",
+        "kind": "numerical",
+        "linked_misconception_id": null,
+        "marks": 3,
+        "options": null,
+        "rubric": {
+          "criteria": "Correct method, substitution, and units",
+          "levels": [
+            {
+              "descriptor": "Correct value with units.",
+              "label": "Complete",
+              "marks": 3
+            },
+            {
+              "descriptor": "Correct method, wrong units.",
+              "label": "Partial",
+              "marks": 2
+            },
+            {
+              "descriptor": "Formula stated only.",
+              "label": "Minimal",
+              "marks": 1
+            }
+          ]
+        },
+        "stem": "A 4 kg trolley experiences a net force of 12 N. Find its acceleration.",
+        "working": "a = F/m = 12 N / 4 kg = 3 m/s^2"
+      }
+    ],
+    "total_marks": 4
+  },
+  "classification": {
+    "category": "textbook_chapter",
+    "chapter": "Chapter 5",
+    "confidences": {
+      "grade_band": 0.88,
+      "subject": 0.97,
+      "topic": 0.95
+    },
+    "curriculum_alignment": null,
+    "difficulty": "intermediate",
+    "grade_band": "9-10",
+    "language": "en",
+    "low_confidence_fields": [],
+    "pedagogy_profile": "quantitative",
+    "subject": "Physics",
+    "topic": "Newton's Laws of Motion"
+  },
+  "classroom_content": [
+    {
+      "activity_refs": [
+        "act_1"
+      ],
+      "blackboard_notes": {
+        "bullet_points": [
+          "Resists change in motion",
+          "Needs an external unbalanced force"
+        ],
+        "diagrams_to_draw": [
+          "Block on a surface with force arrows"
+        ],
+        "formulae_latex": [
+          "\\vec{F} = m\\vec{a}"
+        ],
+        "headings": [
+          "Inertia and the First Law"
+        ]
+      },
+      "checkpoint_questions": [
+        {
+          "bloom_level": "understand",
+          "concept_ids": [
+            "concept_inertia"
+          ],
+          "expected_answer": "Yes — gravity and the normal force, which balance to zero net force.",
+          "question": "A book rests on a table. Is a force acting on it?"
+        }
+      ],
+      "entry_ticket": {
+        "duration_minutes": 5,
+        "expected_response": "Any example of continued motion, e.g. a rolling ball.",
+        "prompt": "Name one situation where something kept moving after you stopped pushing it."
+      },
+      "exit_ticket": {
+        "duration_minutes": 3,
+        "prompt": "In one sentence, why do passengers lurch forward when a bus brakes?",
+        "success_indicator": "Answer refers to continued motion, not to a forward force."
+      },
+      "homework": {
+        "estimated_minutes": 20,
+        "submission_format": "Notebook",
+        "tasks": [
+          "Find two examples of inertia at home and explain each in one sentence."
+        ]
+      },
+      "mentor_moment": {
+        "grounded": false,
+        "story": "Newton developed much of his work on motion while Cambridge was closed during an outbreak, working alone at his family home.",
+        "takeaway": "Progress often comes from steady thinking in unpromising conditions.",
+        "title": "Newton in a plague year"
+      },
+      "period_no": 1,
+      "teacher_script": [
+        {
+          "anticipated_questions": [],
+          "board_action": "Write the three best student examples in a column.",
+          "heading": "Entry ticket",
+          "minute_end": 5,
+          "minute_start": 0,
+          "speaker_notes": "Collect two or three answers without correcting them yet."
+        },
+        {
+          "anticipated_questions": [
+            "Why does a rolling ball eventually stop?"
+          ],
+          "board_action": "Write the formal statement beneath the examples.",
+          "heading": "Inertia and the First Law",
+          "minute_end": 20,
+          "minute_start": 5,
+          "speaker_notes": "Introduce the idea using the student examples already on the board, then state the law formally."
+        },
+        {
+          "anticipated_questions": [],
+          "board_action": null,
+          "heading": "Activity",
+          "minute_end": 32,
+          "minute_start": 20,
+          "speaker_notes": "Run the activity; circulate and listen for the misconception."
+        },
+        {
+          "anticipated_questions": [],
+          "board_action": null,
+          "heading": "Checkpoint",
+          "minute_end": 37,
+          "minute_start": 32,
+          "speaker_notes": "Pose the checkpoint question; take a show of hands before answers."
+        },
+        {
+          "anticipated_questions": [],
+          "board_action": null,
+          "heading": "Exit ticket",
+          "minute_end": 40,
+          "minute_start": 37,
+          "speaker_notes": "Collect exit tickets at the door."
+        }
+      ]
+    },
+    {
+      "activity_refs": [
+        "act_2"
+      ],
+      "blackboard_notes": {
+        "bullet_points": [
+          "Resists change in motion",
+          "Needs an external unbalanced force"
+        ],
+        "diagrams_to_draw": [
+          "Block on a surface with force arrows"
+        ],
+        "formulae_latex": [
+          "\\vec{F} = m\\vec{a}"
+        ],
+        "headings": [
+          "Force, Mass and Acceleration"
+        ]
+      },
+      "checkpoint_questions": [
+        {
+          "bloom_level": "understand",
+          "concept_ids": [
+            "concept_inertia"
+          ],
+          "expected_answer": "Yes — gravity and the normal force, which balance to zero net force.",
+          "question": "A book rests on a table. Is a force acting on it?"
+        }
+      ],
+      "entry_ticket": {
+        "duration_minutes": 5,
+        "expected_response": "Any example of continued motion, e.g. a rolling ball.",
+        "prompt": "Name one situation where something kept moving after you stopped pushing it."
+      },
+      "exit_ticket": {
+        "duration_minutes": 3,
+        "prompt": "In one sentence, why do passengers lurch forward when a bus brakes?",
+        "success_indicator": "Answer refers to continued motion, not to a forward force."
+      },
+      "homework": {
+        "estimated_minutes": 20,
+        "submission_format": "Notebook",
+        "tasks": [
+          "Find two examples of inertia at home and explain each in one sentence."
+        ]
+      },
+      "mentor_moment": {
+        "grounded": false,
+        "story": "Newton developed much of his work on motion while Cambridge was closed during an outbreak, working alone at his family home.",
+        "takeaway": "Progress often comes from steady thinking in unpromising conditions.",
+        "title": "Newton in a plague year"
+      },
+      "period_no": 2,
+      "teacher_script": [
+        {
+          "anticipated_questions": [],
+          "board_action": "Write the three best student examples in a column.",
+          "heading": "Entry ticket",
+          "minute_end": 5,
+          "minute_start": 0,
+          "speaker_notes": "Collect two or three answers without correcting them yet."
+        },
+        {
+          "anticipated_questions": [
+            "Why does a rolling ball eventually stop?"
+          ],
+          "board_action": "Write the formal statement beneath the examples.",
+          "heading": "Force, Mass and Acceleration",
+          "minute_end": 20,
+          "minute_start": 5,
+          "speaker_notes": "Introduce the idea using the student examples already on the board, then state the law formally."
+        },
+        {
+          "anticipated_questions": [],
+          "board_action": null,
+          "heading": "Activity",
+          "minute_end": 32,
+          "minute_start": 20,
+          "speaker_notes": "Run the activity; circulate and listen for the misconception."
+        },
+        {
+          "anticipated_questions": [],
+          "board_action": null,
+          "heading": "Checkpoint",
+          "minute_end": 37,
+          "minute_start": 32,
+          "speaker_notes": "Pose the checkpoint question; take a show of hands before answers."
+        },
+        {
+          "anticipated_questions": [],
+          "board_action": null,
+          "heading": "Exit ticket",
+          "minute_end": 40,
+          "minute_start": 37,
+          "speaker_notes": "Collect exit tickets at the door."
+        }
+      ]
+    }
+  ],
+  "generated_at": "2026-07-31T12:00:00Z",
+  "generator": {
+    "app_version": "0.1.0",
+    "models_by_stage": {
+      "knowledge-extraction": "claude-opus-5"
+    },
+    "providers_by_stage": {
+      "knowledge-extraction": "anthropic"
+    }
+  },
+  "knowledge": {
+    "applications": [
+      {
+        "concept_ids": [
+          "concept_inertia"
+        ],
+        "context": "Vehicle safety",
+        "description": "Seat belts counter the forward motion a braking passenger retains.",
+        "evidence": [
+          {
+            "chunk_id": "c_001",
+            "confidence": 1.0,
+            "page": 1,
+            "quote": "unless acted upon by an external unbalanced force"
+          }
+        ]
+      }
+    ],
+    "concept_graph": {
+      "edges": [
+        {
+          "confidence": 0.9,
+          "from_id": "concept_inertia",
+          "relation": "prerequisite_of",
+          "to_id": "concept_second_law"
+        }
+      ],
+      "node_ids": [
+        "concept_inertia",
+        "concept_second_law"
+      ]
+    },
+    "concepts": [
+      {
+        "concept_id": "concept_inertia",
+        "evidence": [
+          {
+            "chunk_id": "c_001",
+            "confidence": 1.0,
+            "page": 1,
+            "quote": "A body continues in its state of rest or uniform motion"
+          }
+        ],
+        "importance": "core",
+        "name": "Inertia",
+        "summary": "A body resists any change to its state of rest or uniform motion."
+      },
+      {
+        "concept_id": "concept_second_law",
+        "evidence": [
+          {
+            "chunk_id": "c_002",
+            "confidence": 1.0,
+            "page": 2,
+            "quote": "The acceleration of a body is proportional to the net force"
+          }
+        ],
+        "importance": "core",
+        "name": "Newton's Second Law",
+        "summary": "Net force equals mass times acceleration."
+      }
+    ],
+    "definitions": [
+      {
+        "concept_ids": [
+          "concept_inertia"
+        ],
+        "definition": "The tendency of a body to resist a change in its state of motion.",
+        "evidence": [
+          {
+            "chunk_id": "c_001",
+            "confidence": 1.0,
+            "page": 1,
+            "quote": "unless acted upon by an external unbalanced force"
+          }
+        ],
+        "term": "Inertia"
+      }
+    ],
+    "examples": [
+      {
+        "body": "When a bus brakes suddenly, passengers continue moving forward.",
+        "concept_ids": [
+          "concept_inertia"
+        ],
+        "evidence": [
+          {
+            "chunk_id": "c_001",
+            "confidence": 1.0,
+            "page": 1,
+            "quote": "continues in its state of rest or uniform motion"
+          }
+        ],
+        "title": "Passenger lurching forward"
+      }
+    ],
+    "formulae": [
+      {
+        "concept_ids": [
+          "concept_second_law"
+        ],
+        "evidence": [
+          {
+            "chunk_id": "c_002",
+            "confidence": 1.0,
+            "page": 2,
+            "quote": "the net force: F = m a"
+          }
+        ],
+        "latex": "\\vec{F} = m\\vec{a}",
+        "name": "Newton's Second Law",
+        "plain": "F equals m times a",
+        "variables": [
+          {
+            "meaning": "net force",
+            "symbol": "F",
+            "unit": "N"
+          },
+          {
+            "meaning": "mass",
+            "symbol": "m",
+            "unit": "kg"
+          },
+          {
+            "meaning": "acceleration",
+            "symbol": "a",
+            "unit": "m/s^2"
+          }
+        ]
+      }
+    ],
+    "keywords": [
+      "inertia",
+      "force",
+      "acceleration",
+      "mass"
+    ],
+    "learning_objectives": [
+      {
+        "bloom_level": "understand",
+        "concept_ids": [
+          "concept_inertia"
+        ],
+        "objective_id": "obj_1",
+        "statement": "State Newton's first law and identify it acting in everyday situations."
+      },
+      {
+        "bloom_level": "apply",
+        "concept_ids": [
+          "concept_second_law"
+        ],
+        "objective_id": "obj_2",
+        "statement": "Calculate the acceleration of a body given net force and mass."
+      }
+    ],
+    "misconceptions": [
+      {
+        "concept_ids": [
+          "concept_inertia"
+        ],
+        "correction": "Uniform motion needs no net force; friction is what requires opposing it.",
+        "evidence": [
+          {
+            "chunk_id": "c_001",
+            "confidence": 1.0,
+            "page": 1,
+            "quote": "unless acted upon by an external unbalanced force"
+          }
+        ],
+        "misconception_id": "mis_1",
+        "statement": "A moving object must have a force acting on it to keep moving.",
+        "why_it_happens": "Everyday motion always involves friction, hiding the ideal case."
+      }
+    ],
+    "prerequisites": [
+      {
+        "concept_ids": [],
+        "statement": "Familiarity with speed, velocity, and mass."
+      }
+    ]
+  },
+  "learning_gaps": [
+    {
+      "concept_ids": [
+        "concept_inertia"
+      ],
+      "diagnostic_questions": [
+        {
+          "expected_wrong_answer": "A forward force from the push.",
+          "question": "A puck slides on frictionless ice. What force keeps it moving?",
+          "reveals": "Naming any force shows the misconception is still held."
+        }
+      ],
+      "evidence": [
+        {
+          "chunk_id": "c_001",
+          "confidence": 1.0,
+          "page": 1,
+          "quote": "unless acted upon by an external unbalanced force"
+        }
+      ],
+      "gap_id": "gap_1",
+      "misconception": "Motion requires a continuously applied force.",
+      "remediation": [
+        {
+          "action": "Contrast a low-friction and a high-friction surface side by side.",
+          "estimated_minutes": 10,
+          "rationale": "Isolates friction as the cause of stopping, not the absence of force."
+        }
+      ],
+      "severity": "high"
+    }
+  ],
+  "provenance": {
+    "citations": [],
+    "stage_timings": [
+      {
+        "attempts": 1,
+        "degraded": false,
+        "duration_ms": 31500,
+        "stage": "knowledge-extraction",
+        "tokens_cached": 0,
+        "tokens_in": 0,
+        "tokens_out": 0
+      }
+    ],
+    "total_cost_usd": 2.14,
+    "total_duration_ms": 96000,
+    "total_tokens_in": 184300,
+    "total_tokens_out": 41200
+  },
+  "schema_version": "1.0.0",
+  "source": {
+    "author": "NCERT",
+    "created_at": "2026-07-31T12:00:00Z",
+    "detected_language": "en",
+    "filename": "newtons-laws.pdf",
+    "mime": "application/pdf",
+    "page_count": 12,
+    "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "size_bytes": 184320,
+    "title": "Newton's Laws of Motion",
+    "word_count": 3400
+  },
+  "teaching_plan": {
+    "period_duration_minutes": 40,
+    "periods": [
+      {
+        "concept_ids": [
+          "concept_inertia"
+        ],
+        "objective_ids": [
+          "obj_1"
+        ],
+        "period_no": 1,
+        "sequence_rationale": "Inertia is the prerequisite for the second law, so it is taught first.",
+        "time_allocation": [
+          {
+            "label": "Entry ticket",
+            "minutes": 5
+          },
+          {
+            "label": "Direct instruction",
+            "minutes": 15
+          },
+          {
+            "label": "Activity",
+            "minutes": 12
+          },
+          {
+            "label": "Checkpoint",
+            "minutes": 5
+          },
+          {
+            "label": "Exit ticket",
+            "minutes": 3
+          }
+        ],
+        "title": "Inertia and the First Law"
+      },
+      {
+        "concept_ids": [
+          "concept_second_law"
+        ],
+        "objective_ids": [
+          "obj_2"
+        ],
+        "period_no": 2,
+        "sequence_rationale": "Builds quantitatively on the qualitative idea of inertia.",
+        "time_allocation": [
+          {
+            "label": "Entry ticket",
+            "minutes": 5
+          },
+          {
+            "label": "Derivation",
+            "minutes": 15
+          },
+          {
+            "label": "Problem set",
+            "minutes": 12
+          },
+          {
+            "label": "Checkpoint",
+            "minutes": 5
+          },
+          {
+            "label": "Exit ticket",
+            "minutes": 3
+          }
+        ],
+        "title": "Force, Mass and Acceleration"
+      }
+    ],
+    "total_periods": 2,
+    "unmapped_objective_ids": []
+  },
+  "tkp_id": "22222222-2222-4222-8222-222222222222",
+  "validation": {
+    "attempts": 1,
+    "checked_at": "2026-07-31T12:00:00Z",
+    "consistency": {
+      "dangling_activity_refs": [],
+      "duplicate_concept_ids": [],
+      "prerequisite_violations": [],
+      "timing_ok": true
+    },
+    "coverage": {
+      "concepts_taught": 2,
+      "concepts_total": 2,
+      "objectives_assessed": 2,
+      "objectives_planned": 2,
+      "objectives_total": 2,
+      "unassessed_objective_ids": [],
+      "untaught_concept_ids": []
+    },
+    "grounding_score": 1.0,
+    "issues": [],
+    "profile_ruleset": "quantitative",
+    "schema_ok": true,
+    "status": "pass",
+    "unsupported_claims": []
+  }
+}

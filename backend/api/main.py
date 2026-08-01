@@ -10,14 +10,18 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import FileResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
 
 from api.routes import documents, events, jobs
 from contracts.primitives import SCHEMA_VERSION
-from core.config import get_settings
+from core.config import REPO_ROOT, get_settings
 
 API_PREFIX = "/api/v1"
+
+#: Where `npm run build` puts the bundle, and where the Dockerfile copies it.
+FRONTEND_DIST = REPO_ROOT / "frontend" / "dist"
 
 
 def create_app() -> FastAPI:
@@ -64,7 +68,50 @@ def create_app() -> FastAPI:
             "schema_version": SCHEMA_VERSION,
         }
 
+    _mount_frontend(app)
     return app
+
+
+def _mount_frontend(app: FastAPI) -> None:
+    """Serve the built SPA from this same app, if it has been built.
+
+    Mounted last so it can never shadow ``/api/v1``, ``/healthz`` or ``/readyz``
+    — Starlette matches routes in registration order, and this one matches
+    everything.
+
+    Absent ``dist/`` is not an error: the backend suite and ``make dev`` run
+    against an unbuilt frontend constantly, and failing to boot over a missing
+    static bundle would make the API undevelopable. The deployed image always has
+    it, because the Dockerfile builds it in an earlier stage.
+    """
+    if not (FRONTEND_DIST / "index.html").is_file():
+        return
+
+    assets = FRONTEND_DIST / "assets"
+    if assets.is_dir():
+        app.mount("/assets", StaticFiles(directory=assets), name="assets")
+
+    @app.get("/{path:path}", include_in_schema=False)
+    async def spa(path: str) -> FileResponse:
+        """Any non-API path resolves to the SPA shell.
+
+        The frontend routes client-side, so a hard refresh on ``/run/<job-id>``
+        arrives here as a real GET the server has no route for. Returning
+        ``index.html`` is what lets the router take over — without it a refresh
+        mid-run 404s, which is precisely the moment the progress stream is
+        supposed to prove it survives one.
+
+        A real file wins over the shell so ``favicon.ico`` and friends resolve;
+        anything under ``api/`` 404s honestly instead of returning HTML to a
+        caller that asked for JSON.
+        """
+        if path.startswith("api/"):
+            raise HTTPException(404, detail={"code": "not_found"})
+
+        candidate = (FRONTEND_DIST / path).resolve()
+        if path and candidate.is_file() and candidate.is_relative_to(FRONTEND_DIST.resolve()):
+            return FileResponse(candidate)
+        return FileResponse(FRONTEND_DIST / "index.html")
 
 
 app = create_app()

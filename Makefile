@@ -15,8 +15,14 @@ IMPORTS := ./.venv/bin/lint-imports
 BACKEND := backend
 export PYTHONPATH := $(BACKEND)
 
+DOCKER      := docker
+IMAGE       := eduforge-ai
+CONTAINER   := eduforge-ai
+
 .DEFAULT_GOAL := help
-.PHONY: help venv install dev test test-contract lint boundaries fmt typecheck schema fixtures check clean
+# `samples` must be declared phony: samples/ is a real directory, so without this
+# make considers the target already built and does nothing.
+.PHONY: help venv install dev test test-contract lint boundaries fmt typecheck schema fixtures evals samples check clean docker-build docker-run
 
 help:  ## Show available targets
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) \
@@ -60,6 +66,19 @@ check:  ## Everything CI runs
 	$(IMPORTS) --config $(BACKEND)/pyproject.toml
 	$(PY) -m pytest $(BACKEND)/tests -q
 
+evals:  ## Score the reference packages on the 9-dimension rubric
+	$(PY) -m pytest $(BACKEND)/tests/unit/test_evals.py -q
+	$(PY) scripts/build_samples.py
+
+samples:  ## Regenerate samples/ (packages, PDFs, eval reports) from the fixtures
+	$(PY) scripts/build_samples.py
+
 clean:  ## Remove caches and build artifacts
 	rm -rf .pytest_cache .ruff_cache .mypy_cache
 	find $(BACKEND) -type d -name __pycache__ -prune -exec rm -rf {} +
+
+docker-build:  ## Build the production image (see Dockerfile)
+	$(DOCKER) build -t $(IMAGE) .
+
+docker-run:  ## Run the image locally on :8000 using ./.env (needs docker-build first)
+	$(DOCKER) run --rm -p 8000:8000 --env-file .env --name $(CONTAINER) $(IMAGE)
