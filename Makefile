@@ -22,7 +22,7 @@ CONTAINER   := eduforge-ai
 .DEFAULT_GOAL := help
 # `samples` must be declared phony: samples/ is a real directory, so without this
 # make considers the target already built and does nothing.
-.PHONY: help venv install dev test test-contract lint boundaries fmt typecheck schema fixtures evals samples check clean docker-build docker-run
+.PHONY: help venv install dev test test-contract lint boundaries hygiene fmt typecheck schema fixtures evals samples check clean docker-build docker-run
 
 help:  ## Show available targets
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) \
@@ -60,8 +60,12 @@ typecheck:  ## Static type check
 schema:  ## Regenerate the published JSON Schema and fixtures
 	$(PY) scripts/generate_schema.py
 
+hygiene:  ## Fail if generated files or secrets are tracked
+	$(PY) scripts/check_repo_hygiene.py
+
 check:  ## Everything CI runs
 	$(PY) scripts/generate_schema.py --check
+	$(PY) scripts/check_repo_hygiene.py
 	$(PY) -m ruff check $(BACKEND) scripts
 	$(IMPORTS) --config $(BACKEND)/pyproject.toml
 	$(PY) -m pytest $(BACKEND)/tests -q

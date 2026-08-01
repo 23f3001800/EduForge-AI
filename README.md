@@ -1,5 +1,20 @@
 # EduForge AI
 
+[![Live](https://img.shields.io/badge/demo-live-2ea043?style=flat-square)](https://eduforge-ai.azurewebsites.net)
+[![Tests](https://img.shields.io/badge/tests-312%20passing-2ea043?style=flat-square)](#testing)
+[![Stages](https://img.shields.io/badge/pipeline-10%20stages-1f6feb?style=flat-square)](#the-ten-stages)
+[![Boundaries](https://img.shields.io/badge/module%20boundaries-enforced-1f6feb?style=flat-square)](#architecture)
+[![Grounding](https://img.shields.io/badge/citations-mandatory-0e7490?style=flat-square)](#five-decisions-that-shape-everything)
+
+[![Python](https://img.shields.io/badge/Python-3.12-3776AB?style=flat-square&logo=python&logoColor=white)](https://www.python.org/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=flat-square&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
+[![LangGraph](https://img.shields.io/badge/LangGraph-orchestration-1C3C3C?style=flat-square)](https://langchain-ai.github.io/langgraph/)
+[![Pydantic](https://img.shields.io/badge/Pydantic-v2-E92063?style=flat-square&logo=pydantic&logoColor=white)](https://docs.pydantic.dev/)
+[![Next.js](https://img.shields.io/badge/Next.js-14-000000?style=flat-square&logo=nextdotjs&logoColor=white)](https://nextjs.org/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?style=flat-square&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![Tailwind](https://img.shields.io/badge/Tailwind-3-06B6D4?style=flat-square&logo=tailwindcss&logoColor=white)](https://tailwindcss.com/)
+[![Azure](https://img.shields.io/badge/Azure-App%20Service-0078D4?style=flat-square&logo=microsoftazure&logoColor=white)](https://eduforge-ai.azurewebsites.net)
+
 **Live: <https://eduforge-ai.azurewebsites.net>** · [API docs](https://eduforge-ai.azurewebsites.net/api/v1/docs) · [health](https://eduforge-ai.azurewebsites.net/healthz) · [samples](samples/)
 
 Upload a chapter — PDF, DOCX, PPTX or text — and get back a **Teacher Knowledge
@@ -11,6 +26,21 @@ claim.
 A ten-stage pipeline does the work. The same code path handles a physics chapter
 and a history chapter, and produces genuinely different material for each,
 without anything in the system knowing what a "subject" is.
+
+### Submission checklist
+
+| Required | Where |
+|---|---|
+| **1. Deployed working prototype** | <https://eduforge-ai.azurewebsites.net> — upload a document, watch it run, read the package |
+| **2. Source code** | <https://github.com/23f3001800/EduForge-AI> — backend, AI orchestration, and frontend |
+| **3. README** — setup, architecture diagram, orchestration explanation | [Running it locally](#running-it-locally) · [Architecture](#architecture) · [AI orchestration](#ai-orchestration) |
+| **4. ≥2 sample TKP files** | [`samples/`](samples/) — one quantitative, one narrative, each with PDFs and an eval report |
+
+**Bonus features:** [multi-agent orchestration](#ai-orchestration) ·
+[traceability](#five-decisions-that-shape-everything) ·
+[curriculum alignment](#curriculum-boards) · [performance](#performance) ·
+[observability](#observability) · [multilingual](#multilingual). Status and
+honest gaps for each are in [Bonus features](#bonus-features).
 
 ---
 
@@ -207,6 +237,38 @@ Base path `/api/v1`. Full spec at [`/api/v1/docs`](https://eduforge-ai.azurewebs
 
 ---
 
+## AI orchestration
+
+**LangGraph** owns topology, state reduction and conditional retry edges. Model
+calls inside each node go through our own `LLMClient` wrapping the provider SDK
+directly — not a generic chain abstraction — so structured outputs, prompt
+caching and exact token accounting survive.
+
+Three choices are worth stating, because each was a fork:
+
+**The graph is built from the stage roster, not hand-wired.** `build_graph`
+chains a list pairwise, so a stage added to
+[`orchestration/pipeline.py`](backend/orchestration/pipeline.py) *is* a stage in
+the pipeline. There is no second place to update and no way for the two to
+disagree.
+
+**Checkpointing is ours, not LangGraph's saver.** One source of truth for "what
+has this job completed" — the `stage_outputs` store — beats two that can disagree
+at minute nine of a twelve-minute run. It is also what makes a retry resume at
+the first incomplete stage without re-billing the ones that succeeded.
+
+**Ten agents with enforced separation.** Each stage is its own package with one
+responsibility, and `import-linter` fails the build if one imports another. That
+is what let stages be built in parallel, and it is why replacing a stage is a
+local edit rather than an archaeology exercise.
+
+Every stage reads a narrowed view of state, writes the keys it owns, and emits
+progress through `stage_span`. A stage never sees the whole document, only the
+slice its job needs — which is also why prompts stay small enough for a
+free-tier model to answer well.
+
+---
+
 ## Architecture
 
 **Modular monolith with enforced boundaries**, not ten microservices.
@@ -312,6 +374,54 @@ against synthetic input proves nothing. Tests worth knowing about:
   the earliest sign a provider or prompt has degraded.
 - **`trace_id`** on every error response, matching `X-Request-ID` and the logs.
   An inbound request id from a proxy is honoured rather than renamed.
+
+---
+
+## Bonus features
+
+Status is stated honestly — a ✅ means it is built *and* verified, and where it
+is only half done the missing half is named.
+
+| Feature | Status | What exists |
+|---|---|---|
+| **Multi-agent orchestration** | ✅ | Ten stages, one responsibility each, LangGraph topology built from the roster, separation enforced by CI. [Details](#ai-orchestration) |
+| **Curriculum alignment** | ✅ | CBSE / ICSE / IB / Common Core compose with the pedagogy profile by multiplication. [Details](#curriculum-boards) |
+| **Observability** | ✅ | Structured JSON logs with correlation, `/metrics`, `trace_id` on every error, retry with provider-stated backoff. [Details](#observability) |
+| **Performance** | ✅ | See [Performance](#performance). Caching is the one piece not built. |
+| **RAG & traceability** | 🟡 | Traceability is complete and is the system's strongest property — evidence is *unconstructable* if absent, verified deterministically before any judge. **But there is no vector retrieval**: `EMBEDDINGS=none`, chunks go to the model whole. Calling it RAG would overstate it. |
+| **Multilingual** | 🟡 | See [Multilingual](#multilingual). Plumbed and unit-tested; not yet verified against a live model. |
+
+### Performance
+
+- **Concurrent per-period generation.** Stage 5 is 25% of a run and its periods
+  share no state, so they are generated in parallel rather than one at a time.
+  Bounded by the LLM client's semaphore, so the concurrency ceiling lives in one
+  place and a provider's rate limit is respected across every stage at once.
+- **Batched grounding judge** — 20 claims per call, never one call per claim.
+- **Deterministic pre-filter** resolves most claims with no model call at all.
+- **Token budget and ceiling fitting** per job, so a pathological run stops at a
+  known limit rather than discovering it on a bill.
+- **Not built: caching.** A content-hash cache across runs is the obvious next
+  win and is not there.
+
+The concurrency tests measure *overlap*, not output — a test that only checked
+the result would pass just as happily against the sequential version.
+
+### Multilingual
+
+`output_language` threads a directive through all five generation stages:
+natural-language **values** are translated, JSON **keys** stay English. The keys
+half is what keeps the schema, the viewer and the PDF renderers working — a
+package with translated keys would break all three at once, silently.
+
+Devanagari renders as real glyphs, proven by round-tripping the exact string back
+out of a rendered PDF (a tofu render could not). Fonts ship in the repo under the
+SIL OFL.
+
+**The gap:** this has not been run end to end against a live model in a
+non-English language. The unit tests cover the directive and the rendering; they
+cannot prove a model obeys it. Complex-script shaping also uses fpdf2's own
+engine rather than HarfBuzz, so conjuncts are not typographically perfect.
 
 ---
 
