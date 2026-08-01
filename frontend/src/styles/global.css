@@ -113,7 +113,10 @@ ol {
   position: sticky;
   top: 0;
   z-index: 20;
-  height: var(--ef-header-height);
+  /* `min-height`, not `height`. A fixed height cannot contain a wrapped row,
+     so at 360px the demo toggle pushed the wordmark out of the header
+     entirely. */
+  min-height: var(--ef-header-height);
   display: flex;
   align-items: center;
   border-bottom: 1px solid var(--ef-color-border);
@@ -125,10 +128,11 @@ ol {
   width: 100%;
   max-width: var(--ef-max-width);
   margin: 0 auto;
-  padding: 0 var(--ef-space-5);
+  padding: var(--ef-space-2) var(--ef-space-3);
   display: flex;
   align-items: center;
-  gap: var(--ef-space-5);
+  flex-wrap: wrap;
+  gap: var(--ef-space-2) var(--ef-space-3);
 }
 
 .ef-brand {
@@ -177,10 +181,12 @@ ol {
   width: 100%;
   max-width: var(--ef-max-width);
   margin: 0 auto;
-  padding: var(--ef-space-6) var(--ef-space-5) var(--ef-space-8);
+  /* Mobile-first: the 360px layout is the base and wider screens add padding,
+     rather than the 1280px layout being squeezed down. */
+  padding: var(--ef-space-4) var(--ef-space-3) var(--ef-space-7);
   display: flex;
   flex-direction: column;
-  gap: var(--ef-space-6);
+  gap: var(--ef-space-5);
   min-width: 0;
 }
 
@@ -192,18 +198,43 @@ ol {
   font-size: var(--ef-font-size-xs);
 }
 
-@media (max-width: 640px) {
-  .ef-header__inner {
-    padding: 0 var(--ef-space-3);
-    gap: var(--ef-space-3);
+/* Breakpoints, mobile-first (docs/14-design-system.md §3). These replace a
+   single `max-width: 640px` rule, which was the only media query in the entire
+   codebase — everything else was drawn at desktop width and left to fend for
+   itself. */
+
+/* sm — the wordmark stops competing with the nav for the first row. */
+@media (min-width: 480px) {
+  .ef-demo-toggle__hint {
+    display: inline;
   }
-  .ef-main {
-    padding: var(--ef-space-4) var(--ef-space-3) var(--ef-space-7);
+}
+
+/* md — single-row header, roomier page gutters. */
+@media (min-width: 768px) {
+  .ef-header__inner {
+    flex-wrap: nowrap;
+    padding: 0 var(--ef-space-5);
     gap: var(--ef-space-5);
   }
-  .ef-nav__link {
-    padding: var(--ef-space-2);
+  .ef-main {
+    padding: var(--ef-space-6) var(--ef-space-5) var(--ef-space-8);
+    gap: var(--ef-space-6);
   }
+  .ef-nav__link {
+    padding: var(--ef-space-2) var(--ef-space-3);
+  }
+}
+
+/* Anything wide enough to scroll sideways is a bug, not a layout. Long words,
+   urls and ids are the usual culprits inside cards and table cells. */
+.ef-shell {
+  overflow-x: hidden;
+}
+
+.ef-table-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 /* ---------------------------------------------------------------- text */

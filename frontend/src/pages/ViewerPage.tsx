@@ -11,6 +11,8 @@ import { ClassroomContentTab } from "../viewer/ClassroomContentTab";
 import { KnowledgeTab } from "../viewer/KnowledgeTab";
 import { LearningGapsTab } from "../viewer/LearningGapsTab";
 import { OverviewTab } from "../viewer/OverviewTab";
+import { describeError } from "../utils/errors";
+import { ArtifactsPanel } from "../viewer/ArtifactsPanel";
 import { PackageHeader } from "../viewer/PackageHeader";
 import { TeachingPlanTab } from "../viewer/TeachingPlanTab";
 import { ValidationTab } from "../viewer/ValidationTab";
@@ -64,13 +66,15 @@ export function ViewerPage() {
     if (error?.status === 404) {
       return (
         <EmptyState title="Package not found" tone="error">
-          This package does not exist, or has not finished generating yet. <Link to="/">Start a new one</Link>.
+          This package does not exist, or has not finished generating yet.{" "}
+        <Link to="/upload">Start a new one</Link>.
         </EmptyState>
       );
     }
     return (
       <EmptyState title="Could not load this package" tone="error">
-        {error?.message ?? "Something went wrong."} <Link to="/">Start a new one</Link>.
+        {error ? describeError(error).body : "Something went wrong."}{" "}
+        <Link to="/upload">Start a new one</Link>.
       </EmptyState>
     );
   }
@@ -109,6 +113,7 @@ export function ViewerPage() {
   return (
     <div className="ef-stack">
       <PackageHeader tkp={tkp} />
+      <ArtifactsPanel packageId={packageId} />
       <Tabs tabs={tabs} active={activeExists ? activeTab : "overview"} onChange={setActiveTab} />
     </div>
   );

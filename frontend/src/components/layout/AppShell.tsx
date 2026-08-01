@@ -9,7 +9,6 @@ function useMockMode(): boolean {
 export function AppShell({ children, mainRef }: { children: ReactNode; mainRef: RefObject<HTMLElement> }) {
   const pathname = usePathname();
   const mockMode = useMockMode();
-  const onUpload = pathname === "/";
 
   return (
     <div className="ef-shell">
@@ -17,12 +16,23 @@ export function AppShell({ children, mainRef }: { children: ReactNode; mainRef: 
         Skip to main content
       </a>
       <header className="ef-header">
+        {/* Wraps rather than clipping: the header had a fixed height and a
+            single row, so at 360px the demo toggle pushed the wordmark out of
+            view. Height is a token that steps down below the tablet
+            breakpoint, and the row is allowed to wrap under it. */}
         <div className="ef-header__inner">
           <Link to="/" className="ef-brand">
             EduForge <span className="ef-brand__mark">AI</span>
           </Link>
           <nav className="ef-nav" aria-label="Primary">
-            <Link to="/" className="ef-nav__link" aria-current={onUpload ? "page" : undefined}>
+            <Link to="/" className="ef-nav__link" aria-current={pathname === "/" ? "page" : undefined}>
+              Home
+            </Link>
+            <Link
+              to="/upload"
+              className="ef-nav__link"
+              aria-current={pathname === "/upload" ? "page" : undefined}
+            >
               New package
             </Link>
           </nav>
@@ -32,7 +42,9 @@ export function AppShell({ children, mainRef }: { children: ReactNode; mainRef: 
               checked={mockMode}
               onChange={(e) => setMockMode(e.target.checked)}
             />
-            <span>Demo data (no backend)</span>
+            <span>
+              Demo data <span className="ef-demo-toggle__hint">(no backend)</span>
+            </span>
           </label>
         </div>
       </header>
