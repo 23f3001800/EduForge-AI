@@ -302,6 +302,11 @@ class KnowledgeExtractionStage:
                 )
             if audit.dropped:
                 span.warn(f"evidence verification — {audit.summary()}")
+                span.decide(
+                    f"{audit.dropped} claims dropped",
+                    "their quotes did not appear in the chunk they cited; an unverifiable "
+                    "citation is removed here rather than propagating into six later stages",
+                )
 
             # ── concept graph ──────────────────────────────────────────────
             concept_ids = [c["concept_id"] for c in payload["concepts"]]

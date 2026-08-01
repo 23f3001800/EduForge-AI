@@ -74,6 +74,7 @@ def _make_node(
     completed: dict[str, StageOutput],
     executed: list[str],
     skipped: list[str],
+    llm: Any | None = None,
 ) -> Callable[[dict[str, Any]], Awaitable[dict[str, Any]]]:
     async def node(state: dict[str, Any]) -> dict[str, Any]:
         # Resume: a completed stage is restored, never re-executed or re-billed.
@@ -105,7 +106,24 @@ def _make_node(
             await store.put_blob(uri, payload)
             return uri
 
-        ctx = StageContext(job_id=job_id, options=options, emit=emit, put_artifact=put_artifact)
+        # Attribute model usage to this stage by snapshotting the client's call
+        # log around it. Every CallRecord already carries its stage, so filtering
+        # on the delta is exact even when a retry interleaves — and it means no
+        # stage has to report its own token count, which is the kind of
+        # bookkeeping that goes stale the moment someone adds a call.
+        calls_before = len(llm.calls) if llm is not None else 0
+        report: dict[str, Any] = {}
+
+        def record(**fields: Any) -> None:
+            report.update(fields)
+
+        ctx = StageContext(
+            job_id=job_id,
+            options=options,
+            emit=emit,
+            put_artifact=put_artifact,
+            record=record,
+        )
         # Every log line and metric emitted anywhere inside this stage — including
         # from the LLM client several frames down — carries the job and stage
         # without either being threaded through a signature.
@@ -114,10 +132,39 @@ def _make_node(
         executed.append(stage.name)
         logger.info("stage completed", extra={"keys": sorted(fragment)})
 
+        stage_calls = llm.calls[calls_before:] if llm is not None else []
+        report.update(_usage_of(stage_calls))
+        fragment = {**fragment, "stage_reports": [report]}
+
         await store.put_checkpoint(StageOutput(job_id=job_id, stage=stage.name, output=fragment))
         return fragment
 
     return node
+
+
+def _usage_of(calls: list[Any]) -> dict[str, Any]:
+    """What one stage actually spent, from its own call records.
+
+    ``attempts`` counts every call including the ones that failed — a stage that
+    succeeded on its third try cost three, and a package that hides that is
+    reporting a price nobody paid. ``degraded`` is true when any attempt fell
+    back to a placeholder, which is the difference between "this section is
+    thin" and "this section is thin *and we know why*".
+    """
+    if not calls:
+        return {"attempts": 1, "tokens_in": 0, "tokens_out": 0, "degraded": False}
+
+    return {
+        "attempts": len(calls),
+        "tokens_in": sum(call.usage.tokens_in for call in calls),
+        "tokens_out": sum(call.usage.tokens_out for call in calls),
+        "tokens_cached": sum(call.usage.tokens_cached for call in calls),
+        "cost_usd": sum(call.usage.cost_usd for call in calls),
+        "degraded": any(call.outcome == "degraded" for call in calls),
+        # The last attempt is the one whose output survived.
+        "model": calls[-1].model,
+        "provider": calls[-1].provider,
+    }
 
 
 def _progress_for(stage: StageName) -> int:
@@ -134,6 +181,7 @@ async def run_pipeline(
     stages: list[Any],
     store: Store,
     emit: EmitFn,
+    llm: Any | None = None,
 ) -> PipelineResult:
     """Execute the pipeline for one job, resuming from any existing checkpoints."""
     completed = await store.get_checkpoints(job_id)
@@ -151,6 +199,7 @@ async def run_pipeline(
             completed=completed,
             executed=executed,
             skipped=skipped,
+            llm=llm,
         ),
     )
 
