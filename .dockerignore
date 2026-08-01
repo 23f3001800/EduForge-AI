@@ -25,8 +25,18 @@ __pycache__/
 .coverage
 htmlcov/
 
-# node / frontend (frontend-build stage installs its own node_modules)
+# node / frontend (the frontend-build stage runs its own `npm ci`)
+#
+# Spelled three ways on purpose. Docker's own packer honours the trailing-slash
+# form, but `az acr build` uploads the context with a different walker — and when
+# the CLI is the Windows build reading a WSL working tree, it follows symlinks it
+# cannot resolve and dies on the first one (`node_modules/.bin/*` is full of
+# them). The recursive globs keep every packer out of the tree, and also catch
+# nested node_modules that the anchored path would miss.
 frontend/node_modules/
+frontend/node_modules/**
+**/node_modules
+**/node_modules/**
 frontend/dist/
 frontend/.vite/
 

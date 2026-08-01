@@ -1,0 +1,12 @@
+# Azure App Service build manifest.
+#
+# App Service's Oryx builder looks for a requirements.txt at the repository root
+# and pip-installs it during deployment. It does not read pyproject extras, so
+# this file names the same four extras the Dockerfile installs — keep them in
+# step (backend/pyproject.toml is the source of truth for versions).
+#
+# `platform_deps` is deliberately absent: nothing connects to Postgres yet.
+#
+# Not used by local development, which installs the package properly:
+#   ./.venv/bin/python -m pip install -e "backend[dev]"
+./backend[api,llm,parsing,render]

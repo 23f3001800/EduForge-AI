@@ -11,6 +11,8 @@ before anyone reads it.
 
 from __future__ import annotations
 
+import pytest
+
 from stages.s3_knowledge.concept_graph import build_concept_graph
 from stages.s3_knowledge.grounding import normalise, verify_items
 
@@ -272,3 +274,61 @@ def test_a_degraded_half_does_not_discard_the_other() -> None:
     )
     assert merged["concepts"] == []
     assert len(merged["misconceptions"]) == 1
+
+
+# ─────────────────────────────────────────── objective fallback (live failure)
+
+
+def test_objectives_are_derived_when_extraction_returns_none() -> None:
+    """A live narrative run died at stage 4 with concepts but zero objectives.
+
+    Stage 4 requires an objective per period, so an empty list ends the job and
+    discards three stages of completed work and real model spend. Deriving from
+    the concepts that DID survive turns a total loss into a degraded package.
+    """
+    from stages.s3_knowledge.stage import derive_objectives
+
+    concepts = [
+        {"concept_id": "c1", "name": "Partition of Bengal", "summary": "s", "importance": "core"},
+        {"concept_id": "c2", "name": "Swadeshi Movement", "summary": "s", "importance": "core"},
+    ]
+    derived = derive_objectives(concepts)
+
+    assert len(derived) == 2
+    assert {o["concept_ids"][0] for o in derived} == {"c1", "c2"}
+    # Every reference must resolve; an objective pointing at nothing is worse
+    # than no objective, because stage 9 reports it as a broken package.
+    assert all(o["concept_ids"][0] in {"c1", "c2"} for o in derived)
+    assert len({o["objective_id"] for o in derived}) == 2
+    # Not credited above the floor a bare concept actually implies.
+    assert all(o["bloom_level"] == "understand" for o in derived)
+    assert all(
+        o["statement"] and not o["statement"].lower().startswith("understand ") for o in derived
+    )
+
+
+def test_derived_objectives_satisfy_the_planner_that_rejected_the_empty_list() -> None:
+    """The fallback is only worth anything if stage 4 accepts it."""
+    from stages.s3_knowledge.stage import derive_objectives
+    from stages.s4_planner.banding import build_skeleton
+
+    concepts = [
+        {"concept_id": "c1", "name": "Partition of Bengal", "summary": "s", "importance": "core"},
+    ]
+    knowledge = {
+        "concepts": concepts,
+        "learning_objectives": derive_objectives(concepts),
+        "concept_graph": {"edges": []},
+    }
+    skeleton = build_skeleton(knowledge, period_duration_minutes=40)
+    assert skeleton is not None
+
+    with pytest.raises(ValueError, match="no learning objectives"):
+        build_skeleton({**knowledge, "learning_objectives": []}, period_duration_minutes=40)
+
+
+def test_nothing_is_derived_when_there_are_no_concepts_either() -> None:
+    """A document that yielded nothing must still fail loudly, not fabricate."""
+    from stages.s3_knowledge.stage import derive_objectives
+
+    assert derive_objectives([]) == []
