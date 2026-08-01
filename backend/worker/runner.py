@@ -73,6 +73,7 @@ async def run_job(
         schema_version=package_payload.get("schema_version", SCHEMA_VERSION),
         tkp=package_payload,
         status=validation_status,
+        artifacts=dict(result.state.get("artifacts") or {}),
     )
     await store.save_package(record)
 

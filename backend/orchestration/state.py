@@ -46,6 +46,7 @@ class GraphState(TypedDict, total=False):
     learning_gaps: list[dict[str, Any]]
     validation: dict[str, Any]
     package: dict[str, Any]
+    artifacts: dict[str, str]
 
     # control
     warnings: Annotated[list[str], operator.add]

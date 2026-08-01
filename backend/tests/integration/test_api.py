@@ -22,6 +22,7 @@ from api.main import FRONTEND_DIST, create_app
 from contracts import TeacherKnowledgePackage
 from contracts.primitives import STAGE_NAMES
 from core.storage.memory import InMemoryStore
+from stages.s10_publishing.stage import PublishingStage
 from stages.stubs import STUB_STAGES
 
 PDF = b"%PDF-1.7\n" + b"x" * 512
@@ -327,3 +328,45 @@ async def test_a_deep_link_refresh_returns_the_spa_shell(client: httpx.AsyncClie
     response = await client.get("/run/00000000-0000-0000-0000-000000000000")
     assert response.status_code == 200
     assert response.headers["content-type"].startswith("text/html")
+
+
+# ------------------------------------------------------- artifact download
+
+
+async def test_rendered_artifacts_are_listed_and_downloadable() -> None:
+    """The download buttons the frontend already renders must resolve.
+
+    Run with the real publishing stage over stub upstream stages: the stubs make
+    no model calls, and stage 10 never did, so this exercises the whole
+    render -> store -> list -> download path for free.
+    """
+    set_store(InMemoryStore())
+
+    async def real_publishing_roster(*_args: Any) -> Any:
+        return [*STUB_STAGES[:9], PublishingStage()]
+
+    set_roster_builder(real_publishing_roster)
+    app = create_app()
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=app), base_url="http://test"
+    ) as client:
+        document_id = await _upload(client)
+        created = await client.post("/api/v1/jobs", json={"document_id": document_id})
+        job = await _await_job(client, created.json()["job_id"])
+        assert job["status"] == "succeeded", job.get("error")
+
+        listing = await client.get(f"/api/v1/packages/{job['package_id']}/artifacts")
+        assert listing.status_code == 200
+        artifacts = listing.json()["artifacts"]
+        assert artifacts, "nothing was published"
+        assert all(a["status"] == "ready" and a["bytes"] > 0 for a in artifacts)
+
+        pdf = next(a for a in artifacts if a["kind"] == "lesson_plan_pdf")
+        downloaded = await client.get(pdf["url"])
+        assert downloaded.status_code == 200
+        assert downloaded.content[:4] == b"%PDF"
+        assert downloaded.headers["content-type"].startswith("application/pdf")
+        assert "attachment" in downloaded.headers["content-disposition"]
+
+        missing = await client.get(f"/api/v1/packages/{job['package_id']}/artifacts/nope")
+        assert missing.status_code == 404

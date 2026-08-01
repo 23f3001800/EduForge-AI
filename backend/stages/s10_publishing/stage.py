@@ -57,13 +57,27 @@ class PublishingStage:
             tkp = assemble_package(state)
 
             wanted = _requested_artifacts(ctx.options or {})
+            artifacts: dict[str, str] = {}
             for index, kind in enumerate(wanted):
                 await span.progress(index / max(len(wanted), 1), message=f"rendering {kind}")
                 rendered = RENDERERS[kind](tkp)
                 if not rendered:
                     span.warn(f"{kind}: rendered zero bytes")
+                    continue
+                payload = rendered if isinstance(rendered, bytes) else rendered.encode("utf-8")
+                if ctx.put_artifact is None:
+                    # Rendering still proves the package is renderable, which is
+                    # what the unit tests assert. Only persistence is missing.
+                    span.warn(f"{kind}: rendered but not stored (no artifact sink)")
+                    continue
+                artifacts[kind] = await ctx.put_artifact(kind, payload)
 
             await span.progress(
-                0.98, message=f"published {len(wanted)} artifact(s): {', '.join(wanted) or 'none'}"
+                0.98,
+                message=f"published {len(artifacts)} of {len(wanted)} artifact(s): "
+                f"{', '.join(wanted) or 'none'}",
             )
-            return {"package": tkp.model_dump(mode="json")}
+            # Two keys. `package` is what this stage owns; `artifacts` is the
+            # uri map the worker needs to attach to the package record, and it
+            # rides in the same fragment so a resumed run restores both.
+            return {"package": tkp.model_dump(mode="json"), "artifacts": artifacts}

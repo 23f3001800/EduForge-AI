@@ -89,7 +89,18 @@ def _make_node(
             # stage writes.
             return dict(checkpoint.output)
 
-        ctx = StageContext(job_id=job_id, options=options, emit=emit)
+        async def put_artifact(kind: str, payload: bytes) -> str:
+            """Persist one rendered artifact and return its uri.
+
+            Keyed by job and kind rather than by content hash: re-running
+            publishing after a regeneration must *replace* the old lesson plan,
+            not accumulate a second one nothing points at.
+            """
+            uri = f"artifact://{job_id}/{kind}"
+            await store.put_blob(uri, payload)
+            return uri
+
+        ctx = StageContext(job_id=job_id, options=options, emit=emit, put_artifact=put_artifact)
         fragment = await stage.run(ctx, state)
         executed.append(stage.name)
 
