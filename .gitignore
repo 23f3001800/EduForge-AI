@@ -19,7 +19,12 @@ htmlcov/
 
 # node / frontend
 node_modules/
+# Next.js build output and its webpack cache. The cache alone is ~150MB of
+# binary packs that change on every build — it has no business in history.
+frontend/.next/
 frontend/dist/
+frontend/out/
+next-env.d.ts
 frontend/.vite/
 
 # local artifacts
