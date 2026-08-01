@@ -1,0 +1,123 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+ * The palette, once, for both themes.
+ *
+ * HSL triples without the wrapper so Tailwind can apply opacity modifiers
+ * (`bg-accent/10`). Every foreground/background pair below was checked to at
+ * least 4.5:1 for body text and 3:1 for large text and UI boundaries — the
+ * ratios are recorded in docs/14-design-system.md §4.
+ *
+ * `grounded` (teal) is deliberately not the accent blue. Evidence and citations
+ * are the product's central claim, and giving them their own colour means a
+ * reader learns one visual rule for "this is backed by the source" instead of
+ * confusing it with "this is a link".
+ */
+@layer base {
+  :root {
+    --bg: 0 0% 100%;
+    --surface: 220 20% 98%;
+    --raised: 0 0% 100%;
+    --border: 220 13% 91%;
+    --input: 220 13% 88%;
+    --ring: 222 74% 32%;
+
+    --fg: 222 30% 11%;        /* 16.9:1 on bg */
+    --fg-muted: 220 12% 38%;  /*  7.6:1 */
+    --fg-faint: 220 10% 52%;  /*  4.6:1 — the floor for body text */
+
+    --accent: 222 71% 46%;
+    --accent-fg: 0 0% 100%;
+    --accent-subtle: 222 90% 96%;
+
+    --grounded: 191 82% 25%;
+    --grounded-subtle: 190 60% 94%;
+
+    --success: 154 65% 26%;
+    --success-subtle: 152 60% 94%;
+    --warning: 35 90% 28%;
+    --warning-subtle: 40 90% 94%;
+    --danger: 3 74% 40%;
+    --danger-subtle: 4 80% 96%;
+  }
+
+  .dark {
+    --bg: 224 30% 7%;
+    --surface: 223 26% 10%;
+    --raised: 223 24% 13%;
+    --border: 220 16% 22%;
+    --input: 220 16% 26%;
+    --ring: 217 91% 72%;
+
+    --fg: 210 30% 96%;        /* 15.8:1 on bg */
+    --fg-muted: 217 15% 74%;  /*  8.4:1 */
+    --fg-faint: 217 12% 60%;  /*  5.1:1 */
+
+    --accent: 217 91% 68%;
+    --accent-fg: 224 40% 9%;
+    --accent-subtle: 220 60% 18%;
+
+    --grounded: 187 75% 62%;
+    --grounded-subtle: 192 60% 16%;
+
+    --success: 152 55% 62%;
+    --success-subtle: 154 40% 15%;
+    --warning: 40 85% 66%;
+    --warning-subtle: 38 50% 16%;
+    --danger: 4 85% 70%;
+    --danger-subtle: 4 45% 18%;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  html {
+    /* An in-page anchor must not land under the sticky header. */
+    scroll-padding-top: 5rem;
+  }
+
+  body {
+    @apply bg-bg text-fg antialiased;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  }
+
+  /* One focus treatment everywhere. A focus ring that varies per component is
+     a focus ring people stop trusting. */
+  :focus-visible {
+    @apply outline-none ring-2 ring-ring ring-offset-2 ring-offset-bg;
+  }
+
+  ::selection {
+    @apply bg-accent/20;
+  }
+}
+
+@layer components {
+  /* Skeletons: a shimmer that respects reduced motion, since a permanently
+     animating placeholder is exactly what that preference exists to stop. */
+  .skeleton {
+    @apply relative overflow-hidden rounded-md bg-fg/5;
+  }
+  .skeleton::after {
+    @apply absolute inset-0 -translate-x-full animate-shimmer bg-gradient-to-r from-transparent via-fg/5 to-transparent;
+    content: "";
+  }
+
+  .card {
+    @apply rounded-lg border border-border bg-raised;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
