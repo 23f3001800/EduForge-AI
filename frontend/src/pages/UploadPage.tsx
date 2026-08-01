@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { createJob, isMockMode, uploadDocument } from "../api";
 import { ACCEPTED_EXTENSIONS, MAX_UPLOAD_BYTES, MAX_UPLOAD_MB } from "../api/constants";
-import { ApiError } from "../api/types";
+import { describeErrorText } from "../utils/errors";
 import type { DocumentKind, JobOptions, TeachingStyle } from "../api/types";
 import { Banner } from "../components/ui/Banner";
 import { Spinner } from "../components/ui/Spinner";
@@ -35,14 +35,6 @@ const LANGUAGES: { value: string; label: string }[] = [
 ];
 
 type SubmitPhase = "idle" | "uploading" | "creating_job";
-
-function describeApiError(err: unknown): string {
-  if (err instanceof ApiError) {
-    return err.message || `Request failed (${err.status}).`;
-  }
-  if (err instanceof Error) return err.message;
-  return "Something went wrong. Please try again.";
-}
 
 function validateFile(file: File): string | null {
   const lower = file.name.toLowerCase();
@@ -118,7 +110,7 @@ export function UploadPage() {
       const job = await createJob(uploaded.document_id, options, idempotencyKey);
       navigate(`/run/${job.job_id}`);
     } catch (err) {
-      setSubmitError(describeApiError(err));
+      setSubmitError(describeErrorText(err));
       setPhase("idle");
     }
   }
