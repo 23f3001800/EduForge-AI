@@ -56,6 +56,12 @@ class Settings(BaseSettings):
     retention_days: int = Field(default=30, ge=1)
     demo_access_code: str | None = None
 
+    # ── observability ───────────────────────────────────────────────────────
+    log_level: str = "INFO"
+    #: JSON in a deployment where a log aggregator reads it; plain text is
+    #: what you want when reading a local run in a terminal.
+    log_json: bool = True
+
     app_version: str = "0.1.0"
 
     @model_validator(mode="after")

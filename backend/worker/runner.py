@@ -16,11 +16,15 @@ from typing import Any
 from uuid import UUID, uuid4
 
 from contracts.primitives import SCHEMA_VERSION
+from core.obs import metrics
+from core.obs.logging import get_logger
 from core.progress.emitter import ProgressEmitter
 from core.storage.base import PackageRecord, Store
 from orchestration.graph import PipelineResult, run_pipeline
 
 __all__ = ["run_job"]
+
+logger = get_logger("worker.runner")
 
 
 async def run_job(
@@ -34,6 +38,7 @@ async def run_job(
         raise LookupError(f"job {job_id} not found")
 
     emit = ProgressEmitter(store, job_id)
+    logger.info("job started", extra={"document_id": str(job.document_id)})
     job.status = "running"
     job.started_at = job.started_at or datetime.now(UTC)
     await store.update_job(job)
@@ -49,6 +54,8 @@ async def run_job(
             emit=emit,
         )
     except Exception as exc:  # the boundary that records failure before re-raising
+        metrics.record_job("failed")
+        logger.exception("job failed")
         job.status = "failed"
         job.error = {"type": type(exc).__name__, "message": str(exc)}
         job.finished_at = datetime.now(UTC)
@@ -78,6 +85,8 @@ async def run_job(
     await store.save_package(record)
 
     job.package_id = record.id
+    metrics.record_job("succeeded")
+    logger.info("job succeeded", extra={"package_id": str(record.id)})
     job.status = "succeeded"
     job.progress = 100
     job.current_stage = "publishing"
