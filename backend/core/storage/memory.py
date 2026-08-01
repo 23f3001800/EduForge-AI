@@ -161,3 +161,6 @@ class InMemoryStore(Store):
 
     async def list_samples(self) -> list[PackageRecord]:
         return [p for p in self._packages.values() if p.is_sample]
+
+    async def list_packages(self) -> list[PackageRecord]:
+        return list(self._packages.values())

@@ -26,6 +26,8 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 
 __all__ = [
+    "counters",
+    "histograms",
     "observe_stage",
     "record_job",
     "record_llm_call",
@@ -159,6 +161,23 @@ def render() -> str:
         lines.append(f"{name}_count{_format_labels(labels)} {len(ordered)}")
 
     return "\n".join(lines) + "\n"
+
+
+def counters() -> dict[tuple[str, tuple[tuple[str, str], ...]], float]:
+    """A snapshot of every counter.
+
+    A copy, taken under the lock: handing out the live dict would let a caller
+    iterate it while a request thread mutates it, which is a RuntimeError in the
+    middle of rendering a page.
+    """
+    with _lock:
+        return dict(_counters)
+
+
+def histograms() -> dict[tuple[str, tuple[tuple[str, str], ...]], list[float]]:
+    """A snapshot of every recorded observation, same copying rule."""
+    with _lock:
+        return {key: list(values) for key, values in _histograms.items()}
 
 
 def reset() -> None:
