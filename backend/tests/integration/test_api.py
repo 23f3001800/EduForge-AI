@@ -18,7 +18,7 @@ import httpx
 import pytest
 
 from api.deps import set_roster_builder, set_store
-from api.main import create_app
+from api.main import FRONTEND_DIST, create_app
 from contracts import TeacherKnowledgePackage
 from contracts.primitives import STAGE_NAMES
 from core.storage.memory import InMemoryStore
@@ -285,3 +285,45 @@ async def test_openapi_is_published(client: httpx.AsyncClient) -> None:
     paths = spec.json()["paths"]
     assert "/api/v1/documents" in paths
     assert "/api/v1/jobs/{job_id}/events" in paths
+
+
+# ------------------------------------------------------------- static SPA
+
+
+@pytest.mark.skipif(
+    not (FRONTEND_DIST / "index.html").is_file(),
+    reason="frontend not built; the deployed image always builds it",
+)
+async def test_the_spa_mount_never_shadows_the_api(client: httpx.AsyncClient) -> None:
+    """The catch-all route matches everything, so its ordering is load-bearing.
+
+    Registered last on purpose. If it ever moves ahead of the routers, every API
+    call starts returning HTML with a 200 — which a JSON client reports as a
+    parse error somewhere far away from the cause.
+    """
+    for path in ("/healthz", "/readyz", "/api/v1/openapi.json"):
+        response = await client.get(path)
+        assert response.status_code == 200
+        assert response.headers["content-type"].startswith("application/json"), path
+
+    # An unknown API path must 404 as JSON, not hand back the SPA shell.
+    unknown = await client.get("/api/v1/not-a-route")
+    assert unknown.status_code == 404
+    assert unknown.headers["content-type"].startswith("application/json")
+
+
+@pytest.mark.skipif(
+    not (FRONTEND_DIST / "index.html").is_file(),
+    reason="frontend not built; the deployed image always builds it",
+)
+async def test_a_deep_link_refresh_returns_the_spa_shell(client: httpx.AsyncClient) -> None:
+    """H-02, from the server side.
+
+    The frontend routes client-side, so refreshing on /run/<job-id> mid-run
+    arrives as a real GET the server has no route for. Without this the refresh
+    404s at exactly the moment the resumable progress stream is meant to prove
+    it survives one.
+    """
+    response = await client.get("/run/00000000-0000-0000-0000-000000000000")
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("text/html")

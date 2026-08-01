@@ -25,19 +25,19 @@ clarifications in [`FAQ.md`](FAQ.md) folded into the design.
 | 6 · Activity Generation | ✅ wired — profile-weighted activity mix |
 | 7 · Assessment Generation | ✅ wired — blueprint-first, rubrics enforced |
 | 8 · Gap Analysis | ✅ wired — severity from the concept graph |
-| 9 · Validation | 🟡 rules written, not yet wired |
-| 10 · Publishing | 🟡 fonts only (multilingual PDF rendering not written) |
+| 9 · Validation | ✅ wired — profile-conditioned rules + grounding judge |
+| 10 · Publishing | ✅ wired — 3 PDFs + Markdown, Devanagari-capable |
 | Orchestration, worker, SSE API | ✅ real, end-to-end |
-| Frontend | 🟡 scaffold + API/SSE client |
-| Deployment | ⛔ not yet |
+| Frontend | ✅ upload, live progress, TKP viewer (served single-origin) |
+| Quality evals + samples | ✅ 9 deterministic dimensions, [`samples/`](samples/) |
+| Deployment | 🟡 Dockerfile + CI + Render blueprint ready; **not yet deployed** |
 
-Stages 9 and 10 still run as **stubs returning reference fixtures**, so the
-pipeline walks end to end today and each remaining stage is swapped in
-independently. The roster lives in one place — [`orchestration/pipeline.py`](backend/orchestration/pipeline.py)
-— and `REMAINING_STUBS` there is what the tests assert against, so a stub cannot
-quietly survive its milestone.
+**No stubs remain.** `REMAINING_STUBS` in
+[`orchestration/pipeline.py`](backend/orchestration/pipeline.py) is now empty, and
+a roster test asserts it — a stub reintroduced during a refactor has to be
+declared there to pass.
 
-`make check` — **201 tests, lint clean, schema drift clean, 3/3 boundary contracts kept.**
+`make check` — **249 tests, lint clean, schema drift clean, 3/3 boundary contracts kept.**
 
 ---
 
@@ -106,8 +106,11 @@ make help          # list targets
 make test          # full suite
 make check         # what CI runs: schema drift + lint + boundaries + tests
 make boundaries    # import-linter: a stage importing a stage fails here
+make evals         # score the reference packages on the 9-dimension rubric
+make samples       # regenerate samples/ (packages, PDFs, eval reports)
 make lint / fmt    # ruff
 make schema        # regenerate the published JSON Schema + fixtures
+make docker-build  # build the production image
 ```
 
 There is no separate worker command. Until the Postgres store lands, an
@@ -266,7 +269,13 @@ backend/
 frontend/         React + Vite (served as static assets by the API — single origin)
 config/models.yaml  per-stage model routing per profile
 docs/             SRS, HLD, LLD, data model, agent graph, API spec, roadmap, risks, DoD
+samples/          two published packages + PDFs + eval reports — start here
 ```
+
+The frontend is served by the API itself from `frontend/dist`, so there is one
+origin, no CORS config, and one deploy. A deep link like `/run/<job-id>` returns
+the SPA shell rather than 404, which is what makes a refresh mid-run resume
+instead of breaking.
 
 ---
 
@@ -295,15 +304,24 @@ Tests worth knowing about:
 
 ## Known limitations
 
-- **Stages 9 and 10 are not wired in yet.** The validation rules are written;
-  publishing is fonts only. Both run as stubs.
-- **Not deployed.** The mandatory live URL is outstanding.
+- **Not deployed.** The image, CI, and a Render blueprint are in the repo
+  ([`docs/12-deployment.md`](docs/12-deployment.md)); nobody has run the deploy.
+  The mandatory live URL is the biggest outstanding gap.
 - Storage is in-memory; the Postgres implementation sits behind the same
   interface and is not written yet. Uploaded bytes live in the same in-memory
   store, so a restart loses documents and any job retry that depended on them.
+- **Rendered PDFs are produced but not persisted.** Stage 10 builds them and
+  validates them; there is no `PackageRecord.artifacts` field or download
+  endpoint yet, so today they exist only inside the run and in `samples/`.
+- Devanagari **glyphs** render correctly (verified by round-tripping the text
+  back out of the PDF), but complex-script shaping uses fpdf2's own engine rather
+  than HarfBuzz — conjuncts and matra reordering are not typographically perfect.
 - Scanned PDFs are rejected with a clear error rather than OCR'd.
-- Quality is bounded by free-tier models. Per-stage routing in
-  `config/models.yaml` is the single place to upgrade.
+- Per-stage token/cost/timing provenance is empty: no stage threads its usage
+  back into graph state, so publishing has nothing honest to report there.
+- Quality is bounded by free-tier models, and the OpenRouter free tier allows
+  **50 requests/day** — roughly one and a half full pipeline runs. Per-stage
+  routing in `config/models.yaml` is the single place to upgrade.
 
 ---
 

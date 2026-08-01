@@ -22,6 +22,14 @@ platform_deps = [
 llm = [
     "anthropic>=0.40",
     "langgraph>=0.2",
+    # Both are imported lazily, inside the adapter that needs them, so a missing
+    # one costs nothing until that provider is actually selected. That is also
+    # why their absence here went unnoticed: the suite never constructs a real
+    # adapter, so it stayed green while a production image would have booted,
+    # passed /healthz, and then died with ModuleNotFoundError on the first job.
+    # `openai` backs the OpenRouter adapter — the default production provider.
+    "openai>=2.0",
+    "google-genai>=1.0",
 ]
 api = [
     "fastapi>=0.115",
@@ -36,8 +44,13 @@ parsing = [
     "python-pptx>=1.0",
 ]
 render = [
-    "jinja2>=3.1",
-    "weasyprint>=62",
+    # Pure-Python PDF generation — no wkhtmltopdf, no LaTeX, no system packages,
+    # which is what makes stage 10 buildable in the same container as
+    # everything else. `NotoSans`/`NotoSansDevanagari` (shipped under
+    # `stages/s10_publishing/render/fonts/`) are registered directly against
+    # this, which is also why `jinja2` here was never taken up: stage 10
+    # builds pages with fpdf2's own layout primitives, not HTML+CSS.
+    "fpdf2>=2.8",
 ]
 dev = [
     "pytest>=8.3",
@@ -45,6 +58,9 @@ dev = [
     "mypy>=1.13",
     "ruff>=0.7",
     "import-linter>=2.1",
+    # `render` is a runtime extra, but the unit suite exercises stage 10's PDF
+    # output directly, so `pip install -e backend[dev]` must pull it too.
+    "eduforge[render]",
 ]
 
 [build-system]

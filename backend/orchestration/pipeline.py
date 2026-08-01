@@ -1,7 +1,7 @@
 """Assembling the stage roster for one job.
 
-This is the only module that knows which stages are real and which are still
-stubs, and it is deliberately the *only* one: the graph builds itself from
+This is the only module that knows the pipeline's composition, and it is
+deliberately the *only* one: the graph builds itself from
 whatever list it is handed, the worker runs whatever the graph compiled, and the
 API asks for a roster without knowing what is in it. Replacing a stub is an edit
 here and nowhere else.
@@ -12,7 +12,8 @@ imported all ten would be a stage importing other stages, which is exactly what
 the independence rule forbids — and the rule is worth more than the convenience.
 
 Stage 1 is constructed per job because it closes over that job's document bytes.
-Stages 2-8 close over the LLM client. Stages 9-10 are still fixtures.
+Stages 2-9 close over the LLM client. Stage 10 makes no model calls at all —
+it assembles and renders what the other nine produced.
 """
 
 from __future__ import annotations
@@ -31,14 +32,15 @@ from stages.s5_classroom_content.stage import ClassroomContentStage
 from stages.s6_activities.stage import ActivityGenerationStage
 from stages.s7_assessments.stage import AssessmentGenerationStage
 from stages.s8_gaps.stage import GapAnalysisStage
-from stages.stubs import STUB_STAGES
+from stages.s9_validation.stage import ValidationStage
+from stages.s10_publishing.stage import PublishingStage
 
 __all__ = ["REMAINING_STUBS", "build_stages", "roster_for_job"]
 
-#: Stages still served by fixtures. Emptying this list is what "the pipeline is
-#: finished" means, and ``test_no_stub_survives_its_milestone`` reads it rather
-#: than a comment.
-REMAINING_STUBS: tuple[str, ...] = ("validation", "publishing")
+#: Stages still served by fixtures. Now empty: every stage is real. The name and
+#: the roster test that reads it stay, because an empty list is the assertion —
+#: a stub reintroduced during a refactor has to be declared here to pass.
+REMAINING_STUBS: tuple[str, ...] = ()
 
 
 def build_stages(
@@ -51,13 +53,12 @@ def build_stages(
     max_pages: int,
     parse_timeout_s: float,
 ) -> list[Any]:
-    """The ordered roster for one job: real stages 1-8, then the remaining stubs.
+    """The ordered roster for one job: all ten stages, real.
 
     Order comes from this list alone — ``build_graph`` chains it pairwise — so a
     stage inserted here is a stage in the pipeline, with no second place to
     update and no way for the two to disagree.
     """
-    stubs_by_name = {stub.name: stub for stub in STUB_STAGES}
     return [
         DocumentIntelligenceStage(
             payload=payload,
@@ -74,7 +75,8 @@ def build_stages(
         ActivityGenerationStage(llm),
         AssessmentGenerationStage(llm),
         GapAnalysisStage(llm),
-        *(stubs_by_name[name] for name in REMAINING_STUBS),
+        ValidationStage(llm),
+        PublishingStage(),
     ]
 
 

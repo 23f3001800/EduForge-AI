@@ -21,6 +21,7 @@ from contracts.primitives import STAGE_NAMES
 from core.storage.base import DocumentRecord, JobRecord
 from core.storage.memory import InMemoryStore
 from stages.base import StageContext, cumulative_progress, stage_span
+from stages.s10_publishing.stage import PublishingStage
 from stages.stubs import STUB_STAGES
 from worker.runner import run_job
 
@@ -230,6 +231,34 @@ async def test_resume_restores_every_key_a_stage_wrote_not_just_the_mapped_one()
         await run_job(store=store, job_id=job_id, stages=[TwoKeyStage(), Downstream()])
 
     assert seen["chunks"], "chunks were dropped when stage 1 was restored"
+
+
+async def test_the_real_publishing_stage_closes_the_graph_with_a_valid_package() -> None:
+    """The last stage, wired for real, over the graph rather than in isolation.
+
+    ``test_publishing.py`` calls the renderers directly. This proves the stage
+    also works as a *node*: that what stages 1-9 actually put into ``GraphState``
+    is what ``assemble_package`` reads, that the fragment key matches
+    ``STAGE_STATE_KEY``, and that ``run_job`` can find a package to persist.
+    A stage can pass its unit tests and still be wired to the wrong keys.
+
+    Stage 10 makes no model calls, so this costs nothing and needs no adapter.
+    """
+    store = InMemoryStore()
+    job_id, _ = await _seed(store)
+
+    roster = [*STUB_STAGES[:9], PublishingStage()]
+    result = await run_job(store=store, job_id=job_id, stages=roster)
+
+    assert result.executed == list(STAGE_NAMES)
+    job = await store.get_job(job_id)
+    assert job is not None and job.status == "succeeded"
+    assert job.package_id is not None
+
+    package = await store.get_package(job.package_id)
+    assert package is not None
+    # Not "looks like a TKP" — is one.
+    TeacherKnowledgePackage.model_validate(package.tkp)
 
 
 async def test_targeted_regeneration_reruns_only_the_named_stages() -> None:

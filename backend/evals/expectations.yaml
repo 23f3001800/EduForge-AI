@@ -1,0 +1,93 @@
+# Profile-conditioned expectations for the quality harness.
+#
+# This file exists so that the single most important correctness property of the
+# eval holds: a narrative package with zero formulae and zero numerical questions
+# scores WELL. It is not a gap; it is the designed output of the narrative profile
+# (pedagogy/profiles.yaml), and a harness that rewarded STEM shape would push the
+# whole system in the wrong direction one score at a time.
+#
+# What lives here and what does not:
+#
+#   * Item kinds, activity types, and the knowledge fields a profile owes are NOT
+#     duplicated here. They are read from `pedagogy/profiles.yaml` through the
+#     registry, so the eval and the generator share one source of truth. A metric
+#     that re-declared "narrative expects no numerical items" would drift.
+#   * What IS here is what the generator does not need but a reviewer does: how
+#     much of a bank may be recall, where the higher-order floor sits for this kind
+#     of content, and how much cognitive load one period may carry.
+#
+# `higher_order_from` is the field that keeps the two shapes even. Quantitative
+# material earns its higher-order marks at `apply` (a multi-step problem is the
+# thinking); interpretive material earns them at `analyze` (there is nothing to
+# calculate, and demanding `apply` would mark down a well-built essay bank). Both
+# routes reach the same score for equally good work.
+
+defaults:
+  # Bank-level Bloom shape.
+  min_distinct_bloom_levels: 3
+  max_recall_mark_share: 0.35
+  higher_order_from: apply
+  min_higher_order_mark_share: 0.30
+  # Objectives should not all sit on one rung once there are enough of them.
+  objective_spread_threshold: 3
+
+  # Sequencing / load.
+  max_concepts_per_period: 4
+  min_concepts_per_period: 1
+  # A period whose slot count is below this has no arc to speak of.
+  min_time_slots_per_period: 4
+
+  # Activities.
+  min_distinct_activity_types: 2
+  min_teacher_steps: 2
+
+  # Assessment craft.
+  min_distractor_rationale_share: 0.5
+  min_rubric_levels_for_extended: 3
+  # Marks at which an item counts as "extended response" for rubric depth.
+  extended_response_marks: 3
+
+profiles:
+
+  quantitative:
+    # Worked, multi-step application is where this material does its thinking.
+    higher_order_from: apply
+    min_higher_order_mark_share: 0.40
+
+  conceptual:
+    # Mechanism and contrast, not calculation — the floor sits at analysis, and it
+    # sits lower, because a well-built conceptual bank leans on `understand`.
+    higher_order_from: analyze
+    min_higher_order_mark_share: 0.20
+    max_recall_mark_share: 0.30
+
+  narrative:
+    # Interpretation, argument, and evidence. Recall of dates is the failure mode
+    # this profile most needs protecting from, so the recall cap is the tightest
+    # of the five — and the higher-order floor is measured from `analyze`, since
+    # `apply` is not what this content asks a student to do.
+    higher_order_from: analyze
+    min_higher_order_mark_share: 0.30
+    max_recall_mark_share: 0.25
+
+  procedural:
+    # Doing the procedure correctly is the outcome, so `apply` is the floor.
+    higher_order_from: apply
+    min_higher_order_mark_share: 0.40
+    max_recall_mark_share: 0.30
+
+  mixed:
+    # Asserts the least, matching the profile it mirrors.
+    higher_order_from: apply
+    min_higher_order_mark_share: 0.25
+
+# Grade-appropriateness window for student-facing text, by the highest grade in
+# the band. Reported, never scored (weight 0 at the call site): sentence length is
+# a proxy for cognitive demand, and a proxy should not decide a grade. It is here
+# so an obvious mismatch — undergraduate prose in a primary lesson — is visible.
+grade_readability:
+  - { up_to_grade: 5, max_words_per_sentence: 14, max_long_word_share: 0.12 }
+  - { up_to_grade: 8, max_words_per_sentence: 18, max_long_word_share: 0.16 }
+  - { up_to_grade: 10, max_words_per_sentence: 22, max_long_word_share: 0.20 }
+  - { up_to_grade: 12, max_words_per_sentence: 26, max_long_word_share: 0.24 }
+  - { up_to_grade: 99, max_words_per_sentence: 32, max_long_word_share: 0.32 }
