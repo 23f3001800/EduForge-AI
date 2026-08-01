@@ -36,6 +36,39 @@ const VALIDATION_TONE: Record<string, "success" | "warning" | "danger"> = {
   fail: "danger",
 };
 
+/**
+ * An entry or exit ticket.
+ *
+ * These are objects — `{prompt, duration_minutes, expected_response}` — not
+ * strings. Rendering one directly put an object where React expects a child and
+ * took the whole page down with error #31, which is the failure mode of
+ * assuming a shape instead of reading the contract.
+ */
+function Ticket({ label, ticket }: { label: string; ticket?: Any | null }) {
+  if (!ticket?.prompt) return null;
+  return (
+    <div>
+      <h4 className="text-sm font-semibold">
+        {label}
+        {ticket.duration_minutes ? (
+          <span className="ml-2 font-normal text-fg-faint">{ticket.duration_minutes} min</span>
+        ) : null}
+      </h4>
+      <p className="mt-1 text-sm text-fg-muted">{ticket.prompt}</p>
+      {ticket.expected_response ? (
+        <p className="mt-1 text-xs text-fg-faint">
+          <span className="font-medium">Expect:</span> {ticket.expected_response}
+        </p>
+      ) : null}
+      {ticket.success_indicator ? (
+        <p className="mt-1 text-xs text-fg-faint">
+          <span className="font-medium">Success looks like:</span> {ticket.success_indicator}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
 /** Absent sections are omitted entirely — a humanities package has no formulae,
  *  and an empty card labelled "Formulae" would imply something went missing. */
 function Section({ title, count, children }: { title: string; count: number; children: React.ReactNode }) {
@@ -202,15 +235,19 @@ function ViewerBody() {
                   {period.sequence_rationale ? (
                     <p className="mt-2 text-sm text-fg-muted">{period.sequence_rationale}</p>
                   ) : null}
-                  {period.time_allocation ? (
+                  {/* A LIST of {label, minutes}, not a mapping. Treating it as
+                      one rendered the object itself as a child and crashed the
+                      page with React error #31. */}
+                  {(period.time_allocation ?? []).length ? (
                     <ul className="mt-3 flex flex-wrap gap-2 text-xs">
-                      {Object.entries(period.time_allocation as Record<string, number>).map(
-                        ([segment, minutes]) => (
-                          <li key={segment} className="rounded-full bg-surface px-2 py-0.5">
-                            {titleCase(segment)} · {minutes}m
-                          </li>
-                        ),
-                      )}
+                      {(period.time_allocation as Any[]).map((slot, index) => (
+                        <li
+                          key={`${slot.label}-${index}`}
+                          className="rounded-full bg-surface px-2 py-0.5"
+                        >
+                          {slot.label} · {slot.minutes}m
+                        </li>
+                      ))}
                     </ul>
                   ) : null}
                 </CardContent>
@@ -223,40 +260,115 @@ function ViewerBody() {
               <Card key={period.period_no}>
                 <CardContent className="flex flex-col gap-4 pt-5">
                   <Badge>Period {period.period_no}</Badge>
-                  {period.entry_ticket ? (
-                    <div>
-                      <h4 className="text-sm font-semibold">Entry ticket</h4>
-                      <p className="mt-1 text-sm text-fg-muted">{period.entry_ticket}</p>
-                    </div>
-                  ) : null}
+
+                  <Ticket label="Entry ticket" ticket={period.entry_ticket} />
+
                   {(period.teacher_script ?? []).length ? (
                     <div>
                       <h4 className="text-sm font-semibold">Teacher script</h4>
-                      <ol className="mt-1 space-y-2">
+                      <ol className="mt-2 space-y-2">
                         {(period.teacher_script as Any[]).map((beat, index) => (
-                          <li key={index} className="rounded-md bg-surface p-3 text-sm">
-                            {typeof beat === "string" ? beat : beat.say ?? JSON.stringify(beat)}
+                          <li key={index} className="rounded-md bg-surface p-3">
+                            <div className="flex flex-wrap items-baseline justify-between gap-2">
+                              <span className="text-sm font-medium">{beat.heading}</span>
+                              <span className="font-mono text-xs text-fg-faint">
+                                {beat.minute_start}–{beat.minute_end} min
+                              </span>
+                            </div>
+                            {beat.speaker_notes ? (
+                              <p className="mt-1 text-sm text-fg-muted">{beat.speaker_notes}</p>
+                            ) : null}
+                            {beat.board_action ? (
+                              <p className="mt-1.5 text-xs text-fg-faint">
+                                <span className="font-medium">On the board:</span>{" "}
+                                {beat.board_action}
+                              </p>
+                            ) : null}
+                            {(beat.anticipated_questions ?? []).length ? (
+                              <ul className="mt-1.5 list-disc space-y-0.5 pl-5 text-xs text-fg-faint">
+                                {(beat.anticipated_questions as string[]).map((question, i) => (
+                                  <li key={i}>{question}</li>
+                                ))}
+                              </ul>
+                            ) : null}
                           </li>
                         ))}
                       </ol>
                     </div>
                   ) : null}
+
+                  {period.blackboard_notes ? (
+                    <div>
+                      <h4 className="text-sm font-semibold">Blackboard</h4>
+                      <ul className="mt-1 list-disc space-y-1 pl-5 text-sm text-fg-muted">
+                        {(period.blackboard_notes.bullet_points ?? []).map(
+                          (point: string, index: number) => (
+                            <li key={index}>{point}</li>
+                          ),
+                        )}
+                        {(period.blackboard_notes.diagrams_to_draw ?? []).map(
+                          (diagram: string, index: number) => (
+                            <li key={`d-${index}`} className="italic">
+                              Draw: {diagram}
+                            </li>
+                          ),
+                        )}
+                      </ul>
+                    </div>
+                  ) : null}
+
                   {(period.checkpoint_questions ?? []).length ? (
                     <div>
                       <h4 className="text-sm font-semibold">Checks for understanding</h4>
-                      <ul className="mt-1 list-disc space-y-1 pl-5 text-sm text-fg-muted">
+                      <ul className="mt-2 space-y-2">
                         {(period.checkpoint_questions as Any[]).map((question, index) => (
-                          <li key={index}>
-                            {typeof question === "string" ? question : question.question}
+                          <li key={index} className="rounded-md border border-border p-3 text-sm">
+                            <p>{question.question}</p>
+                            {question.expected_answer ? (
+                              <p className="mt-1 text-xs text-fg-faint">
+                                <span className="font-medium">Expect:</span>{" "}
+                                {question.expected_answer}
+                              </p>
+                            ) : null}
                           </li>
                         ))}
                       </ul>
                     </div>
                   ) : null}
-                  {period.exit_ticket ? (
+
+                  <Ticket label="Exit ticket" ticket={period.exit_ticket} />
+
+                  {period.mentor_moment ? (
+                    <div className="rounded-md border-l-2 border-l-warning bg-warning-subtle p-3">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h4 className="text-sm font-semibold">{period.mentor_moment.title}</h4>
+                        {/* The one thing the pipeline writes without a source.
+                            Labelled, so it is never mistaken for extracted fact. */}
+                        {period.mentor_moment.grounded === false ? (
+                          <Badge tone="warning">Illustrative — not from the source</Badge>
+                        ) : null}
+                      </div>
+                      <p className="mt-1 text-sm text-fg-muted">{period.mentor_moment.story}</p>
+                      {period.mentor_moment.takeaway ? (
+                        <p className="mt-1 text-sm font-medium">{period.mentor_moment.takeaway}</p>
+                      ) : null}
+                    </div>
+                  ) : null}
+
+                  {period.homework ? (
                     <div>
-                      <h4 className="text-sm font-semibold">Exit ticket</h4>
-                      <p className="mt-1 text-sm text-fg-muted">{period.exit_ticket}</p>
+                      <h4 className="text-sm font-semibold">
+                        Homework
+                        <span className="ml-2 font-normal text-fg-faint">
+                          ~{period.homework.estimated_minutes} min ·{" "}
+                          {period.homework.submission_format}
+                        </span>
+                      </h4>
+                      <ul className="mt-1 list-disc space-y-1 pl-5 text-sm text-fg-muted">
+                        {(period.homework.tasks ?? []).map((task: string, index: number) => (
+                          <li key={index}>{task}</li>
+                        ))}
+                      </ul>
                     </div>
                   ) : null}
                 </CardContent>

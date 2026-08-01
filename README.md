@@ -134,11 +134,15 @@ make check                    # lint + boundaries + tests + schema drift
 make dev                      # http://localhost:8000
 ```
 
-The frontend is served by the API itself:
+The frontend is a **Next.js static export**, served by the API itself — one
+process, one origin, no CORS:
 
 ```bash
-cd frontend && npm install && npm run build
+cd frontend && npm install && npm run build   # exports to frontend/dist
 ```
+
+Static export rather than SSR is deliberate: it keeps the whole product a single
+FastAPI deployment. `npm run dev` gives hot reload on `:3000` during UI work.
 
 ### Provider configuration
 
@@ -221,10 +225,17 @@ backend/
   worker/         job execution and resume
   api/            FastAPI routes, SSE, middleware
   evals/          9-dimension quality rubric
-frontend/         React + TypeScript + Vite, served single-origin by the API
+frontend/         Next.js (static export) + TypeScript + Tailwind, served single-origin
 docs/             SRS, HLD, LLD, data model, agent graph, API spec, design system
 samples/          two published packages + PDFs + eval reports — start here
 ```
+
+The UI is six pages: landing, upload, live run, package viewer, samples and
+analytics. Job and package ids travel as query parameters (`/run?job=…`,
+`/packages?id=…`) because a static export has no pre-built HTML for
+`/run/<uuid>`, whereas a query string is the same document for every job. A
+refresh still resumes — the query survives it and the stream reconnects from its
+stored cursor. Design system and UI states: [`docs/14-design-system.md`](docs/14-design-system.md).
 
 ### Five decisions that shape everything
 
@@ -309,9 +320,9 @@ against synthetic input proves nothing. Tests worth knowing about:
 - **Storage is in-memory.** A restart loses uploaded documents, jobs and
   packages. The Postgres implementation sits behind the same interface and is
   not written. This is also why the deployment runs a single instance.
-- **The UI redesign is specified but not built.** [`docs/14-design-system.md`](docs/14-design-system.md)
-  and the design tokens are committed; the landing page and responsive layout are
-  not yet implemented, so the current UI is functional but desktop-oriented.
+- **No authentication, users, or teams.** Anyone with the URL can upload and read
+  every package. That is deliberate for an assignment demo and would be the first
+  thing to add for real use.
 - **Free-tier quota** — 50 requests/day, roughly 1.5 runs.
 - Devanagari **glyphs** render correctly (verified by round-tripping text back
   out of the PDF), but complex-script shaping uses fpdf2's own engine rather than
