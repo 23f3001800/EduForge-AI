@@ -104,6 +104,11 @@ class PackageRecord:
     schema_version: str
     tkp: dict[str, Any]
     status: str
+    #: Artifact kind -> blob uri, as written by stage 10. Kept on the record
+    #: rather than inside the TKP because it is storage detail, not curriculum
+    #: content: the same package re-rendered to a different backend is the same
+    #: package.
+    artifacts: dict[str, str] = field(default_factory=dict)
     is_sample: bool = False
     created_at: datetime = field(default_factory=_now)
 

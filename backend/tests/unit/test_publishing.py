@@ -250,7 +250,44 @@ async def test_publishing_stage_returns_a_validated_package() -> None:
     state = _full_state()
     result = await PublishingStage().run(_ctx(), state)
 
-    assert set(result) == {"package"}
+    assert set(result) == {"package", "artifacts"}
+    TeacherKnowledgePackage.model_validate(result["package"])
+
+
+async def test_rendered_artifacts_are_persisted_and_reported() -> None:
+    """Rendering is not publishing.
+
+    The stage used to render every artifact and drop the bytes on the floor,
+    which nothing caught: the package was still valid, the progress messages
+    still said "rendering lesson_plan_pdf", and the download endpoint the
+    frontend calls had nothing to serve. What makes it publishing is that the
+    bytes are somewhere addressable afterwards.
+    """
+    stored: dict[str, bytes] = {}
+
+    async def put_artifact(kind: str, payload: bytes) -> str:
+        stored[kind] = payload
+        return f"artifact://test/{kind}"
+
+    ctx = StageContext(
+        job_id=uuid4(),
+        options={"include_artifacts": ["lesson_plan_pdf", "markdown_bundle"]},
+        put_artifact=put_artifact,
+    )
+    result = await PublishingStage().run(ctx, _full_state())
+
+    assert set(result["artifacts"]) == {"lesson_plan_pdf", "markdown_bundle"}
+    assert stored["lesson_plan_pdf"][:4] == b"%PDF"
+    assert stored["markdown_bundle"]
+    for kind, uri in result["artifacts"].items():
+        assert uri.endswith(kind)
+
+
+async def test_without_a_sink_the_stage_warns_rather_than_silently_dropping() -> None:
+    """No sink is a real configuration, not an error — but it must be visible."""
+    ctx = StageContext(job_id=uuid4(), options={"include_artifacts": ["markdown_bundle"]})
+    result = await PublishingStage().run(ctx, _full_state())
+    assert result["artifacts"] == {}
     TeacherKnowledgePackage.model_validate(result["package"])
 
 

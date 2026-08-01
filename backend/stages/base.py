@@ -69,6 +69,14 @@ class StageContext:
     llm: Any | None = None
     retrieval: Any | None = None
     logger: Any | None = None
+    #: ``async (kind, payload) -> uri``. How a stage persists bytes it produced.
+    #:
+    #: A callable rather than the ``Store`` itself, so a stage can write a blob
+    #: without gaining the ability to read jobs, mutate checkpoints, or publish
+    #: packages — and so a test can pass a dict-backed sink instead of a store.
+    #: ``None`` means nothing is collecting artifacts, which is why stage 10
+    #: treats it as "render and report" rather than an error.
+    put_artifact: Callable[[str, bytes], Any] | None = None
 
 
 class StageSpan:
