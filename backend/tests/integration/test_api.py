@@ -19,6 +19,7 @@ import pytest
 
 from api.deps import set_roster_builder, set_store
 from api.main import FRONTEND_DIST, create_app
+from api.samples import seed_samples
 from contracts import TeacherKnowledgePackage
 from contracts.primitives import STAGE_NAMES
 from core.storage.memory import InMemoryStore
@@ -428,3 +429,102 @@ async def test_a_route_error_code_survives_into_the_envelope(
     )
     assert response.status_code == 404
     assert response.json()["error"]["code"] == "document_not_found"
+
+
+# ---------------------------------------------------------------- samples
+
+
+@pytest.fixture
+async def seeded_client() -> Any:
+    """A client whose store has the reference packages loaded.
+
+    Seeded explicitly rather than through the app's lifespan because
+    ``ASGITransport`` does not run lifespan events — under uvicorn it does, which
+    is why the deployed app has samples and this fixture has to say so out loud.
+    """
+    store = InMemoryStore()
+    set_store(store)
+    set_roster_builder(_stub_roster)
+    await seed_samples(store)
+    app = create_app()
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=app), base_url="http://test"
+    ) as c:
+        yield c
+
+
+async def test_samples_are_listed(seeded_client: httpx.AsyncClient) -> None:
+    """The route the frontend has always called, which did not exist until now.
+
+    Without it the physics-vs-history comparison — the clearest demonstration
+    this product has — had no live path into the UI at all.
+    """
+    response = await seeded_client.get("/api/v1/samples")
+    assert response.status_code == 200
+    samples = response.json()["samples"]
+    assert len(samples) == 2
+
+    profiles = {s["pedagogy_profile"] for s in samples}
+    assert profiles == {"quantitative", "narrative"}
+    for sample in samples:
+        assert sample["package_id"] and sample["subject"] and sample["title"]
+        assert sample["periods"] >= 1
+
+
+async def test_a_sample_opens_without_running_anything(
+    seeded_client: httpx.AsyncClient,
+) -> None:
+    """A full run costs 5-7 minutes and a slice of a 50/day quota.
+
+    An evaluator must be able to read a finished package on the first click.
+    """
+    listed = (await seeded_client.get("/api/v1/samples")).json()["samples"]
+    for sample in listed:
+        package = await seeded_client.get(f"/api/v1/packages/{sample['package_id']}")
+        assert package.status_code == 200
+        TeacherKnowledgePackage.model_validate(package.json())
+
+
+async def test_sample_pdfs_download(seeded_client: httpx.AsyncClient) -> None:
+    listed = (await seeded_client.get("/api/v1/samples")).json()["samples"]
+    for sample in listed:
+        artifacts = (
+            await seeded_client.get(f"/api/v1/packages/{sample['package_id']}/artifacts")
+        ).json()["artifacts"]
+        assert artifacts, sample["subject"]
+        assert all(a["status"] == "ready" and a["bytes"] > 0 for a in artifacts)
+
+        pdf = next(a for a in artifacts if a["kind"] == "lesson_plan_pdf")
+        downloaded = await seeded_client.get(pdf["url"])
+        assert downloaded.status_code == 200
+        assert downloaded.content[:4] == b"%PDF"
+
+
+async def test_sample_ids_are_stable_across_restarts() -> None:
+    """A bookmarked sample URL must survive a redeploy.
+
+    Random ids per boot would break every link to a sample on every restart, and
+    App Service restarts on each deployment.
+    """
+    first, second = InMemoryStore(), InMemoryStore()
+    await seed_samples(first)
+    await seed_samples(second)
+    assert {p.id for p in await first.list_samples()} == {p.id for p in await second.list_samples()}
+
+
+async def test_a_missing_samples_directory_does_not_stop_the_app(tmp_path: Any) -> None:
+    """The samples are a demonstration, never a dependency."""
+    store = InMemoryStore()
+    assert await seed_samples(store, tmp_path / "nope") == 0
+    assert await store.list_samples() == []
+
+
+async def test_options_serves_the_boards_the_pipeline_actually_reads(
+    client: httpx.AsyncClient,
+) -> None:
+    """A UI holding its own board list offers choices the backend ignores."""
+    body = (await client.get("/api/v1/options")).json()
+    values = [b["value"] for b in body["curriculum_boards"]]
+    assert values[0] == "generic", "the common case must not be last in the list"
+    assert {"CBSE", "ICSE"} <= set(values)
+    assert body["teaching_styles"] and body["artifact_kinds"]

@@ -8,6 +8,8 @@ only ever appear in the deployed environment (docs/02 ADR #8).
 
 from __future__ import annotations
 
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from typing import Any
 
 from fastapi import FastAPI, HTTPException, Request
@@ -18,6 +20,7 @@ from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from api.routes import documents, events, jobs, options
+from api.samples import seed_samples
 from contracts.primitives import SCHEMA_VERSION
 from core.config import REPO_ROOT, get_settings
 
@@ -36,6 +39,23 @@ _DEFAULT_MESSAGES = {
 FRONTEND_DIST = REPO_ROOT / "frontend" / "dist"
 
 
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    """Load the reference packages so the app is useful on the first click.
+
+    Best-effort by design — ``seed_samples`` logs and skips a broken sample
+    rather than raising, because a demonstration must never be able to stop the
+    service from starting.
+
+    Resolved through ``get_store`` at call time rather than captured at import,
+    so a test that swaps the store still seeds the one it swapped in.
+    """
+    from api.deps import get_store
+
+    await seed_samples(get_store())
+    yield
+
+
 def create_app() -> FastAPI:
     app = FastAPI(
         title="EduForge AI",
@@ -46,6 +66,7 @@ def create_app() -> FastAPI:
         ),
         openapi_url=f"{API_PREFIX}/openapi.json",
         docs_url=f"{API_PREFIX}/docs",
+        lifespan=lifespan,
     )
 
     app.include_router(documents.router, prefix=API_PREFIX)

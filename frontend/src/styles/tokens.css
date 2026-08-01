@@ -1,134 +1,226 @@
 /*
- * Design tokens for EduForge AI.
+ * Design tokens for EduForge AI — single source of truth for colour, type,
+ * spacing, radius, shadow and motion. Every component consumes these custom
+ * properties; nothing hardcodes a value that has a token here.
  *
- * No design-token file was supplied with the spec (docs/ has none), so this
- * file is the single source of truth for colour, spacing, radius and type.
- * Every component consumes these custom properties rather than hardcoding
- * values. If a case needs a token that doesn't exist here, add it here first.
+ * Full rationale, the contrast audit, and the breakpoint scale these tokens
+ * are meant to be combined with live in docs/14-design-system.md — read that
+ * first if a value here looks arbitrary. Short version of the direction:
+ *
+ *   - Neutral, ink-on-paper base (near-black text, near-white surface) with
+ *     ONE confident interactive blue ("accent") and a separate teal
+ *     ("info") reserved for the product's central claim — grounding. Every
+ *     citation, evidence quote and "Grounded" badge in the app uses the
+ *     teal, consistently, so it becomes a recognisable signal rather than
+ *     one more shade of the same blue as the buttons.
+ *   - No purple, no gradient, no illustration. This is a document-in →
+ *     document-out tool for teachers; it should look like a well-typeset
+ *     lesson plan, not a startup landing page.
+ *
+ * Naming: `--ef-<category>-<name>[-<variant>]`. Category prefixes in use:
+ * color, space, radius, shadow, font, line, tracking, duration, easing,
+ * z, header, container, target, focus, measure.
  */
 
 :root {
   color-scheme: light dark;
 
-  /* ---- Colour: neutrals ---- */
+  /* ============================================================ COLOUR */
+
+  /* ---- neutrals (ink on paper) ---- */
   --ef-color-bg: #ffffff;
-  --ef-color-bg-subtle: #f6f7f9;
-  --ef-color-bg-raised: #ffffff;
-  --ef-color-border: #d9dce1;
-  --ef-color-border-strong: #b7bcc4;
-  --ef-color-text: #1a1d21;
-  --ef-color-text-muted: #565c66;
-  --ef-color-text-faint: #7b818c;
+  --ef-color-bg-subtle: #f5f6f8; /* stat tiles, subtle section fills */
+  --ef-color-bg-sunken: #eef0f3; /* code/formula blocks, quote wells */
+  --ef-color-bg-raised: #ffffff; /* cards, popovers — same as bg in light, differs in dark */
+  --ef-color-border: #dadde3;
+  --ef-color-border-strong: #aeb4bf;
+  --ef-color-text: #16181d; /* body text — 17.8:1 on --ef-color-bg */
+  --ef-color-text-muted: #545a66; /* secondary text — 6.7:1 on --ef-color-bg */
+  --ef-color-text-faint: #6b7180; /* tertiary meta only (timestamps, ids) — 4.9:1 on --ef-color-bg */
 
-  /* ---- Colour: brand / accent ---- */
-  --ef-color-accent: #2952cc;
-  --ef-color-accent-strong: #1d3d99;
-  --ef-color-accent-bg: #eaefff;
-  --ef-color-accent-contrast: #ffffff;
+  /* ---- accent: interactive / brand (cobalt blue) ---- */
+  --ef-color-accent: #2251c9; /* 6.8:1 on white — links, primary buttons, focus */
+  --ef-color-accent-strong: #17368e; /* hover/active, and text-on-tint use */
+  --ef-color-accent-bg: #eaf0fe;
+  --ef-color-accent-contrast: #ffffff; /* text on a solid --ef-color-accent fill */
 
-  /* ---- Colour: semantic ---- */
-  --ef-color-success: #157a45;
+  /* ---- semantic: state ---- */
+  --ef-color-success: #157a45; /* 5.4:1 — pass, correct answer, done */
   --ef-color-success-bg: #e6f6ec;
   --ef-color-success-border: #a9dfc0;
-  --ef-color-warning: #8a5a00;
+  --ef-color-warning: #8a5a00; /* 5.9:1 — warnings, medium severity */
   --ef-color-warning-bg: #fff4dc;
   --ef-color-warning-border: #f0cd7f;
-  --ef-color-danger: #b3261e;
+  --ef-color-danger: #b3261e; /* 6.5:1 — errors, high severity, failure */
   --ef-color-danger-bg: #fdeceb;
   --ef-color-danger-border: #f2b8b5;
-  --ef-color-info: #0b5fa5;
-  --ef-color-info-bg: #e8f2fb;
-  --ef-color-info-border: #a9cdea;
 
-  /* ---- Focus ---- */
-  --ef-color-focus-ring: #1d3d99;
+  /* ---- info / grounding: teal, deliberately not the accent blue ----
+   * Reserved for evidence: "Grounded" badges, citation chips, evidence
+   * quote blocks, the grounding-score stat. One recognisable colour for
+   * "this claim is backed by a citation" across every tab. */
+  --ef-color-info: #0e7490; /* 5.4:1 */
+  --ef-color-info-bg: #e3f4f7;
+  --ef-color-info-border: #a8d8e0;
 
-  /* ---- Spacing scale (4px base) ---- */
-  --ef-space-1: 0.25rem;
-  --ef-space-2: 0.5rem;
-  --ef-space-3: 0.75rem;
-  --ef-space-4: 1rem;
-  --ef-space-5: 1.5rem;
-  --ef-space-6: 2rem;
-  --ef-space-7: 3rem;
-  --ef-space-8: 4rem;
+  /* ---- ungrounded / illustrative content: explicit, not silent ----
+   * For the one content type the pipeline deliberately invents (the
+   * "mentor moment" anecdote) — visually distinct from the neutral badge
+   * so "not from source" reads as a label, not a muted afterthought. */
+  --ef-color-illustrative: #6b5a00;
+  --ef-color-illustrative-bg: #faf3d6;
+  --ef-color-illustrative-border: #e3d38a;
 
-  /* ---- Radius ---- */
-  --ef-radius-sm: 4px;
-  --ef-radius-md: 8px;
-  --ef-radius-lg: 14px;
-  --ef-radius-pill: 999px;
+  /* ---- focus ---- */
+  --ef-color-focus-ring: #17368e; /* accent-strong — ≥3:1 on every surface below */
 
-  /* ---- Shadow ---- */
+  /* ======================================================== SPACING (4px base) */
+  --ef-space-1: 0.25rem; /* 4 */
+  --ef-space-2: 0.5rem; /* 8 */
+  --ef-space-3: 0.75rem; /* 12 */
+  --ef-space-4: 1rem; /* 16 */
+  --ef-space-5: 1.5rem; /* 24 */
+  --ef-space-6: 2rem; /* 32 */
+  --ef-space-7: 3rem; /* 48 */
+  --ef-space-8: 4rem; /* 64 */
+  --ef-space-9: 5rem; /* 80 — landing section padding, desktop only */
+  --ef-space-10: 6rem; /* 96 — landing hero padding, desktop only */
+
+  /* ============================================================ RADIUS */
+  --ef-radius-sm: 4px; /* inputs, formula blocks */
+  --ef-radius-md: 8px; /* buttons, tags, small controls */
+  --ef-radius-lg: 14px; /* cards */
+  --ef-radius-xl: 20px; /* landing feature panels, the hero proof panel */
+  --ef-radius-pill: 999px; /* badges, chips */
+
+  /* ============================================================ SHADOW */
   --ef-shadow-sm: 0 1px 2px rgba(20, 22, 26, 0.08);
   --ef-shadow-md: 0 4px 16px rgba(20, 22, 26, 0.12);
+  --ef-shadow-lg: 0 16px 48px rgba(20, 22, 26, 0.16); /* hero / proof panel only */
   --ef-shadow-popover: 0 8px 28px rgba(20, 22, 26, 0.22);
+  --ef-shadow-header: 0 1px 0 var(--ef-color-border); /* resting: hairline, not a shadow */
+  --ef-shadow-header-scrolled: var(--ef-shadow-sm); /* swap on scroll > 4px, see spec */
 
-  /* ---- Type ---- */
+  /* ============================================================== TYPE */
   --ef-font-sans:
     "Inter", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   --ef-font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
 
+  --ef-weight-regular: 400;
+  --ef-weight-medium: 500;
+  --ef-weight-semibold: 600;
+  --ef-weight-bold: 700;
+
+  /* App-shell scale (fluid within a page, tuned per breakpoint — see spec) */
   --ef-font-size-xs: clamp(0.72rem, 0.68rem + 0.15vw, 0.78rem);
   --ef-font-size-sm: clamp(0.82rem, 0.78rem + 0.15vw, 0.88rem);
   --ef-font-size-md: clamp(0.92rem, 0.88rem + 0.2vw, 1rem);
   --ef-font-size-lg: clamp(1.05rem, 1rem + 0.3vw, 1.2rem);
   --ef-font-size-xl: clamp(1.3rem, 1.2rem + 0.6vw, 1.6rem);
-  --ef-font-size-2xl: clamp(1.6rem, 1.4rem + 1vw, 2.1rem);
+  --ef-font-size-2xl: clamp(1.6rem, 1.4rem + 1vw, 2.1rem); /* app page titles */
+
+  /* Landing-only scale — bigger ceiling, only used above the fold */
+  --ef-font-size-3xl: clamp(1.9rem, 1.6rem + 1.6vw, 2.75rem); /* landing section heads */
+  --ef-font-size-display: clamp(2.1rem, 1.6rem + 3.2vw, 3.5rem); /* landing H1 only */
 
   --ef-line-height: 1.5;
-  --ef-line-height-tight: 1.25;
+  --ef-line-height-tight: 1.2;
+  --ef-tracking-tight: -0.015em; /* large headings */
+  --ef-tracking-eyebrow: 0.08em; /* small-caps-style labels */
 
-  /* ---- Motion ---- */
-  --ef-duration-fast: 120ms;
-  --ef-duration-med: 220ms;
+  --ef-measure-body: 60ch; /* max line length for prose */
+  --ef-measure-narrow: 40ch; /* max line length for dense captions */
+
+  /* ============================================================ MOTION */
+  --ef-duration-fast: 120ms; /* hover, focus */
+  --ef-duration-med: 220ms; /* progress bar fill, panel open */
+  --ef-duration-slow: 400ms; /* route/page-level entrance, landing only */
+  --ef-duration-pulse: 1200ms; /* "current stage" marker */
   --ef-easing: cubic-bezier(0.2, 0, 0, 1);
 
-  /* ---- Layout ---- */
-  --ef-max-width: 1180px;
-  --ef-header-height: 60px;
+  /* ============================================================= LAYOUT */
+  --ef-max-width: 1180px; /* app pages: upload, run, viewer */
+  --ef-max-width-wide: 1280px; /* landing hero row only */
+  --ef-max-width-prose: 640px; /* landing long-form sections */
+  --ef-header-height: 64px; /* ≥768px, see responsive override below */
+  --ef-header-height-sm: 56px; /* <768px */
+
+  /* ============================================================== SIZE */
+  --ef-target-min: 44px; /* primary interactive targets (buttons, tabs on touch) */
+  --ef-target-min-dense: 36px; /* acceptable dense exception: inline badges-as-buttons, still ≥24px AA */
+  --ef-focus-ring-width: 2px;
+  --ef-focus-ring-offset: 2px;
+
+  /* ============================================================= Z-INDEX */
+  --ef-z-sticky: 20; /* header */
+  --ef-z-overlay: 40; /* mobile nav sheet backdrop */
+  --ef-z-modal: 50; /* mobile nav sheet panel */
+  --ef-z-toast: 60;
+  --ef-z-skip-link: 100;
 }
 
+/* ---------------------------------------------------- responsive layout ---
+ * Header compresses below the tablet breakpoint. See docs/14-design-system.md
+ * §Breakpoints for why 768px is the line for the whole app, not just this. */
+@media (max-width: 767px) {
+  :root {
+    --ef-header-height: var(--ef-header-height-sm);
+  }
+}
+
+/* ================================================================= DARK */
 @media (prefers-color-scheme: dark) {
   :root {
     --ef-color-bg: #14161a;
     --ef-color-bg-subtle: #1b1e23;
+    --ef-color-bg-sunken: #0f1114;
     --ef-color-bg-raised: #21252b;
     --ef-color-border: #33383f;
-    --ef-color-border-strong: #464c55;
-    --ef-color-text: #eef0f3;
-    --ef-color-text-muted: #a8afba;
-    --ef-color-text-faint: #7d848f;
+    --ef-color-border-strong: #4a5058;
+    --ef-color-text: #edeff3; /* 13.4:1 on --ef-color-bg-raised */
+    --ef-color-text-muted: #a6adba; /* 6.8:1 on --ef-color-bg-raised */
+    --ef-color-text-faint: #868d9b; /* 5.4:1 on --ef-color-bg */
 
-    --ef-color-accent: #7d9dff;
-    --ef-color-accent-strong: #a8beff;
-    --ef-color-accent-bg: #1e2a4d;
+    --ef-color-accent: #7fa0ff; /* 7.2:1 on --ef-color-bg */
+    --ef-color-accent-strong: #aec2ff;
+    --ef-color-accent-bg: #1b2b4d;
     --ef-color-accent-contrast: #0b1020;
 
-    --ef-color-success: #4fd18b;
+    --ef-color-success: #4fd18b; /* 9.3:1 */
     --ef-color-success-bg: #103322;
     --ef-color-success-border: #1f6e46;
-    --ef-color-warning: #e8b64b;
+    --ef-color-warning: #e8b64b; /* 9.7:1 */
     --ef-color-warning-bg: #3a2c0b;
     --ef-color-warning-border: #7a5a13;
-    --ef-color-danger: #f2867e;
+    --ef-color-danger: #f2867e; /* 7.3:1 */
     --ef-color-danger-bg: #3a1613;
     --ef-color-danger-border: #7a2c26;
-    --ef-color-info: #7fc0f2;
-    --ef-color-info-bg: #0f2a3d;
-    --ef-color-info-border: #1f557a;
 
-    --ef-color-focus-ring: #a8beff;
+    --ef-color-info: #5fc2d9; /* 8.8:1 */
+    --ef-color-info-bg: #0f2c33;
+    --ef-color-info-border: #1f5c6c;
+
+    --ef-color-illustrative: #e0c85a;
+    --ef-color-illustrative-bg: #332b0a;
+    --ef-color-illustrative-border: #6b5a1f;
+
+    --ef-color-focus-ring: #aec2ff;
 
     --ef-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
     --ef-shadow-md: 0 4px 16px rgba(0, 0, 0, 0.5);
+    --ef-shadow-lg: 0 16px 48px rgba(0, 0, 0, 0.55);
     --ef-shadow-popover: 0 8px 28px rgba(0, 0, 0, 0.6);
+    --ef-shadow-header: 0 1px 0 var(--ef-color-border);
+    --ef-shadow-header-scrolled: var(--ef-shadow-sm);
   }
 }
 
+/* ==================================================== reduced motion ==== */
 @media (prefers-reduced-motion: reduce) {
   :root {
     --ef-duration-fast: 0ms;
     --ef-duration-med: 0ms;
+    --ef-duration-slow: 0ms;
+    --ef-duration-pulse: 1600ms; /* keep the "current stage" pulse, just slow enough to not read as flicker */
   }
 }
