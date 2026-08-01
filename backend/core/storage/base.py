@@ -187,3 +187,7 @@ class Store(ABC):
 
     @abstractmethod
     async def list_samples(self) -> list[PackageRecord]: ...
+
+    @abstractmethod
+    async def list_packages(self) -> list[PackageRecord]:
+        """Every package, samples included. Read-only, for stats views."""
