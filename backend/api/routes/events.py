@@ -24,7 +24,7 @@ from collections.abc import AsyncIterator
 from typing import Any
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Request
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse
 
 from api.deps import get_store
@@ -34,6 +34,8 @@ router = APIRouter(tags=["jobs"])
 
 HEARTBEAT_SECONDS = 15.0
 TERMINAL_STAGES = {"completed", "failed", "cancelled"}
+#: Job statuses after which no further event can ever arrive.
+TERMINAL_JOB_STATUSES = {"succeeded", "succeeded_partial", "failed", "cancelled"}
 
 
 def _frame(event_id: int, event_name: str, payload: dict[str, Any]) -> str:
@@ -77,6 +79,15 @@ async def _stream(store: Store, job_id: UUID, cursor: int, request: Request) -> 
             if event.stage in TERMINAL_STAGES:
                 return
 
+        # Caught up on a job that has already finished. The loop above only
+        # returns when it *sees* a terminal event, so a client reconnecting with
+        # a cursor already past that event would wait here forever, heartbeating
+        # at a job that will never produce another frame — one held-open
+        # connection per such client, indefinitely.
+        job = await store.get_job(job_id)
+        if job is not None and job.status in TERMINAL_JOB_STATUSES:
+            return
+
         # Nothing new: block until there is, then loop. On timeout emit a comment
         # so intermediaries see traffic without the client seeing a fake event.
         await store.wait_for_events(job_id, cursor, timeout=HEARTBEAT_SECONDS)
@@ -89,13 +100,22 @@ async def stream_job_events(
     job_id: UUID,
     request: Request,
     last_event_id: str | None = Header(default=None, alias="Last-Event-ID"),
+    # The browser's own EventSource cannot set request headers, so a page
+    # resuming after a refresh has no way to send Last-Event-ID at all — the
+    # header alone made the documented replay guarantee unreachable from the one
+    # client that matters most. The query parameter is that client's only route
+    # to it. The header still wins where it is present: the browser sets it
+    # automatically on an *automatic* reconnect, and it is then more current
+    # than a cursor the page captured when it mounted.
+    last_event_id_param: str | None = Query(default=None, alias="last_event_id"),
     store: Store = Depends(get_store),
 ) -> StreamingResponse:
     if await store.get_job(job_id) is None:
         raise HTTPException(status_code=404, detail={"code": "job_not_found"})
 
+    supplied = last_event_id or last_event_id_param
     try:
-        cursor = int(last_event_id) if last_event_id else 0
+        cursor = int(supplied) if supplied else 0
     except ValueError:
         # A malformed cursor replays from the start rather than failing: losing
         # the whole timeline is worse than re-sending events the client can dedupe.
