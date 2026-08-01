@@ -1,7 +1,16 @@
 # EduForge AI — Architecture Set
 
-Source of truth: `../Task Intern-2.pdf` ("AI Engineer Assignment: Teacher AI Platform").
-Status: **proposed, pending approval.** No production code until approved.
+Source of truth: `../Task Intern-2.pdf` ("AI Engineer Assignment: Teacher AI
+Platform"), plus the follow-up clarifications in `../FAQ.md`.
+
+**Status: built and deployed.** All ten stages are implemented and wired; the
+system runs at <https://eduforge-ai.azurewebsites.net>. Start at
+[`../README.md`](../README.md) for what it does and how to run it — these
+documents are the design behind it.
+
+Where a document and the code disagree, **the code is right**. Some of these were
+written before implementation and record intent rather than outcome; the ones
+that were revised by contact with reality say so.
 
 | # | Document | What it answers |
 |---|----------|-----------------|
@@ -17,6 +26,9 @@ Status: **proposed, pending approval.** No production code until approved.
 | [09](09-risks.md) | Risk Analysis | Scored risks with mitigations traced to design decisions |
 | [10](10-definition-of-done.md) | Definition of Done | Per-module DoD, each closing named requirement IDs |
 | [11](11-module-briefs.md) | Module Briefs | Ready-to-issue prompts, one per agent |
+| [12](12-deployment.md) | Deployment (generic) | Container image, CI, and a platform-agnostic deploy |
+| [13](13-azure-deployment.md) | Azure Deployment | What actually runs, and why App Service over Container Apps |
+| [14](14-design-system.md) | Design System | Tokens, breakpoints, component specs, UI states, error copy |
 
 ## The five decisions that shape everything else
 
@@ -33,5 +45,27 @@ Status: **proposed, pending approval.** No production code until approved.
 
 ## Reading order
 
-New to the project: 00 → 02 → 05 → 08.
-About to implement: 11 (your brief) → 03 → 10 (your DoD).
+- **New to the project:** [`../README.md`](../README.md) → 00 → 02 → 05.
+- **Evaluating it:** [`../README.md`](../README.md) → [`../samples/`](../samples/)
+  → 00 (requirements trace) → the live URL.
+- **Changing the code:** 03 (LLD) → 07 (boundaries) → the stage's own module
+  docstring, which is where the reasoning that survived implementation lives.
+- **Deploying it:** 13.
+
+## What changed after implementation
+
+Kept honest here because a design set that never records being wrong is not worth
+reading:
+
+- **`backend/platform/` became `backend/core/`** — the original name shadowed the
+  standard library's `platform` module.
+- **Stage 3 was split** into core and pedagogical extraction. One schema covering
+  the whole knowledge base was wide enough that a small model returned an empty
+  generation rather than failing cleanly.
+- **Stage 9's grounding pre-filter was made one-directional.** It had been
+  resolving claims as *unsupported* without a model call whenever lexical overlap
+  was low — but low overlap means paraphrase, not fabrication, and four of seven
+  claims in the reference package were being reported as hallucinations that
+  nothing had read.
+- **Curriculum boards became a composition mechanism**, not a label: a board
+  multiplies the pedagogy profile's assessment mix rather than overriding it.
