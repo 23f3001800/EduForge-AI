@@ -207,7 +207,7 @@ async def test_oversized_upload_is_rejected(client: httpx.AsyncClient) -> None:
         "/api/v1/documents", files={"file": ("big.pdf", oversized, "application/pdf")}
     )
     assert response.status_code == 413
-    assert response.json()["detail"]["code"] == "document_too_large"
+    assert response.json()["error"]["code"] == "document_too_large"
 
 
 async def test_unsupported_type_is_rejected_by_content_not_extension(
@@ -370,3 +370,61 @@ async def test_rendered_artifacts_are_listed_and_downloadable() -> None:
 
         missing = await client.get(f"/api/v1/packages/{job['package_id']}/artifacts/nope")
         assert missing.status_code == 404
+
+
+# ---------------------------------------------------------- error envelope
+
+
+async def test_every_failure_uses_one_error_envelope(client: httpx.AsyncClient) -> None:
+    """One shape for every failure, whatever raised it.
+
+    The UI builds its error from ``body.error.message``. When a raised
+    HTTPException returned FastAPI's ``{"detail": ...}`` instead, that read
+    ``undefined.message`` and the real cause was replaced by "Cannot read
+    properties of undefined (reading 'message')" — the error path throwing its
+    own error, which is the one path that must not.
+
+    Covers all three producers: a raised HTTPException, a request-validation
+    failure, and a route that does not exist.
+    """
+    document_id = await _upload(client)
+
+    responses = [
+        await client.get("/api/v1/jobs/11111111-1111-4111-8111-111111111111"),
+        await client.post("/api/v1/jobs", json={"document_id": "not-a-uuid"}),
+        await client.post("/api/v1/jobs", json={"document_id": document_id, "nope": 1}),
+        await client.get("/api/v1/definitely-not-a-route"),
+    ]
+
+    for response in responses:
+        assert response.status_code >= 400
+        assert response.headers["content-type"].startswith("application/json")
+        body = response.json()
+        assert "error" in body, f"{response.url} returned {body}"
+        error = body["error"]
+        assert isinstance(error.get("code"), str) and error["code"]
+        assert isinstance(error.get("message"), str) and error["message"]
+
+
+async def test_a_validation_error_names_the_field_that_failed(
+    client: httpx.AsyncClient,
+) -> None:
+    """Pydantic's raw list is JSON; a person needs to know which field broke."""
+    response = await client.post("/api/v1/jobs", json={"document_id": "not-a-uuid"})
+    assert response.status_code == 422
+    error = response.json()["error"]
+    assert error["code"] == "invalid_request"
+    assert "document_id" in error["message"]
+    # The raw list stays available for anyone who wants it.
+    assert error["details"]["errors"]
+
+
+async def test_a_route_error_code_survives_into_the_envelope(
+    client: httpx.AsyncClient,
+) -> None:
+    """Routes raise with a machine-readable code; the UI branches on it."""
+    response = await client.post(
+        "/api/v1/jobs", json={"document_id": "11111111-1111-4111-8111-111111111111"}
+    )
+    assert response.status_code == 404
+    assert response.json()["error"]["code"] == "document_not_found"

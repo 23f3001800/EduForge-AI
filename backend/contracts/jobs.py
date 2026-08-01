@@ -92,7 +92,15 @@ class JobOptions(StrictModel):
     answer they do give measurably sharpens it.
     """
 
-    period_duration_minutes: int = Field(default=40, ge=5, le=240)
+    period_duration_minutes: int | None = Field(
+        default=None,
+        ge=5,
+        le=240,
+        description="None means take the curriculum board's convention — 40 minutes "
+        "generically, 60 for IB, 45 for Common Core. A hard default of 40 here would "
+        "silently win over the board, since a caller who chose nothing and a caller "
+        "who chose 40 would be indistinguishable.",
+    )
 
     teaching_style: TeachingStyle = Field(
         default="balanced",

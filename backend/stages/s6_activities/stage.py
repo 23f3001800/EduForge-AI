@@ -26,6 +26,7 @@ from typing import Any
 from contracts.content import Activity
 from core.llm.client import LLMClient
 from core.llm.prompts import OUTPUT_DISCIPLINE, document_block
+from pedagogy.curriculum import get_board
 from pedagogy.registry import get_strategy
 from stages.base import StageContext, stage_span
 from stages.s6_activities.schemas import ActivityDraft
@@ -213,6 +214,7 @@ class ActivityGenerationStage:
 
             system = (
                 f"{SYSTEM}\n\n{strategy.prompt_guidance()}\n\n"
+                f"{get_board(options.get('curriculum_board')).prompt_guidance()}\n\n"
                 f"{audience_brief(classification)}\n\n{OUTPUT_DISCIPLINE}"
                 f"{language_directive(options.get('output_language'))}"
             )

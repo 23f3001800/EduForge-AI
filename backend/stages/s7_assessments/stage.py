@@ -34,6 +34,7 @@ from typing import Any
 from contracts.assessment import AssessmentBank, AssessmentBlueprint, AssessmentItem
 from core.llm.client import LLMClient
 from core.llm.prompts import OUTPUT_DISCIPLINE, document_block
+from pedagogy.curriculum import get_board
 from pedagogy.registry import get_strategy
 from stages.base import StageContext, stage_span
 from stages.s7_assessments.blueprint import Blueprint, ItemSpec, build_blueprint, rubric_ladder
@@ -293,8 +294,9 @@ class AssessmentGenerationStage:
             classification: dict[str, Any] = state.get("classification") or {}
             options = ctx.options or {}
             strategy = get_strategy(classification.get("pedagogy_profile", "mixed"))
+            board = get_board(options.get("curriculum_board"))
 
-            blueprint: Blueprint = build_blueprint(knowledge, strategy)
+            blueprint: Blueprint = build_blueprint(knowledge, strategy, board)
             if not blueprint.specs:
                 raise ValueError(
                     "cannot generate assessments: the knowledge base has no concepts "
@@ -305,7 +307,8 @@ class AssessmentGenerationStage:
             all_misconceptions = list(knowledge.get("misconceptions") or [])
 
             common = (
-                f"\n\n{strategy.prompt_guidance()}\n\n{audience_brief(classification)}\n\n"
+                f"\n\n{strategy.prompt_guidance()}\n\n{board.prompt_guidance()}\n\n"
+                f"{audience_brief(classification)}\n\n"
                 f"{OUTPUT_DISCIPLINE}{language_directive(options.get('output_language'))}"
             )
             mcq_system = MCQ_SYSTEM + common

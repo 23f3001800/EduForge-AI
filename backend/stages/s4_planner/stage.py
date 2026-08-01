@@ -30,6 +30,7 @@ from typing import Any
 from contracts.plan import TeachingPlan
 from core.llm.client import LLMClient
 from core.llm.prompts import OUTPUT_DISCIPLINE, document_block
+from pedagogy.curriculum import get_board
 from pedagogy.registry import ProfileStrategy, get_strategy
 from stages.base import StageContext, stage_span
 from stages.s4_planner.banding import (
@@ -254,7 +255,11 @@ class TeachingPlannerStage:
             options = ctx.options or {}
             strategy = get_strategy(classification.get("pedagogy_profile", "mixed"))
 
-            duration = int(options.get("period_duration_minutes") or 40)
+            # The board supplies the period length the teacher did not give.
+            # `period_duration_minutes` is None by default precisely so that a
+            # caller who chose nothing is distinguishable from one who chose 40.
+            board = get_board(options.get("curriculum_board"))
+            duration = board.period_length(options.get("period_duration_minutes"))
             target = options.get("target_period_count")
 
             # ── deterministic: count, order, bands, objectives ──────────────

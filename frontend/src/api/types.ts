@@ -593,19 +593,50 @@ export interface ApiErrorBody {
   };
 }
 
+/**
+ * An API failure, parsed defensively.
+ *
+ * The backend now normalises every failure into `{ error: { code, message } }`,
+ * but this constructor must not assume it. It previously did — `body.error.message`
+ * on a FastAPI `{ "detail": ... }` response threw "Cannot read properties of
+ * undefined (reading 'message')", which replaced the real error with a TypeError
+ * and told the user nothing. An error path that can itself throw is the one path
+ * that must not.
+ *
+ * So: read the envelope when it is there, fall back through the shapes a server
+ * or proxy can realistically return, and end at the status code, which always
+ * exists.
+ */
 export class ApiError extends Error {
   code: string;
   status: number;
   details?: Record<string, unknown>;
   traceId?: string;
 
-  constructor(status: number, body: ApiErrorBody) {
-    super(body.error.message);
+  constructor(status: number, body: unknown) {
+    const envelope = (body as Partial<ApiErrorBody> | null | undefined)?.error;
+    const detail = (body as { detail?: unknown } | null | undefined)?.detail;
+
+    let message: string | undefined = envelope?.message;
+    let code: string | undefined = envelope?.code;
+
+    if (!message && typeof detail === "string") {
+      message = detail;
+    } else if (!message && detail && typeof detail === "object") {
+      // FastAPI's raw shapes: a dict from a raised HTTPException, or the
+      // validation error list.
+      const asRecord = detail as Record<string, unknown>;
+      const first = Array.isArray(detail) ? (detail[0] as Record<string, unknown>) : asRecord;
+      message = typeof first?.msg === "string" ? first.msg : undefined;
+      code = code ?? (typeof asRecord.code === "string" ? asRecord.code : undefined);
+    }
+
+    super(message || `Request failed with status ${status}.`);
     this.name = "ApiError";
     this.status = status;
-    this.code = body.error.code;
-    this.details = body.error.details;
-    this.traceId = body.error.trace_id;
+    this.code = code ?? "unknown_error";
+    this.details = envelope?.details;
+    this.traceId = envelope?.trace_id;
   }
 }
 
