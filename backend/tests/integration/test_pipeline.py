@@ -364,3 +364,37 @@ async def test_stage_span_reports_both_ends_even_when_the_body_raises() -> None:
 def test_stub_roster_covers_every_stage_exactly_once() -> None:
     names = [s.name for s in STUB_STAGES]
     assert names == list(STAGE_NAMES)
+
+
+async def test_the_job_snapshot_tracks_progress_during_the_run() -> None:
+    """The REST view must not sit at 0% while SSE streams a healthy run.
+
+    Two views of one fact. They drifted: a live Azure run streamed correct
+    per-stage progress over SSE while GET /jobs/{id} reported 0% and a null
+    current_stage for six minutes, because the emitter wrote the event log and
+    never touched the job record. Anything that polls — or that reads the
+    snapshot once before subscribing — saw a job that looked hung.
+    """
+    store = InMemoryStore()
+    job_id, _ = await _seed(store)
+
+    seen: list[tuple[int, str | None]] = []
+    original = store.append_event
+
+    async def spy(event):  # type: ignore[no-untyped-def]
+        result = await original(event)
+        job = await store.get_job(job_id)
+        assert job is not None
+        seen.append((job.progress, job.current_stage))
+        return result
+
+    store.append_event = spy  # type: ignore[method-assign]
+    await run_job(store=store, job_id=job_id, stages=STUB_STAGES)
+
+    mid = [p for p, _ in seen if 0 < p < 100]
+    assert mid, "the snapshot never showed intermediate progress"
+    assert [p for p, _ in seen] == sorted(p for p, _ in seen), "snapshot progress went backwards"
+
+    stages_seen = {s for _, s in seen if s}
+    assert stages_seen <= set(STAGE_NAMES), "a terminal marker leaked into current_stage"
+    assert len(stages_seen) > 1, "current_stage never advanced"

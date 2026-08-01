@@ -28,7 +28,7 @@ from stages.s3_knowledge.concept_graph import build_concept_graph
 from stages.s3_knowledge.grounding import EvidenceAudit, verify_items
 from stages.s3_knowledge.schemas import CoreKnowledge, PedagogicalKnowledge, merge_pair
 
-__all__ = ["KnowledgeExtractionStage"]
+__all__ = ["KnowledgeExtractionStage", "derive_objectives"]
 
 #: Above this, extraction runs section-by-section and merges. A single call over a
 #: long chapter degrades badly: recall drops and citations get vaguer.
@@ -80,6 +80,40 @@ with the reason they arise. Generic study advice is not a misconception.
 Fields that do not apply to this material must be empty. A history chapter has no \
 formulae, and returning an empty list is the correct answer — inventing entries \
 to fill a field is worse than leaving it empty."""
+
+
+def derive_objectives(concepts: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """One objective per concept, when extraction returned none of its own.
+
+    Stage 4 cannot build a plan without objectives — every period must serve at
+    least one — so an empty list ends the run at stage 4 and throws away three
+    stages of work and real model spend. That happened on a live narrative
+    document: concepts came back, objectives did not, and the whole job failed.
+
+    Deriving them is honest rather than inventive. ``LearningObjective`` is not a
+    grounded type: it carries no evidence, so nothing here fabricates a citation.
+    Each derived objective points at a ``concept_id`` that genuinely exists, and
+    "explain this concept and why it matters" is what the concept already
+    asserts is teachable. ``understand`` is the floor Bloom level a concept
+    implies, deliberately not guessed higher.
+
+    The caller warns, and the eval harness scores these lower than authored
+    objectives — a derived objective is a degraded package, not a silent one.
+    """
+    derived: list[dict[str, Any]] = []
+    for index, concept in enumerate(concepts):
+        name = str(concept.get("name") or "").strip()
+        if not name:
+            continue
+        derived.append(
+            {
+                "objective_id": f"obj_derived_{index + 1:02d}",
+                "statement": f"Explain {name}, and why it matters in this material.",
+                "bloom_level": "understand",
+                "concept_ids": [str(concept["concept_id"])],
+            }
+        )
+    return derived
 
 
 def _chunk_text(chunks: list[dict[str, Any]]) -> str:
@@ -285,6 +319,13 @@ class KnowledgeExtractionStage:
                 for item in payload.get(field) or []:
                     if "concept_ids" in item:
                         item["concept_ids"] = [c for c in item["concept_ids"] if c in known]
+
+            if not payload.get("learning_objectives") and payload["concepts"]:
+                payload["learning_objectives"] = derive_objectives(payload["concepts"])
+                span.warn(
+                    f"no learning objectives survived extraction; derived "
+                    f"{len(payload['learning_objectives'])} from the concepts instead"
+                )
 
             knowledge = KnowledgeBase.model_validate(payload)
             await span.progress(

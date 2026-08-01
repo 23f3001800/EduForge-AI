@@ -73,6 +73,13 @@ evals:  ## Score the reference packages on the 9-dimension rubric
 samples:  ## Regenerate samples/ (packages, PDFs, eval reports) from the fixtures
 	$(PY) scripts/build_samples.py
 
+evals:  ## Score the reference packages on the 9-dimension rubric
+	 -m pytest /tests/unit/test_evals.py -q
+	 scripts/build_samples.py
+
+samples:  ## Regenerate samples/ (packages, PDFs, and eval reports) from fixtures
+	 scripts/build_samples.py
+
 clean:  ## Remove caches and build artifacts
 	rm -rf .pytest_cache .ruff_cache .mypy_cache
 	find $(BACKEND) -type d -name __pycache__ -prune -exec rm -rf {} +
