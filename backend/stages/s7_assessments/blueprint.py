@@ -29,6 +29,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from contracts.primitives import BloomLevel
+from pedagogy.curriculum import CurriculumProfile
 from pedagogy.registry import ProfileStrategy
 
 __all__ = [
@@ -112,20 +113,35 @@ class Blueprint:
         return {kind: len(specs) for kind, specs in self.by_kind().items()}
 
 
+def _scaled_marks(kind: str, board: CurriculumProfile | None) -> int:
+    """Marks for one item, scaled by the board's convention.
+
+    Floored at 1: a scale must never produce a zero-mark question, which
+    ``AssessmentItem`` rejects and which would be meaningless anyway.
+    """
+    base = MARKS_BY_KIND.get(kind, DEFAULT_MARKS)
+    scale = board.marks_scale if board else 1.0
+    return max(1, round(base * scale))
+
+
 def _item_budget(concept_count: int, objective_count: int) -> int:
     """Bank size from content volume. A fixed count is wrong at both extremes."""
     derived = 2 * concept_count + objective_count
     return max(MIN_ITEMS, min(derived, MAX_ITEMS))
 
 
-def _kind_plan(strategy: ProfileStrategy, budget: int) -> list[str]:
+def _kind_plan(
+    strategy: ProfileStrategy, budget: int, board: CurriculumProfile | None = None
+) -> list[str]:
     """Kinds expanded to one entry per item, interleaved so the bank alternates.
 
     Interleaving is not cosmetic: an assessment book with every MCQ first and
     every long answer last is harder to sit and harder to mark, and the ordering
     is free to get right here.
     """
-    counts = strategy.target_item_counts(budget)
+    mix = board.blend(strategy.assessment_mix) if board else strategy.assessment_mix
+    counts = {kind: round(budget * share) for kind, share in mix.items() if share > 0}
+    counts = {k: v for k, v in counts.items() if v > 0}
     if not counts:
         counts = {"short_answer": max(1, budget)}
 
@@ -178,13 +194,23 @@ def _coverage_targets(
     return targets
 
 
-def build_blueprint(knowledge: Mapping[str, Any], strategy: ProfileStrategy) -> Blueprint:
-    """Design the bank: count, kinds, coverage, Bloom levels, and marks."""
+def build_blueprint(
+    knowledge: Mapping[str, Any],
+    strategy: ProfileStrategy,
+    board: CurriculumProfile | None = None,
+) -> Blueprint:
+    """Design the bank: count, kinds, coverage, Bloom levels, and marks.
+
+    ``board`` shifts emphasis within what the profile already allows, and
+    scales the marks. It can never introduce a kind the content does not
+    support: the blend multiplies through a profile share of zero, so a
+    narrative chapter still yields no numerical items under any board.
+    """
     concepts = list(knowledge.get("concepts") or [])
     objectives = list(knowledge.get("learning_objectives") or [])
 
     budget = _item_budget(len(concepts), len(objectives))
-    kinds = _kind_plan(strategy, budget)
+    kinds = _kind_plan(strategy, budget, board)
     targets = _coverage_targets(objectives, concepts)
 
     specs: list[ItemSpec] = []
@@ -195,7 +221,7 @@ def build_blueprint(knowledge: Mapping[str, Any], strategy: ProfileStrategy) -> 
             ItemSpec(
                 item_id=f"item_{index + 1:02d}",
                 kind=kind,
-                marks=MARKS_BY_KIND.get(kind, DEFAULT_MARKS),
+                marks=_scaled_marks(kind, board),
                 bloom_level=level,
                 concept_ids=list(concept_ids),
                 objective_id=objective_id,

@@ -11,14 +11,26 @@ from __future__ import annotations
 from typing import Any
 
 from fastapi import FastAPI, HTTPException, Request
+from fastapi.encoders import jsonable_encoder
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from api.routes import documents, events, jobs
+from api.routes import documents, events, jobs, options
 from contracts.primitives import SCHEMA_VERSION
 from core.config import REPO_ROOT, get_settings
 
 API_PREFIX = "/api/v1"
+
+#: Fallback wording when a route raises with a code but no human-readable text.
+_DEFAULT_MESSAGES = {
+    404: "The requested resource was not found.",
+    409: "That conflicts with the current state.",
+    413: "The upload is too large.",
+    415: "That file type is not supported.",
+    422: "The request could not be processed.",
+}
 
 #: Where `npm run build` puts the bundle, and where the Dockerfile copies it.
 FRONTEND_DIST = REPO_ROOT / "frontend" / "dist"
@@ -39,10 +51,59 @@ def create_app() -> FastAPI:
     app.include_router(documents.router, prefix=API_PREFIX)
     app.include_router(jobs.router, prefix=API_PREFIX)
     app.include_router(events.router, prefix=API_PREFIX)
+    app.include_router(options.router, prefix=API_PREFIX)
+
+    # Every failure leaves through one of these three, so a client parses one
+    # shape. This used to be true only of unhandled exceptions: a deliberate
+    # HTTPException returned FastAPI's `{"detail": ...}` and a validation error
+    # returned `{"detail": [ ... ]}`, so the UI's `body.error.message` read
+    # `undefined.message` and the real error was replaced by a TypeError.
+    @app.exception_handler(StarletteHTTPException)
+    async def http_error(_: Request, exc: StarletteHTTPException) -> JSONResponse:
+        """Normalise a raised HTTPException into the envelope.
+
+        Routes raise with ``detail={"code": ..., "message": ...}``, so that dict
+        is the envelope's body when present; a bare string detail becomes the
+        message.
+        """
+        detail: Any = exc.detail
+        if isinstance(detail, dict):
+            error = {
+                "code": detail.get("code", "http_error"),
+                "message": detail.get("message")
+                or _DEFAULT_MESSAGES.get(exc.status_code, "Request failed."),
+                **({"details": detail["details"]} if "details" in detail else {}),
+            }
+        else:
+            error = {"code": "http_error", "message": str(detail)}
+        return JSONResponse(status_code=exc.status_code, content={"error": error})
+
+    @app.exception_handler(RequestValidationError)
+    async def invalid_request(_: Request, exc: RequestValidationError) -> JSONResponse:
+        """422s, flattened to something a person can act on.
+
+        Pydantic's raw error list names the failing field in ``loc`` and buries
+        the reason in ``msg``; a UI showing the list verbatim shows JSON. The
+        first error becomes the message and the whole list stays in ``details``.
+        """
+        errors = exc.errors()
+        first = errors[0] if errors else {}
+        field = ".".join(str(part) for part in first.get("loc", ()) if part != "body")
+        reason = first.get("msg", "Request body is not valid.")
+        return JSONResponse(
+            status_code=422,
+            content={
+                "error": {
+                    "code": "invalid_request",
+                    "message": f"{field}: {reason}" if field else reason,
+                    "details": {"errors": jsonable_encoder(errors)},
+                }
+            },
+        )
 
     @app.exception_handler(Exception)
     async def unhandled(_: Request, exc: Exception) -> JSONResponse:
-        """Uniform error envelope; never leak an internal traceback to a caller."""
+        """Never leak an internal traceback to a caller."""
         return JSONResponse(
             status_code=500,
             content={

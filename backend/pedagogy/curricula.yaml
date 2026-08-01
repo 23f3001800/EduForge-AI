@@ -1,0 +1,116 @@
+# Curriculum board conventions.
+#
+# A board is NOT a subject and NOT a pedagogy profile. The profile says what the
+# *content* demands (a quantitative chapter needs numerical practice whoever is
+# teaching it); the board says what the *institution* expects — how long a period
+# runs, how a paper is structured, what a mark is worth, what things are called.
+# The two compose: an ICSE physics chapter is quantitative AND long-form.
+#
+# Everything here is declarative on purpose. Adding a board is a block in this
+# file, not a conditional in a stage — the same reason `profiles.yaml` exists.
+# Nothing in `stages/` may branch on a board name any more than on a subject name.
+#
+# `assessment_bias` multiplies the profile's own mix and is then renormalised, so
+# a board can never conjure an item kind the content does not support: a
+# narrative chapter under CBSE still yields zero numerical items, because the
+# profile weights that kind at zero and zero times anything is zero. A board
+# shifts emphasis; it cannot override what the material is.
+
+default: generic
+
+boards:
+  generic:
+    label: "No specific board"
+    description: >-
+      The neutral default. Used when a teacher names no board, which is the
+      common case and must produce a good package on its own.
+    period_minutes: 40
+    unit_word: "chapter"
+    assessment_bias: {}
+    marks_scale: 1.0
+    emphasis: []
+
+  CBSE:
+    label: "CBSE (India)"
+    description: >-
+      Central Board of Secondary Education. Since the 2020 NEP the paper has
+      moved decisively toward competency-based items — MCQ, assertion-reason, and
+      case/source-based questions — over long reproduction answers.
+    period_minutes: 40
+    unit_word: "chapter"
+    assessment_bias:
+      mcq: 1.6
+      short_answer: 1.2
+      numerical: 1.0
+      long_answer: 0.6
+    marks_scale: 1.0
+    emphasis:
+      - >-
+        Favour competency-based items: application to an unseen situation over
+        recall of the passage.
+      - >-
+        Where a question suits it, frame it as a short case or source extract
+        followed by questions, which is the CBSE pattern.
+      - Use NCERT terminology where the material already uses it.
+
+  ICSE:
+    label: "ICSE / CISCE (India)"
+    description: >-
+      Council for the Indian School Certificate Examinations. Longer descriptive
+      answers, more internal choice, and a heavier weighting on explanation and
+      structured reasoning than CBSE.
+    period_minutes: 40
+    unit_word: "chapter"
+    assessment_bias:
+      long_answer: 1.8
+      short_answer: 1.3
+      numerical: 1.0
+      mcq: 0.5
+    marks_scale: 1.2
+    emphasis:
+      - >-
+        Favour extended descriptive answers that require structured reasoning,
+        not single-sentence recall.
+      - >-
+        Expect precise subject vocabulary and full working; ICSE marking rewards
+        the steps, not only the result.
+
+  IB:
+    label: "IB (International Baccalaureate)"
+    description: >-
+      Inquiry-led, concept-driven, with explicit command terms and a strong
+      emphasis on evaluation and transfer across contexts.
+    period_minutes: 60
+    unit_word: "unit"
+    assessment_bias:
+      long_answer: 1.6
+      short_answer: 1.1
+      numerical: 1.0
+      mcq: 0.7
+    marks_scale: 1.0
+    emphasis:
+      - >-
+        Open with an inquiry question rather than a statement of the topic.
+      - >-
+        Use IB command terms precisely — "evaluate", "analyse", "to what extent"
+        each demand a different response, and the verb is the instruction.
+      - Ask students to transfer the idea to a second, unfamiliar context.
+
+  CommonCore:
+    label: "Common Core (US)"
+    description: >-
+      Standards-referenced, with explicit emphasis on evidence from the text and
+      on explaining the reasoning behind an answer.
+    period_minutes: 45
+    unit_word: "unit"
+    assessment_bias:
+      short_answer: 1.4
+      long_answer: 1.2
+      numerical: 1.0
+      mcq: 0.9
+    marks_scale: 1.0
+    emphasis:
+      - >-
+        Require students to cite specific evidence from the material when making
+        a claim.
+      - Ask for the reasoning, not only the answer.
