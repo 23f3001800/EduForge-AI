@@ -1,5 +1,7 @@
 # EduForge AI
 
+**Live: <https://eduforge-ai.azurewebsites.net>** · [API docs](https://eduforge-ai.azurewebsites.net/api/v1/docs) · [health](https://eduforge-ai.azurewebsites.net/healthz)
+
 Turns a raw educational document — a PDF chapter, a DOCX, a slide deck, a text
 file — into a **Teacher Knowledge Package (TKP)**: a structured, classroom-ready
 artifact with a multi-period lesson plan, teacher scripts, activities,
@@ -30,7 +32,7 @@ clarifications in [`FAQ.md`](FAQ.md) folded into the design.
 | Orchestration, worker, SSE API | ✅ real, end-to-end |
 | Frontend | ✅ upload, live progress, TKP viewer (served single-origin) |
 | Quality evals + samples | ✅ 9 deterministic dimensions, [`samples/`](samples/) |
-| Deployment | 🟡 Dockerfile + CI + Render blueprint ready; **not yet deployed** |
+| Deployment | ✅ **live on Azure App Service** ([notes](docs/13-azure-deployment.md)) |
 
 **No stubs remain.** `REMAINING_STUBS` in
 [`orchestration/pipeline.py`](backend/orchestration/pipeline.py) is now empty, and
@@ -237,12 +239,20 @@ marks thirty scripts against it. And an MCQ that returns fewer than four distinc
 options is **reissued as a short answer** rather than discarded, since the
 question is usually sound and only the distractors failed.
 
-Verified live on the free tier:
+Verified on the deployed Azure instance, both documents through the same code
+path, neither run naming its subject anywhere:
 
-| Document | Subject | Profile | Concepts | Formulae | Misconceptions |
-|---|---|---|---|---|---|
-| `physics.pdf` | Physics | quantitative | 3 | 1 | 2 |
-| `history.docx` | History | narrative | 6 | **0** | 2 |
+| | `physics.pdf` | `history.docx` |
+|---|---|---|
+| Subject → profile | Physics → `quantitative` | History → `narrative` |
+| Formulae | 1 | **0** |
+| Assessment mix | 3 numerical, 2 mcq, 1 long, 1 short | **0 numerical**, 1 mcq, 3 long, 2 short |
+| Activity chosen | `experiment` | `debate` |
+| Validation | `pass_with_warnings` | `pass_with_warnings` |
+
+The assessment mix and the activity type are both derived from
+`pedagogy_profile`, which stage 2 sets from the content. Nothing branches on
+"physics" or "history".
 
 To reproduce against a live provider — this makes real calls and is not part of
 `make check`:
