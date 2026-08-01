@@ -528,3 +528,51 @@ async def test_options_serves_the_boards_the_pipeline_actually_reads(
     assert values[0] == "generic", "the common case must not be last in the list"
     assert {"CBSE", "ICSE"} <= set(values)
     assert body["teaching_styles"] and body["artifact_kinds"]
+
+
+async def test_the_cursor_can_be_sent_as_a_query_parameter(
+    client: httpx.AsyncClient,
+) -> None:
+    """A browser's EventSource cannot set request headers.
+
+    Which meant the documented Last-Event-ID replay guarantee was unreachable
+    from the one client that matters most: a page resuming after a refresh has
+    no way to send the header at all. The query parameter is that client's only
+    route to it.
+    """
+    document_id = await _upload(client)
+    job_id = (await client.post("/api/v1/jobs", json={"document_id": document_id})).json()["job_id"]
+    await _await_job(client, job_id)
+
+    full = _parse_sse((await client.get(f"/api/v1/jobs/{job_id}/events")).text)
+    assert len(full) > 6
+
+    cut = len(full) // 2
+    resumed = _parse_sse(
+        (await client.get(f"/api/v1/jobs/{job_id}/events?last_event_id={full[cut - 1]['id']}")).text
+    )
+    assert [f["id"] for f in full[:cut] + resumed] == [f["id"] for f in full]
+
+
+async def test_the_header_wins_over_the_query_parameter(
+    client: httpx.AsyncClient,
+) -> None:
+    """Both present means an automatic browser reconnect, whose header is newer.
+
+    EventSource sets Last-Event-ID itself on a reconnect, while the query string
+    still carries whatever the page knew when it mounted. Preferring the stale
+    one would replay events the client already has.
+    """
+    document_id = await _upload(client)
+    job_id = (await client.post("/api/v1/jobs", json={"document_id": document_id})).json()["job_id"]
+    await _await_job(client, job_id)
+
+    full = _parse_sse((await client.get(f"/api/v1/jobs/{job_id}/events")).text)
+    newest = full[-1]["id"]
+
+    response = await client.get(
+        f"/api/v1/jobs/{job_id}/events?last_event_id=0",
+        headers={"Last-Event-ID": str(newest)},
+    )
+    # The header says "I have everything", so nothing is replayed.
+    assert _parse_sse(response.text) == []
