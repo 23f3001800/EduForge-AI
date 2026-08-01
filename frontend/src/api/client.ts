@@ -61,7 +61,13 @@ export async function createJob(
       "Content-Type": "application/json",
       "Idempotency-Key": idempotencyKey,
     },
-    body: JSON.stringify({ document_id: documentId, options }),
+    // Options are FLAT alongside document_id, not nested under an `options`
+    // key — the endpoint's body model extends JobOptions and adds document_id
+    // (`backend/api/routes/jobs.py::_CreateJob`). Sending `{document_id,
+    // options}` was rejected with 422 "options: Extra inputs are not
+    // permitted", because JobOptions forbids unknown fields, and every job
+    // creation from the UI failed on it.
+    body: JSON.stringify({ document_id: documentId, ...options }),
   });
   return parseJsonOrThrow<CreateJobResponse>(response);
 }
