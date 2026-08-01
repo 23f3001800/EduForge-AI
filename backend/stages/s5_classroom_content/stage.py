@@ -26,6 +26,7 @@ shown it, and the prompt stays small enough for a small model to write well in.
 
 from __future__ import annotations
 
+import asyncio
 from collections.abc import Mapping
 from typing import Any
 
@@ -191,23 +192,52 @@ class ClassroomContentStage:
             system_close = self._system(SYSTEM_CLOSE, strategy, classification, options)
 
             total = len(briefs)
-            contents: list[dict[str, Any]] = []
-            for index, brief in enumerate(briefs):
-                await span.progress(
-                    index / total, message=f"period {brief.period_no} of {total} — script"
-                )
+            done = 0
+
+            async def generate(brief: PeriodBrief) -> tuple[dict[str, Any], list[str]]:
+                """One period, start to finish.
+
+                Periods are independent — each brief carries its own concepts,
+                objectives and neighbours — so there is no ordering constraint
+                between them, only within one. Generating them concurrently turns
+                the longest stage in the pipeline from N sequential round trips
+                into roughly one, and this stage is 25% of a run.
+
+                Concurrency is bounded by the LLM client's own semaphore rather
+                than here, so the ceiling stays in one place and a provider's
+                rate limit is respected across every stage at once, not per
+                stage.
+                """
+                nonlocal done
                 core = await self._core(span, system_core, brief)
-
-                await span.progress(
-                    (index + 0.5) / total,
-                    message=f"period {brief.period_no} of {total} — checks",
-                )
                 close = await self._close(span, system_close, brief)
-
                 content, notes = build_period_content(brief, core, close)
+
+                done += 1
+                # Reported on completion rather than on start: with work in
+                # flight, "starting period 4" while 2 and 3 are unfinished
+                # overstates progress.
+                #
+                # Scaled to 0.95 so the last period to finish lands below the
+                # closing summary below it. Reaching a full 1.0 here made the
+                # stage emit 65, 64, 65 — the ProgressEmitter would have clamped
+                # that in production, which is exactly why the stage must not
+                # rely on it: a bar that only looks monotonic because something
+                # downstream hides the mistake is still wrong.
+                await span.progress(
+                    0.95 * done / total, message=f"period {brief.period_no} complete"
+                )
+                return content.model_dump(mode="json"), notes
+
+            # gather preserves input order, so periods come back sequenced even
+            # though they were produced out of order.
+            results = await asyncio.gather(*(generate(brief) for brief in briefs))
+
+            contents: list[dict[str, Any]] = []
+            for brief, (content, notes) in zip(briefs, results, strict=True):
                 for note in notes:
                     span.warn(f"period {brief.period_no}: {note}")
-                contents.append(content.model_dump(mode="json"))
+                contents.append(content)
 
             await span.progress(0.98, message=f"{total} periods of classroom content")
             return {"period_contents": contents}
