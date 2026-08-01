@@ -222,9 +222,21 @@ def _mount_frontend(app: FastAPI) -> None:
         if path.startswith("api/"):
             raise HTTPException(404, detail={"code": "not_found"})
 
+        root = FRONTEND_DIST.resolve()
         candidate = (FRONTEND_DIST / path).resolve()
-        if path and candidate.is_file() and candidate.is_relative_to(FRONTEND_DIST.resolve()):
-            return FileResponse(candidate)
+        # `is_relative_to` first: it is the traversal guard, and a `..` path must
+        # be rejected before anything is read from disk.
+        if path and candidate.is_relative_to(root):
+            if candidate.is_file():
+                return FileResponse(candidate)
+            # A static export emits one directory per route — `/upload/` is
+            # `upload/index.html` on disk. Without this, every route but the
+            # root fell through to the root shell below and rendered the
+            # landing page, which made five of six pages unreachable.
+            nested = candidate / "index.html"
+            if nested.is_file():
+                return FileResponse(nested)
+
         return FileResponse(FRONTEND_DIST / "index.html")
 
 
