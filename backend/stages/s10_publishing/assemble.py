@@ -115,6 +115,7 @@ def assemble_package(state: dict[str, Any]) -> TeacherKnowledgePackage:
     knowledge: dict[str, Any] = state["knowledge"]
     learning_gaps: list[dict[str, Any]] = state.get("learning_gaps") or []
     chunks_by_id = {c["chunk_id"]: c for c in (state.get("chunks") or [])}
+    reports: list[dict[str, Any]] = state.get("stage_reports") or []
 
     payload = {
         "schema_version": SCHEMA_VERSION,
@@ -122,13 +123,10 @@ def assemble_package(state: dict[str, Any]) -> TeacherKnowledgePackage:
         "generated_at": datetime.now(UTC).isoformat(),
         "generator": {
             "app_version": _app_version(),
-            # Per-stage model/provider and token/cost bookkeeping is not threaded
-            # through `GraphState` today (no stage records it there), so this is
-            # honestly empty rather than guessed from the routing config, which
-            # would describe what a stage was *configured* to use, not what it
-            # actually billed.
-            "models_by_stage": {},
-            "providers_by_stage": {},
+            # Taken from what each stage actually called, not from the routing
+            # config — config describes what a stage was *configured* to use,
+            # which diverges the moment a fallback fires.
+            **_generator_fields(reports),
         },
         "source": state["structured_document"]["metadata"],
         "classification": state["classification"],
@@ -141,9 +139,49 @@ def assemble_package(state: dict[str, Any]) -> TeacherKnowledgePackage:
         "validation": state["validation"],
         "provenance": {
             "citations": _collect_citations(knowledge, learning_gaps, chunks_by_id),
-            # Stage timings/tokens/cost have the same gap as models_by_stage
-            # above: no stage writes them into state, so there is nothing
-            # honest to put here beyond the zero defaults.
+            **_provenance_fields(reports),
         },
     }
     return TeacherKnowledgePackage.model_validate(payload)
+
+
+def _generator_fields(reports: list[dict[str, Any]]) -> dict[str, Any]:
+    """Which model and provider actually produced each stage.
+
+    Stages that make no model call (document intelligence, publishing) are
+    omitted rather than listed as empty — an absent entry says "no model was
+    involved", which is true and useful; an empty string says nothing.
+    """
+    models = {r["stage"]: r["model"] for r in reports if r.get("model")}
+    providers = {r["stage"]: r["provider"] for r in reports if r.get("provider")}
+    return {"models_by_stage": models, "providers_by_stage": providers}
+
+
+def _provenance_fields(reports: list[dict[str, Any]]) -> dict[str, Any]:
+    """Per-stage timings and totals, summed from what each stage reported.
+
+    These were zero until stages started reporting usage, which made the cost of
+    a package invisible to the person who ran it. A teacher deciding whether to
+    regenerate a section, and an operator deciding whether the pipeline is worth
+    its bill, both need this and neither could see it.
+    """
+    timings = [
+        {
+            "stage": report["stage"],
+            "duration_ms": int(report.get("duration_ms") or 0),
+            "tokens_in": int(report.get("tokens_in") or 0),
+            "tokens_out": int(report.get("tokens_out") or 0),
+            "tokens_cached": int(report.get("tokens_cached") or 0),
+            "attempts": max(1, int(report.get("attempts") or 1)),
+            "degraded": bool(report.get("degraded")),
+        }
+        for report in reports
+        if report.get("stage")
+    ]
+    return {
+        "stage_timings": timings,
+        "total_tokens_in": sum(t["tokens_in"] for t in timings),
+        "total_tokens_out": sum(t["tokens_out"] for t in timings),
+        "total_cost_usd": round(sum(float(r.get("cost_usd") or 0.0) for r in reports), 6),
+        "total_duration_ms": sum(t["duration_ms"] for t in timings),
+    }

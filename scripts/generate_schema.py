@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Regenerate the published TKP JSON Schema and the reference fixtures.
 
 Run from the repo root:

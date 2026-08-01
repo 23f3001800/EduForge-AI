@@ -1,10 +1,6 @@
 # EduForge AI
 
 [![Live](https://img.shields.io/badge/demo-live-2ea043?style=flat-square)](https://eduforge-ai.azurewebsites.net)
-[![Tests](https://img.shields.io/badge/tests-312%20passing-2ea043?style=flat-square)](#testing)
-[![Stages](https://img.shields.io/badge/pipeline-10%20stages-1f6feb?style=flat-square)](#the-ten-stages)
-[![Boundaries](https://img.shields.io/badge/module%20boundaries-enforced-1f6feb?style=flat-square)](#architecture)
-[![Grounding](https://img.shields.io/badge/citations-mandatory-0e7490?style=flat-square)](#five-decisions-that-shape-everything)
 
 [![Python](https://img.shields.io/badge/Python-3.12-3776AB?style=flat-square&logo=python&logoColor=white)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=flat-square&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)

@@ -219,7 +219,9 @@ async def test_resume_restores_every_key_a_stage_wrote_not_just_the_mapped_one()
     with contextlib.suppress(RuntimeError):
         await run_job(store=store, job_id=job_id, stages=[TwoKeyStage()])
     checkpoint = (await store.get_checkpoints(job_id))["document-intelligence"]
-    assert set(checkpoint.output) == {"structured_document", "chunks"}
+    # `stage_reports` rides along on every fragment — the point of this test is
+    # that the stage's OWN keys both survive, not that it wrote exactly two.
+    assert {"structured_document", "chunks"} <= set(checkpoint.output)
 
     # Second run restores stage 1 from that checkpoint; the next stage must still
     # see the chunks.

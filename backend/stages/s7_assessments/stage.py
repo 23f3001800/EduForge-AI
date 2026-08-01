@@ -297,6 +297,23 @@ class AssessmentGenerationStage:
             board = get_board(options.get("curriculum_board"))
 
             blueprint: Blueprint = build_blueprint(knowledge, strategy, board)
+
+            kinds: dict[str, int] = {}
+            for spec in blueprint.specs:
+                kinds[spec.kind] = kinds.get(spec.kind, 0) + 1
+            mix = ", ".join(f"{count} {kind}" for kind, count in sorted(kinds.items()))
+            span.decide(
+                f"{len(blueprint.specs)} items ({mix}), {blueprint.total_marks} marks",
+                f"the {strategy.name} profile sets the kind weighting from the content"
+                + (f", biased by {board.label} conventions" if not board.is_generic else "")
+                + "; the count follows concept and objective coverage, not a fixed number",
+            )
+            if not strategy.expects_numerical_items:
+                span.decide(
+                    "no numerical items",
+                    f"the {strategy.name} profile weights them at zero — their absence is "
+                    "the designed outcome for this material, not a gap",
+                )
             if not blueprint.specs:
                 raise ValueError(
                     "cannot generate assessments: the knowledge base has no concepts "

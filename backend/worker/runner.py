@@ -32,6 +32,7 @@ async def run_job(
     store: Store,
     job_id: UUID,
     stages: list[Any],
+    llm: Any | None = None,
 ) -> PipelineResult:
     job = await store.get_job(job_id)
     if job is None:
@@ -52,6 +53,7 @@ async def run_job(
             stages=stages,
             store=store,
             emit=emit,
+            llm=llm,
         )
     except Exception as exc:  # the boundary that records failure before re-raising
         metrics.record_job("failed")

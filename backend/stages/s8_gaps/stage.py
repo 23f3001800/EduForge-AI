@@ -192,6 +192,15 @@ class GapAnalysisStage:
             strategy = get_strategy(classification.get("pedagogy_profile", "mixed"))
 
             seeds = plan_seeds(knowledge)
+            observed = sum(1 for seed in seeds if seed.observed)
+            high = sum(1 for seed in seeds if seed.severity == "high")
+            if seeds:
+                span.decide(
+                    f"{len(seeds)} gaps ({observed} from the document, "
+                    f"{len(seeds) - observed} predicted), {high} high severity",
+                    "severity is transitive downstream load in the concept graph — high "
+                    "means later concepts depend on it, not that a model judged it serious",
+                )
             if not seeds:
                 # Legitimately empty: a short document with no misconceptions and no
                 # dependency structure has no gaps to report. `learning_gaps` is not

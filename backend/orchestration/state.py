@@ -48,6 +48,11 @@ class GraphState(TypedDict, total=False):
     package: dict[str, Any]
     artifacts: dict[str, str]
 
+    #: One entry per executed stage: duration, tokens, model, provider, the
+    #: warnings it raised and the decisions it made. Appended rather than
+    #: replaced, so a resumed run keeps what earlier stages reported.
+    stage_reports: Annotated[list[dict[str, Any]], operator.add]
+
     # control
     warnings: Annotated[list[str], operator.add]
     validation_attempts: int

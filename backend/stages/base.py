@@ -25,7 +25,14 @@ from pydantic import model_validator
 from contracts.jobs import STAGE_PROGRESS_WEIGHTS
 from contracts.primitives import STAGE_NAMES, StageName, StrictModel
 
-__all__ = ["Draft", "Stage", "StageContext", "StageSpan", "cumulative_progress"]
+__all__ = [
+    "Decision",
+    "Draft",
+    "Stage",
+    "StageContext",
+    "StageSpan",
+    "cumulative_progress",
+]
 
 
 class Draft(StrictModel):
@@ -77,6 +84,31 @@ class StageContext:
     #: ``None`` means nothing is collecting artifacts, which is why stage 10
     #: treats it as "render and report" rather than an error.
     put_artifact: Callable[[str, bytes], Any] | None = None
+    #: ``(stage, duration_ms, warnings, decisions) -> None``. Called by
+    #: ``stage_span`` when a stage finishes.
+    #:
+    #: A sink rather than a return value, so every stage contributes its
+    #: warnings and decisions without a single stage having to know it is being
+    #: observed — and so adding a stage cannot forget to.
+    record: Callable[..., Any] | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class Decision:
+    """One choice the pipeline made, and the reason it made it.
+
+    The deterministic halves of these stages decide a great deal — how many
+    periods, which assessment kinds, how severe a gap is — and a teacher looking
+    at the result has no way to tell a derived number from an arbitrary one.
+    "5 periods" invites the question; "5 periods, because 9 concepts at core
+    weighting need 210 minutes and a period is 40" answers it.
+
+    Recorded rather than logged, because it belongs in the package a teacher
+    reads, not only in a file an operator greps.
+    """
+
+    what: str
+    because: str
 
 
 class StageSpan:
@@ -87,6 +119,7 @@ class StageSpan:
         self.stage = stage
         self.started = time.monotonic()
         self.warnings: list[str] = []
+        self.decisions: list[Decision] = []
 
     async def progress(self, fraction: float, message: str | None = None) -> None:
         if self.ctx.emit is None:
@@ -99,6 +132,10 @@ class StageSpan:
 
     def warn(self, message: str) -> None:
         self.warnings.append(message)
+
+    def decide(self, what: str, because: str) -> None:
+        """Record a decision and its reason, for the package's decision log."""
+        self.decisions.append(Decision(what=what, because=because))
 
     @property
     def duration_ms(self) -> int:
@@ -113,6 +150,16 @@ async def stage_span(ctx: StageContext, stage: StageName) -> AsyncIterator[Stage
         yield span
     finally:
         await span.progress(1.0)
+        # Reported in `finally`, so a stage that raised still surrenders what it
+        # decided and warned about before it failed. That is precisely the run
+        # where the reasoning is worth the most.
+        if ctx.record is not None:
+            ctx.record(
+                stage=stage,
+                duration_ms=span.duration_ms,
+                warnings=list(span.warnings),
+                decisions=[{"what": d.what, "because": d.because} for d in span.decisions],
+            )
 
 
 @runtime_checkable
