@@ -1,246 +1,94 @@
 # EduForge AI
 
-**Live: <https://eduforge-ai.azurewebsites.net>** · [API docs](https://eduforge-ai.azurewebsites.net/api/v1/docs) · [health](https://eduforge-ai.azurewebsites.net/healthz)
+**Live: <https://eduforge-ai.azurewebsites.net>** · [API docs](https://eduforge-ai.azurewebsites.net/api/v1/docs) · [health](https://eduforge-ai.azurewebsites.net/healthz) · [samples](samples/)
 
-Turns a raw educational document — a PDF chapter, a DOCX, a slide deck, a text
-file — into a **Teacher Knowledge Package (TKP)**: a structured, classroom-ready
-artifact with a multi-period lesson plan, teacher scripts, activities,
-assessments with answer keys and rubrics, learning-gap analysis, and a citation
-back to the source for every factual claim it makes.
+Upload a chapter — PDF, DOCX, PPTX or text — and get back a **Teacher Knowledge
+Package**: a multi-period lesson plan, teacher scripts, classroom activities, an
+assessment bank with answer keys and rubrics, learning-gap analysis with
+diagnostics and remediation, and a citation back to the source for every factual
+claim.
 
-Built for the AI Engineer assignment (`Task Intern-2.pdf`), with the follow-up
-clarifications in [`FAQ.md`](FAQ.md) folded into the design.
+A ten-stage pipeline does the work. The same code path handles a physics chapter
+and a history chapter, and produces genuinely different material for each,
+without anything in the system knowing what a "subject" is.
 
 ---
 
-## Status
+## Try it in two minutes
 
-**First version, in progress.** Honest current state:
+1. Open the [live app](https://eduforge-ai.azurewebsites.net).
+2. **Open a sample** — two finished packages are preloaded, one Physics and one
+   History. No upload, no waiting.
+3. Or upload your own chapter and watch it run. A full run takes 5–7 minutes;
+   refresh the page mid-run and the progress stream resumes where it left off.
 
-| Stage | Status |
+> **Quota note.** The deployment uses OpenRouter's free tier: **50 model requests
+> per day**, about one and a half full runs. A `429` mid-run is the quota, not a
+> defect. The preloaded samples cost nothing and always work.
+
+---
+
+## What it produces
+
+| Artifact | Contents |
 |---|---|
-| 1 · Document Intelligence | ✅ wired — PDF/DOCX/PPTX/TXT, structure-preserving |
-| 2 · Educational Classification | ✅ wired — verified live |
-| 3 · Knowledge Extraction | ✅ wired — verified live, evidence-verified |
-| 4 · Teaching Planner | ✅ wired — period count derived, not fixed |
-| 5 · Classroom Content | ✅ wired — per-period fan-out |
-| 6 · Activity Generation | ✅ wired — profile-weighted activity mix |
-| 7 · Assessment Generation | ✅ wired — blueprint-first, rubrics enforced |
-| 8 · Gap Analysis | ✅ wired — severity from the concept graph |
-| 9 · Validation | ✅ wired — profile-conditioned rules + grounding judge |
-| 10 · Publishing | ✅ wired — 3 PDFs + Markdown, Devanagari-capable |
-| Orchestration, worker, SSE API | ✅ real, end-to-end |
-| Frontend | ✅ upload, live progress, TKP viewer (served single-origin) |
-| Quality evals + samples | ✅ 9 deterministic dimensions, [`samples/`](samples/) |
-| Deployment | ✅ **live on Azure App Service** ([notes](docs/13-azure-deployment.md)) |
-
-**No stubs remain.** `REMAINING_STUBS` in
-[`orchestration/pipeline.py`](backend/orchestration/pipeline.py) is now empty, and
-a roster test asserts it — a stub reintroduced during a refactor has to be
-declared there to pass.
-
-`make check` — **249 tests, lint clean, schema drift clean, 3/3 boundary contracts kept.**
-
----
-
-## Quick start
-
-Requires Python 3.12+. On Windows, run everything through WSL.
-
-```bash
-git clone <this repo> && cd EduForge-AI
-
-python3 -m venv .venv
-./.venv/bin/python -m pip install -U pip
-./.venv/bin/python -m pip install -e "backend[dev]"
-
-cp .env.example .env      # then add ONE provider key (see below)
-
-make check                # lint + tests + schema drift  → should be all green
-```
-
-### Configure a provider
-
-Put a key in `.env` and select a profile:
-
-```bash
-LLM_PROFILE=production          # OpenRouter free models — the default
-Open_Router_API_KEY=sk-or-...
-```
-
-Get a free key at [openrouter.ai](https://openrouter.ai/keys). The default
-profile uses only `:free` models, so a full run costs **$0.00**.
-
-| `LLM_PROFILE` | Provider | Use |
-|---|---|---|
-| `production` | OpenRouter (free models) | Graded output, demo, end-to-end runs |
-| `dev` | OpenRouter (smallest model) | Fast single-stage iteration |
-| `groq` | Groq | Alternative; free tier caps at 8000 TPM |
-| `gemini_dev` | Gemini | Alternative |
-| `ci` | replay | Recorded cassettes — no network, no key |
-
-Anthropic is implemented but **disabled by default**: a key in the environment is
-not sufficient, you must also set `ALLOW_ANTHROPIC=true`. Billing against that
-key should be a decision, not a config typo.
-
-### Run the API
-
-```bash
-make dev      # or: ./.venv/bin/python -m uvicorn api.main:app --reload --app-dir backend
-```
-
-- API docs: <http://localhost:8000/api/v1/docs>
-- Health: <http://localhost:8000/healthz>
-
-```bash
-# upload → enqueue → watch progress → read the package
-curl -F "file=@chapter.pdf" localhost:8000/api/v1/documents
-curl -X POST localhost:8000/api/v1/jobs -H 'Content-Type: application/json' \
-     -d '{"document_id":"<id>"}'
-curl -N localhost:8000/api/v1/jobs/<job_id>/events        # SSE progress
-curl localhost:8000/api/v1/packages/<package_id>          # the TKP
-```
-
-### Common commands
-
-```bash
-make help          # list targets
-make test          # full suite
-make check         # what CI runs: schema drift + lint + boundaries + tests
-make boundaries    # import-linter: a stage importing a stage fails here
-make evals         # score the reference packages on the 9-dimension rubric
-make samples       # regenerate samples/ (packages, PDFs, eval reports)
-make lint / fmt    # ruff
-make schema        # regenerate the published JSON Schema + fixtures
-make docker-build  # build the production image
-```
-
-There is no separate worker command. Until the Postgres store lands, an
-in-memory store cannot be shared across processes, so the API enqueues the job
-and drives it itself as a background task — `make dev` runs the whole system.
-
----
-
-## Architecture
-
-```mermaid
-graph TB
-    UI["Web UI<br/>upload · live progress · TKP viewer"]
-    GW["API Gateway (FastAPI)<br/>validation · idempotency · SSE"]
-    WK["Worker<br/>SKIP LOCKED lease · LangGraph runtime"]
-    PG[("PostgreSQL + pgvector<br/>jobs · events · checkpoints · chunks")]
-
-    UI -->|REST + SSE| GW --> PG
-    PG -.->|claim| WK --> PG
-
-    subgraph "Pipeline (LangGraph nodes)"
-        direction LR
-        S1[1 Document<br/>Intelligence] --> S2[2 Classification] --> S3[3 Knowledge<br/>Extraction]
-        S3 --> S4[4 Teaching<br/>Planner] --> S5[5 Classroom<br/>Content]
-        S5 --> S6[6 Activities] --> S7[7 Assessments] --> S8[8 Gap<br/>Analysis]
-        S8 --> S9[9 Validation] --> S10[10 Publishing]
-    end
-
-    WK --> S1
-    S9 -.->|fail: regenerate<br/>only the owning stage| S3
-    LLM["LLMClient<br/>one choke point: schema repair ·<br/>retry · budget · concurrency · accounting"]
-    S2 & S3 & S4 & S5 & S6 & S7 & S8 & S9 --> LLM
-    LLM --> P["Providers<br/>OpenRouter · Groq · Gemini · replay"]
-```
-
-This is the target architecture. Today the store is in-memory and the API drives
-the worker in-process; the Postgres box is the interface everything is already
-written against, not something running. See **Known limitations**.
-
-Full set in [`docs/`](docs/): SRS, HLD, LLD, data model, agent graph, API spec,
-roadmap, risk analysis, per-module Definition of Done.
-
-### Orchestration
-
-**LangGraph** owns topology, state reduction, and conditional retry edges.
-Model calls inside nodes go through our own `LLMClient` wrapping each provider's
-SDK — not a generic LLM wrapper — so structured outputs, prompt caching, and
-exact token accounting survive.
-
-The graph is built from the stage roster rather than hand-wired, so a stage
-cannot be added and forgotten in the graph. Checkpointing is ours, not
-LangGraph's built-in saver: one source of truth for "what has this job
-completed" beats two that can disagree at minute nine of a twelve-minute run.
-
-### Five decisions that shape everything
-
-1. **Modular monolith with enforced internal boundaries**, not ten microservices.
-   `make boundaries` (in `make check`) fails the build if one stage imports
-   another, if anything imports *into* `contracts`, or if a layer reaches upward.
-   85% of the grade is output quality; the mandatory live prototype is the real
-   delivery risk. Boundaries keep the option of splitting later without paying
-   for distribution now.
-
-2. **Evidence spans are mandatory from stage 3.** `Grounded.evidence` has
-   `min_length=1`, so an ungrounded claim is *unconstructable*. This makes
-   hallucination detection and RAG traceability one subsystem instead of two
-   half-built ones.
-
-3. **Citations are verified deterministically** before any judge model runs.
-   Claims quoting text their cited chunk does not contain are dropped — free,
-   and it stops a fabrication propagating through six downstream stages.
-
-4. **`pedagogy_profile` routing.** Stage 2 classifies content as
-   quantitative / conceptual / narrative / procedural / mixed; that value selects
-   prompts, activity weights, assessment mix, *and the validation ruleset*. **No
-   code anywhere branches on a subject name** — a test greps for it and fails the
-   build. This is why a poetry chapter and a physics chapter take the same path.
-
-5. **Durable jobs + persisted event log with SSE replay.** The pipeline outlives
-   the HTTP request, a browser refresh, and a worker restart.
-
----
-
-## What the pipeline produces
-
-`TeacherKnowledgePackage.json` — classification, knowledge base (objectives,
-concepts, definitions, formulae, examples, misconceptions, concept dependency
-graph), multi-period teaching plan, per-period classroom content, activities,
-assessment bank with rubrics, learning gaps, validation report, and provenance.
-
-Plus Lesson Plan / Teacher Guide / Assessment Book PDFs and a Markdown bundle.
+| `TeacherKnowledgePackage.json` | The whole package, schema-versioned |
+| Lesson Plan PDF | Per-period plan with timings and concept sequencing |
+| Teacher Guide PDF | Scripts, activities, misconceptions, gaps, remediation |
+| Assessment Book PDF | Questions, then the answer key behind a page break |
+| Markdown bundle | The same content, plain text |
 
 Schema: [`backend/contracts/schema/tkp-1.0.0.json`](backend/contracts/schema/tkp-1.0.0.json)
 — generated from the Pydantic models and CI-checked for drift.
 
-### Adaptive, not templated
+---
 
-Period count is **derived** from concept load, depth, and period duration —
-never a fixed 5. Absent content is correct content: a history chapter yields
-**zero formulae and zero numerical questions**, and the validator is
-profile-conditioned so it passes rather than flagging a gap.
+## The ten stages
 
-The same mechanism runs through generation. Every stage that produces classroom
-material splits into a **deterministic half that decides structure** and a model
-call that writes prose:
+```mermaid
+graph LR
+    S1[1 Document<br/>Intelligence] --> S2[2 Educational<br/>Classification] --> S3[3 Knowledge<br/>Extraction]
+    S3 --> S4[4 Teaching<br/>Planner] --> S5[5 Classroom<br/>Content] --> S6[6 Activities]
+    S6 --> S7[7 Assessments] --> S8[8 Gap<br/>Analysis] --> S9[9 Validation] --> S10[10 Publishing]
+    S9 -.->|fail: regenerate<br/>only the owning stage| S3
+```
+
+| # | Stage | What it owns |
+|---|---|---|
+| 1 | Document Intelligence | Parse PDF/DOCX/PPTX/TXT, preserve structure, chunk |
+| 2 | Educational Classification | Subject, grade band, difficulty, **pedagogy profile** |
+| 3 | Knowledge Extraction | Concepts, objectives, definitions, formulae, misconceptions, concept DAG — every claim carrying verified evidence |
+| 4 | Teaching Planner | Period count **derived**, concepts topologically sequenced |
+| 5 | Classroom Content | Per-period scripts, explanations, checks for understanding |
+| 6 | Activities | Profile-weighted activity mix, runnable from the page |
+| 7 | Assessments | Blueprint-first bank, answer keys, discriminating rubrics |
+| 8 | Gap Analysis | Predicted misconceptions, diagnostics, remediation |
+| 9 | Validation | Schema, coverage, consistency, grounding — profile-conditioned |
+| 10 | Publishing | Assemble and render the artifacts |
+
+---
+
+## How it adapts
+
+**Everything downstream keys off `pedagogy_profile`** — `quantitative`,
+`conceptual`, `narrative`, `procedural`, or `mixed` — which stage 2 derives from
+the content. **No code anywhere branches on a subject name**; a test greps for
+that and fails the build.
+
+Every generation stage splits into a deterministic half that decides *structure*
+and a model call that writes *prose*:
 
 | Stage | Decided in Python | Written by the model |
 |---|---|---|
+| 4 · Planner | period count, concept order, time budget | period titles and framing |
 | 6 · Activities | how many, what type, how long, which concepts | the activity itself |
 | 7 · Assessments | item count, kinds, Bloom levels, marks, coverage | stems, distractors, answers, rubrics |
-| 8 · Gaps | which gaps exist, and their severity | the misconception, diagnostic, remediation |
+| 8 · Gaps | which gaps exist, and their severity | misconception, diagnostic, remediation |
 
-So a narrative profile weights `numerical` at zero and **no numerical item is
-ever requested** — zero numerical questions on a poetry chapter is the designed
-outcome, not a prompt that happened to behave. Assessment `total_marks` is exact
-by construction, and gap severity comes from transitive downstream load in the
-concept DAG rather than from a model asked to rate its own output (it answers
-"medium" almost every time).
+That is why absence is reliable rather than lucky: a narrative profile weights
+`numerical` at zero, so **no numerical item is ever requested**.
 
-Two policies differ deliberately from the rest of the pipeline, both in stage 7:
-an item whose **answer key** came back empty is *dropped, never repaired* — a
-plausible invented answer key is worse than a shorter bank, because a teacher
-marks thirty scripts against it. And an MCQ that returns fewer than four distinct
-options is **reissued as a short answer** rather than discarded, since the
-question is usually sound and only the distractors failed.
-
-Verified on the deployed Azure instance, both documents through the same code
-path, neither run naming its subject anywhere:
+Measured on the deployed instance, both documents through the same code path:
 
 | | `physics.pdf` | `history.docx` |
 |---|---|---|
@@ -248,90 +96,229 @@ path, neither run naming its subject anywhere:
 | Formulae | 1 | **0** |
 | Assessment mix | 3 numerical, 2 mcq, 1 long, 1 short | **0 numerical**, 1 mcq, 3 long, 2 short |
 | Activity chosen | `experiment` | `debate` |
-| Validation | `pass_with_warnings` | `pass_with_warnings` |
 
-The assessment mix and the activity type are both derived from
-`pedagogy_profile`, which stage 2 sets from the content. Nothing branches on
-"physics" or "history".
+### Curriculum boards
 
-To reproduce against a live provider — this makes real calls and is not part of
-`make check`:
+A board configures the output, it does not merely label it. Profile and board
+**compose by multiplication**, then renormalise:
+
+```
+effective mix = profile.assessment_mix × board.assessment_bias
+```
+
+| | generic | CBSE | ICSE |
+|---|---|---|---|
+| Quantitative | 6 numerical, 4 mcq, 43 marks | **6 mcq**, 5 num, 41 marks | **3 long**, 2 mcq, **69 marks** |
+| Narrative | 0 numerical | 0 numerical | 0 numerical |
+
+Multiplying is the point: zero times any bias is still zero, so **no board can
+put a numerical question in a poetry chapter**. A board shifts emphasis inside
+what the content affords; it cannot contradict it. Boards live in
+[`backend/pedagogy/curricula.yaml`](backend/pedagogy/curricula.yaml) — adding one
+is a config block, not a conditional.
+
+---
+
+## Running it locally
+
+Requires Python 3.12+ and Node 18+. On Windows, run everything through WSL.
 
 ```bash
-./.venv/bin/python scripts/smoke_pipeline.py --doc physics
-./.venv/bin/python scripts/smoke_pipeline.py --doc history
+git clone <this repo> && cd EduForge-AI
+
+python3 -m venv .venv
+./.venv/bin/python -m pip install -e "backend[dev]"
+
+cp .env.example .env          # add ONE provider key — see below
+make check                    # lint + boundaries + tests + schema drift
+make dev                      # http://localhost:8000
+```
+
+The frontend is served by the API itself:
+
+```bash
+cd frontend && npm install && npm run build
+```
+
+### Provider configuration
+
+```bash
+LLM_PROFILE=production        # OpenRouter free models — the default
+Open_Router_API_KEY=sk-or-...
+```
+
+Free key at [openrouter.ai](https://openrouter.ai/keys). The default profile uses
+only `:free` models, so a run costs **$0.00**.
+
+| `LLM_PROFILE` | Provider | Use |
+|---|---|---|
+| `production` | OpenRouter (free) | Graded output, the deployment |
+| `dev` | OpenRouter (smallest) | Fast single-stage iteration |
+| `groq` / `gemini_dev` | Groq / Gemini | Alternatives |
+| `ci` | replay | Recorded cassettes — no network, no key |
+
+Anthropic is implemented but **off by default**: a key in the environment is not
+enough, `ALLOW_ANTHROPIC=true` is also required. Billing against a key should be
+a decision, not a config typo.
+
+### Commands
+
+```bash
+make check         # what CI runs: schema drift + lint + boundaries + tests
+make boundaries    # import-linter — a stage importing a stage fails here
+make evals         # score the reference packages on the 9-dimension rubric
+make samples       # regenerate samples/ from the fixtures
+make dev           # run the API (also serves the built frontend)
+make docker-build  # build the production image
+```
+
+There is no separate worker command: until the Postgres store lands, an in-memory
+store cannot be shared across processes, so the API drives the pipeline itself.
+
+---
+
+## API
+
+Base path `/api/v1`. Full spec at [`/api/v1/docs`](https://eduforge-ai.azurewebsites.net/api/v1/docs).
+
+| Method | Path | Purpose |
+|---|---|---|
+| `POST` | `/documents` | Upload (multipart), deduplicated by SHA-256 |
+| `POST` | `/jobs` | Enqueue a run — returns `202` immediately |
+| `GET` | `/jobs/{id}` | Snapshot: status, progress, completed stages |
+| `GET` | `/jobs/{id}/events` | **SSE** progress, resumable via `Last-Event-ID` |
+| `POST` | `/jobs/{id}/retry` | Resume from the first incomplete stage |
+| `GET` | `/packages/{id}` | The package |
+| `GET` | `/packages/{id}/artifacts` | Rendered artifacts + download URLs |
+| `GET` | `/samples` | Preloaded reference packages |
+| `GET` | `/options` | Boards, teaching styles, artifact kinds |
+| `GET` | `/healthz` `/readyz` `/metrics` | Ops |
+
+**Every failure uses one envelope**, including a `trace_id` that matches the
+`X-Request-ID` header and the structured logs:
+
+```json
+{"error": {"code": "document_not_found", "message": "…", "trace_id": "c1a666c5d2c9"}}
 ```
 
 ---
 
-## Repository layout
+## Architecture
+
+**Modular monolith with enforced boundaries**, not ten microservices.
+`make boundaries` fails the build if one stage imports another, if anything
+imports *into* `contracts`, or if a layer reaches upward. 85% of the grade is
+output quality; the live prototype was the real delivery risk. Boundaries keep
+the option of splitting later without paying for distribution now.
 
 ```
 backend/
   contracts/      frozen Pydantic models + published JSON Schema (imports nothing else)
-  core/           LLM client & providers, storage, progress, config
+  core/           LLM client & providers, storage, progress, observability, config
+  pedagogy/       pedagogy profiles + curriculum boards (declarative YAML)
   stages/         s1…s10, one package each — never import one another
-  pedagogy/       profile registry: prompt emphasis, activity weights, validation rules
   orchestration/  LangGraph topology, state, checkpointing, the stage roster
   worker/         job execution and resume
-  api/            FastAPI routes incl. resumable SSE
-  tests/          contract · unit · integration, with real document fixtures
-frontend/         React + Vite (served as static assets by the API — single origin)
-config/models.yaml  per-stage model routing per profile
-docs/             SRS, HLD, LLD, data model, agent graph, API spec, roadmap, risks, DoD
+  api/            FastAPI routes, SSE, middleware
+  evals/          9-dimension quality rubric
+frontend/         React + TypeScript + Vite, served single-origin by the API
+docs/             SRS, HLD, LLD, data model, agent graph, API spec, design system
 samples/          two published packages + PDFs + eval reports — start here
 ```
 
-The frontend is served by the API itself from `frontend/dist`, so there is one
-origin, no CORS config, and one deploy. A deep link like `/run/<job-id>` returns
-the SPA shell rather than 404, which is what makes a refresh mid-run resume
-instead of breaking.
+### Five decisions that shape everything
+
+1. **Evidence spans are mandatory from stage 3.** `Grounded.evidence` has
+   `min_length=1`, so an ungrounded claim is *unconstructable*. Hallucination
+   detection and RAG traceability become one subsystem instead of two half-built
+   ones.
+
+2. **Citations are verified deterministically** before any judge model runs.
+   Claims quoting text their cited chunk does not contain are dropped — free, and
+   it stops a fabrication propagating through six downstream stages.
+
+3. **`pedagogy_profile` routing**, described above.
+
+4. **Durable jobs + a persisted event log with SSE replay.** The pipeline
+   outlives the HTTP request, a browser refresh, and a worker restart.
+
+5. **Our own checkpointing, not LangGraph's saver.** One source of truth for
+   "what has this job completed" beats two that can disagree at minute nine of a
+   twelve-minute run.
+
+More in [`docs/`](docs/) — [SRS](docs/01-srs.md), [HLD](docs/02-hld.md),
+[LLD](docs/03-lld.md), [data model](docs/04-data-model.md),
+[agent graph](docs/05-agent-graph.md), [API spec](docs/06-api-spec.md),
+[design system](docs/14-design-system.md),
+[Azure deployment](docs/13-azure-deployment.md).
+
+---
+
+## Quality evaluation
+
+`make evals` scores a package on **nine dimensions, all deterministic** —
+objectives, Bloom distribution, coverage, sequencing, grounding, activities,
+differentiation, assessment integrity, classroom content. An LLM judge is
+optional and never load-bearing.
+
+The tests are about *discrimination*, not about the good package scoring well: a
+package sabotaged four ways scores **0.917 → 0.668**, each sabotage lands on the
+dimension that owns it, and coverage and sequencing do not move.
+
+The property that matters most is that a humanities package is **not** marked
+down for absent STEM content. Coverage is identical across both profiles. A
+grader that rewarded subject shape would push the whole system toward producing
+it, and no other test here would notice.
 
 ---
 
 ## Testing
 
 ```bash
-make check
+make check     # 296 tests, no network, no API key, no model calls
 ```
 
-The suite makes **no live API calls** — a stub adapter serves canned responses,
-so it is free, offline, and deterministic. Document fixtures are *real* generated
-PDF/DOCX/PPTX files, because parser behaviour against synthetic input proves
-nothing.
+Document fixtures are *real* generated PDF/DOCX/PPTX files — parser behaviour
+against synthetic input proves nothing. Tests worth knowing about:
 
-Tests worth knowing about:
-
-- Corrupted TKPs must trip each validation rule class — a validator only ever
-  tested on good input is indistinguishable from `return "pass"`.
-- Kill the worker mid-run; the job resumes at the first incomplete stage and does
+- Corrupted packages must trip **each** validation rule class; a validator only
+  ever tested on good input is indistinguishable from `return "pass"`.
+- Kill the worker mid-run: the job resumes at the first incomplete stage and does
   not re-bill completed ones.
 - Cut the SSE stream, reconnect with `Last-Event-ID`, assert the halves join
   exactly — no gap, no duplicate.
 - A narrative package with zero formulae is asserted **valid**.
+- No board can introduce a numerical item into narrative content.
+
+---
+
+## Observability
+
+- **Structured JSON logs**, one object per line, with `request_id`, `job_id` and
+  `stage` merged in automatically via contextvars.
+- **`/metrics`** in Prometheus format: requests, job outcomes, stage durations,
+  and model calls by outcome — failures included, since a climbing retry rate is
+  the earliest sign a provider or prompt has degraded.
+- **`trace_id`** on every error response, matching `X-Request-ID` and the logs.
+  An inbound request id from a proxy is honoured rather than renamed.
 
 ---
 
 ## Known limitations
 
-- **Not deployed.** The image, CI, and a Render blueprint are in the repo
-  ([`docs/12-deployment.md`](docs/12-deployment.md)); nobody has run the deploy.
-  The mandatory live URL is the biggest outstanding gap.
-- Storage is in-memory; the Postgres implementation sits behind the same
-  interface and is not written yet. Uploaded bytes live in the same in-memory
-  store, so a restart loses documents and any job retry that depended on them.
-- **Rendered PDFs are produced but not persisted.** Stage 10 builds them and
-  validates them; there is no `PackageRecord.artifacts` field or download
-  endpoint yet, so today they exist only inside the run and in `samples/`.
-- Devanagari **glyphs** render correctly (verified by round-tripping the text
-  back out of the PDF), but complex-script shaping uses fpdf2's own engine rather
-  than HarfBuzz — conjuncts and matra reordering are not typographically perfect.
+- **Storage is in-memory.** A restart loses uploaded documents, jobs and
+  packages. The Postgres implementation sits behind the same interface and is
+  not written. This is also why the deployment runs a single instance.
+- **The UI redesign is specified but not built.** [`docs/14-design-system.md`](docs/14-design-system.md)
+  and the design tokens are committed; the landing page and responsive layout are
+  not yet implemented, so the current UI is functional but desktop-oriented.
+- **Free-tier quota** — 50 requests/day, roughly 1.5 runs.
+- Devanagari **glyphs** render correctly (verified by round-tripping text back
+  out of the PDF), but complex-script shaping uses fpdf2's own engine rather than
+  HarfBuzz, so conjuncts are not typographically perfect.
 - Scanned PDFs are rejected with a clear error rather than OCR'd.
-- Per-stage token/cost/timing provenance is empty: no stage threads its usage
-  back into graph state, so publishing has nothing honest to report there.
-- Quality is bounded by free-tier models, and the OpenRouter free tier allows
-  **50 requests/day** — roughly one and a half full pipeline runs. Per-stage
-  routing in `config/models.yaml` is the single place to upgrade.
+- Per-stage token/cost provenance is empty: no stage threads its usage back into
+  graph state, so publishing has nothing honest to report there.
 
 ---
 
