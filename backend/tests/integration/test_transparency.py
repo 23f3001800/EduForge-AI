@@ -11,16 +11,22 @@ did this cost, and why did it choose that.
 
 from __future__ import annotations
 
+import asyncio
 import contextlib
 from typing import Any
 from uuid import uuid4
 
+import httpx
+
+from api.deps import set_roster_builder, set_store
+from api.main import create_app
 from contracts.classification import Classification
 from contracts.llm import LLMUsage, ModelSpec, ProviderRouting
 from core.llm.base import RawCompletion
 from core.llm.client import LLMClient
 from core.storage.base import DocumentRecord, JobRecord
 from core.storage.memory import InMemoryStore
+from orchestration.pipeline import Roster
 from stages.base import StageContext, stage_span
 from stages.s10_publishing.stage import PublishingStage
 from stages.stubs import STUB_STAGES
@@ -251,3 +257,64 @@ async def test_a_retry_is_counted_not_hidden() -> None:
     assert adapter.calls == 2
     assert report["attempts"] == 2, "the failed attempt was not counted"
     assert report["tokens_in"] == 110, "the failed attempt's tokens were not counted"
+
+
+# ──────────────────────────────────────── the wiring, not just the mechanism
+
+
+async def test_the_api_path_hands_the_call_log_to_the_runner() -> None:
+    """Attribution has to survive the path a real request actually takes.
+
+    Every test above calls ``run_job(llm=...)`` by hand. That proves the
+    arithmetic and proves nothing about whether anything passes the client in
+    production — and nothing did: ``roster_for_job`` built the client, handed it
+    to the stages, and dropped it, so the API's spawn path called ``run_job``
+    with ``llm=None``. Attribution then took the no-calls branch and every
+    package the deployed app produced shipped zero tokens, zero cost and an
+    empty ``models_by_stage``.
+
+    It stayed invisible because the fixtures hardcode those fields and every
+    unit test injects the client by hand. What caught it was scoring a live run:
+    stage 10 reported "0 of 8 model-calling stages record which model produced
+    their output".
+    """
+    store = InMemoryStore()
+    set_store(store)
+    llm = _client()
+
+    async def roster(*_args: Any) -> Roster:
+        return Roster(stages=_roster(llm), llm=llm)
+
+    set_roster_builder(roster)
+
+    app = create_app()
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=app), base_url="http://test"
+    ) as client:
+        upload = await client.post(
+            "/api/v1/documents",
+            files={"file": ("x.txt", b"a physics chapter about force", "text/plain")},
+        )
+        created = await client.post(
+            "/api/v1/jobs", json={"document_id": upload.json()["document_id"]}
+        )
+        job_id = created.json()["job_id"]
+
+        for _ in range(200):
+            snapshot = (await client.get(f"/api/v1/jobs/{job_id}")).json()
+            if snapshot["status"] in {"succeeded", "succeeded_partial", "failed"}:
+                break
+            await asyncio.sleep(0.05)
+
+        assert snapshot["status"] == "succeeded", snapshot.get("error")
+        package = (await client.get(f"/api/v1/packages/{snapshot['package_id']}")).json()
+
+    generator = package["generator"]
+    provenance = package["provenance"]
+
+    assert generator["models_by_stage"], "no stage recorded the model that ran it"
+    assert generator["models_by_stage"]["educational-classification"] == "demo-model"
+    assert generator["providers_by_stage"]["educational-classification"] == "openrouter"
+    assert provenance["total_tokens_in"] == 100, "token attribution was lost in the API path"
+    assert provenance["total_tokens_out"] == 50
+    assert provenance["total_cost_usd"] > 0

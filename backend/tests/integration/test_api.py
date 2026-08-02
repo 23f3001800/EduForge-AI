@@ -23,6 +23,7 @@ from api.samples import seed_samples
 from contracts import TeacherKnowledgePackage
 from contracts.primitives import STAGE_NAMES
 from core.storage.memory import InMemoryStore
+from orchestration.pipeline import Roster
 from stages.s10_publishing.stage import PublishingStage
 from stages.stubs import STUB_STAGES
 
@@ -36,8 +37,11 @@ async def _stub_roster(*_args: Any) -> Any:
     package read — and that has to be provable with no network, no API key, and
     no real document. The production roster is exercised against real documents
     in the stage suites and against live providers in the smoke script.
+
+    ``llm=None``: the stubs make no model calls, so there is no call log to
+    attribute against.
     """
-    return STUB_STAGES
+    return Roster(stages=STUB_STAGES, llm=None)
 
 
 @pytest.fixture
@@ -344,7 +348,7 @@ async def test_rendered_artifacts_are_listed_and_downloadable() -> None:
     set_store(InMemoryStore())
 
     async def real_publishing_roster(*_args: Any) -> Any:
-        return [*STUB_STAGES[:9], PublishingStage()]
+        return Roster(stages=[*STUB_STAGES[:9], PublishingStage()], llm=None)
 
     set_roster_builder(real_publishing_roster)
     app = create_app()
