@@ -371,6 +371,35 @@ against synthetic input proves nothing. Tests worth knowing about:
 - **`trace_id`** on every error response, matching `X-Request-ID` and the logs.
   An inbound request id from a proxy is honoured rather than renamed.
 
+### Pipeline transparency
+
+Every package carries its own record, visible in the viewer's **Pipeline** tab.
+
+**Why it chose this.** The deterministic halves decide most of what shapes a
+package, and a teacher cannot tell a derived number from an arbitrary one, so
+each stage records its reasoning:
+
+> **2 periods of 40 minutes** — derived from 2 concepts weighted by importance
+> against a 40-minute period
+> **no numerical items** — the narrative profile weights them at zero; their
+> absence is the designed outcome for this material, not a gap
+> **3 claims dropped** — their quotes did not appear in the chunk they cited
+
+**What it cost.** Per stage: model, provider, duration, tokens, and attempts.
+Two properties worth naming:
+
+- Usage is attributed by snapshotting the LLM call log *around* each stage, not
+  by stages declaring their own counts — bookkeeping that goes stale the first
+  time someone adds a call.
+- **Failed attempts are counted.** A stage that succeeded on its third try cost
+  three calls; a package reporting one quotes a price nobody paid, and hides the
+  earliest signal that a prompt or provider has degraded.
+
+Decisions are recorded in `finally`, so a stage that *raised* still surrenders
+its reasoning — the run where it matters most. Publishing does not appear in the
+timings: it assembles the package, so its own duration is not known until after
+the record it would sit in has been built.
+
 ---
 
 ## Bonus features
