@@ -126,13 +126,50 @@ def _chunk_text(chunks: list[dict[str, Any]]) -> str:
 
 
 def _group_by_section(chunks: list[dict[str, Any]]) -> list[list[dict[str, Any]]]:
-    """Group chunks under their top-level section for map-reduce extraction."""
+    """Group chunks under their top-level section, preserving order."""
     groups: dict[str, list[dict[str, Any]]] = {}
     for chunk in chunks:
         path = chunk.get("section_path") or []
         key = path[0] if path else "__root__"
         groups.setdefault(key, []).append(chunk)
     return list(groups.values())
+
+
+def _pack_sections(
+    chunks: list[dict[str, Any]], budget: int = SINGLE_CALL_TOKEN_BUDGET
+) -> list[list[dict[str, Any]]]:
+    """Pack sections into as few calls as the token budget allows.
+
+    One call per section made extraction cost scale with how finely a document
+    happens to be *sectioned*, which is a formatting accident, not a measure of
+    content. A real NCERT chapter — 44 pages, 56k tokens — has 22 top-level
+    sections and so cost 44 calls before this, against a free tier that allows
+    50 per day. The same chapter packs into 5 groups.
+
+    Sections are packed in document order and never split, so a section's chunks
+    always reach the model together and the narrowed-context property that makes
+    these prompts answerable is preserved. A single section larger than the
+    budget still gets its own call: splitting it would break that property, and
+    an oversized prompt is the lesser problem.
+
+    Calls now scale with content volume, which is the variable that should
+    decide them.
+    """
+    packed: list[list[dict[str, Any]]] = []
+    current: list[dict[str, Any]] = []
+    current_tokens = 0
+
+    for section in _group_by_section(chunks):
+        tokens = sum(int(c.get("token_count") or 0) for c in section)
+        if current and current_tokens + tokens > budget:
+            packed.append(current)
+            current, current_tokens = [], 0
+        current.extend(section)
+        current_tokens += tokens
+
+    if current:
+        packed.append(current)
+    return packed
 
 
 def _merge_cores(parts: list[CoreKnowledge]) -> CoreKnowledge:
@@ -269,8 +306,14 @@ class KnowledgeExtractionStage:
             if total_tokens <= SINGLE_CALL_TOKEN_BUDGET or len(chunks) <= 4:
                 core = await self._extract_core(span, system, chunks, chunk_ids, 0.15, 0.40)
             else:
-                groups = _group_by_section(chunks)
-                await span.progress(0.12, message=f"map-reduce over {len(groups)} sections")
+                groups = _pack_sections(chunks)
+                span.decide(
+                    f"extraction split into {len(groups)} passes",
+                    f"{total_tokens:,} tokens exceeds the {SINGLE_CALL_TOKEN_BUDGET:,}-token "
+                    "single-call budget; sections are packed to the budget rather than one "
+                    "call each, so cost follows content volume",
+                )
+                await span.progress(0.12, message=f"map-reduce over {len(groups)} passes")
                 cores: list[CoreKnowledge] = []
                 for index, group in enumerate(groups, start=1):
                     part = await self._extract_core(

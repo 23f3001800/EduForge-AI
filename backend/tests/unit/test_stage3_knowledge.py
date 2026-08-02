@@ -332,3 +332,76 @@ def test_nothing_is_derived_when_there_are_no_concepts_either() -> None:
     from stages.s3_knowledge.stage import derive_objectives
 
     assert derive_objectives([]) == []
+
+
+# ───────────────────────────────────── extraction fan-out (real documents)
+
+
+def _chunk(section: str, tokens: int, index: int) -> dict:
+    return {
+        "chunk_id": f"c_{index:04d}",
+        "text": "x" * tokens,
+        "token_count": tokens,
+        "section_path": [section],
+    }
+
+
+def test_calls_scale_with_content_not_with_section_count() -> None:
+    """A finely-sectioned document must not cost a call per heading.
+
+    A real NCERT chapter — 44 pages, 56k tokens — has 22 top-level sections. One
+    call per section meant 44 extraction calls against a free tier that allows
+    50 per day, and a live run on it ran past thirty minutes. Section count is a
+    formatting accident; token volume is the thing that should decide cost.
+    """
+    from stages.s3_knowledge.stage import _group_by_section, _pack_sections
+
+    # 22 small sections, 56k tokens total — the shape of the real chapter.
+    chunks = [_chunk(f"section {s}", 2_600, index) for s in range(22) for index in [s]]
+    assert len(_group_by_section(chunks)) == 22
+
+    packed = _pack_sections(chunks, budget=12_000)
+    assert len(packed) < 8, f"packed into {len(packed)} passes, barely better than 22"
+    # Nothing may be lost in the packing.
+    assert sum(len(group) for group in packed) == len(chunks)
+
+
+def test_a_section_is_never_split_across_calls() -> None:
+    """A section's chunks must reach the model together.
+
+    The narrowed-context property is what makes these prompts answerable at all;
+    half a section in one call and half in another produces two partial readings
+    of the same material.
+    """
+    from stages.s3_knowledge.stage import _pack_sections
+
+    chunks = [_chunk("a", 5_000, 0), _chunk("a", 5_000, 1), _chunk("b", 5_000, 2)]
+    packed = _pack_sections(chunks, budget=12_000)
+
+    for group in packed:
+        sections = {tuple(c["section_path"]) for c in group}
+        # Either a group holds whole sections, or one oversized section alone.
+        assert sections, "empty group"
+    a_groups = [g for g in packed if any(c["section_path"] == ["a"] for c in g)]
+    assert len(a_groups) == 1, "section 'a' was split across calls"
+
+
+def test_a_section_larger_than_the_budget_still_gets_a_call() -> None:
+    """Splitting it would break the narrowed context; an oversized prompt is the
+    lesser problem, and the client already fits prompts to the token ceiling."""
+    from stages.s3_knowledge.stage import _pack_sections
+
+    chunks = [_chunk("huge", 40_000, 0)]
+    packed = _pack_sections(chunks, budget=12_000)
+    assert len(packed) == 1
+    assert packed[0][0]["chunk_id"] == "c_0000"
+
+
+def test_packing_preserves_document_order() -> None:
+    """Extraction merges parts; out-of-order parts make the merge non-deterministic."""
+    from stages.s3_knowledge.stage import _pack_sections
+
+    chunks = [_chunk(f"s{i}", 4_000, i) for i in range(6)]
+    packed = _pack_sections(chunks, budget=12_000)
+    ids = [c["chunk_id"] for group in packed for c in group]
+    assert ids == sorted(ids)
