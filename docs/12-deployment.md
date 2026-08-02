@@ -1,25 +1,26 @@
 # EduForge AI — Deployment (DR-01)
 
-Status: configuration and instructions are in this repo; **nothing has been deployed and no
-account has been created.** A human runs the steps below. This document is what that human
-follows.
+> **Superseded.** This Render.com path was written before deployment and never actually used —
+> the live app runs on **Azure App Service**, deployed from source. See
+> [`13-azure-deployment.md`](13-azure-deployment.md) for what is actually running.
+> `render.yaml` has been removed accordingly; the rest of this document is kept as a record of
+> the alternative that was evaluated, not as current instructions.
 
 ---
 
 ## What ships
 
-One Docker image (`Dockerfile`, repo root): a Vite build of `frontend/` copied into a slim,
-non-root Python 3.12 runtime running `uvicorn api.main:app`. Single process — the API also drives
-the worker in-process, because the job store is in-memory and cannot be shared across processes
-yet (see README "Known limitations"). One container, no replicas, no external database.
+One Docker image (`Dockerfile`, repo root): the built `frontend/` copied into a slim, non-root
+Python 3.12 runtime running `uvicorn api.main:app`. Single process — the API also drives the
+worker in-process, because the job store is in-memory and cannot be shared across processes yet
+(see README "Known limitations"). One container, no replicas, no external database.
 
 | File | Purpose |
 |---|---|
-| `Dockerfile` | Multi-stage build: Node 22 builds the frontend, Python 3.12-slim runs the API |
+| `Dockerfile` | Multi-stage build: Node builds the frontend, Python 3.12-slim runs the API |
 | `.dockerignore` | Keeps `.venv`, `node_modules`, `.git`, `.env`, caches out of the build context |
 | `docker-compose.yml` | Local smoke test of the built image — not how this deploys |
 | `.github/workflows/ci.yml` | Lint/test/boundaries/schema on every push and PR, then builds the image |
-| `render.yaml` | The Render Blueprint for the one service this deploys |
 | `Makefile` | `make docker-build`, `make docker-run` |
 
 ---
