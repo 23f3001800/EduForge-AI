@@ -22,7 +22,7 @@ CONTAINER   := eduforge-ai
 .DEFAULT_GOAL := help
 # `samples` must be declared phony: samples/ is a real directory, so without this
 # make considers the target already built and does nothing.
-.PHONY: help venv install dev test test-contract lint boundaries hygiene fmt typecheck schema fixtures evals samples check clean docker-build docker-run
+.PHONY: help venv install dev test test-contract lint boundaries hygiene fmt typecheck schema fixtures evals score samples check clean docker-build docker-run
 
 help:  ## Show available targets
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) \
@@ -70,9 +70,11 @@ check:  ## Everything CI runs
 	$(IMPORTS) --config $(BACKEND)/pyproject.toml
 	$(PY) -m pytest $(BACKEND)/tests -q
 
-evals:  ## Score the reference packages on the 9-dimension rubric
-	$(PY) -m pytest $(BACKEND)/tests/unit/test_evals.py -q
-	$(PY) scripts/build_samples.py
+evals:  ## Run the rubric and per-stage evaluation suites
+	$(PY) -m pytest $(BACKEND)/tests/unit/test_evals.py $(BACKEND)/tests/unit/test_eval_framework.py -q
+
+score:  ## Score samples/ and print the per-stage report
+	cd $(BACKEND) && ../.venv/bin/python -m evals score ../samples/*/
 
 samples:  ## Regenerate samples/ (packages, PDFs, eval reports) from the fixtures
 	$(PY) scripts/build_samples.py

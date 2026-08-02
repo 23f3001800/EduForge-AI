@@ -196,7 +196,8 @@ a decision, not a config typo.
 ```bash
 make check         # what CI runs: schema drift + lint + boundaries + tests
 make boundaries    # import-linter — a stage importing a stage fails here
-make evals         # score the reference packages on the 9-dimension rubric
+make evals         # the rubric + per-stage discrimination suites
+make score         # score samples/ and print the per-stage report
 make samples       # regenerate samples/ from the fixtures
 make dev           # run the API (also serves the built frontend)
 make docker-build  # build the production image
@@ -220,6 +221,10 @@ Base path `/api/v1`. Full spec at [`/api/v1/docs`](https://eduforge-ai.azurewebs
 | `POST` | `/jobs/{id}/retry` | Resume from the first incomplete stage |
 | `GET` | `/packages/{id}` | The package |
 | `GET` | `/packages/{id}/artifacts` | Rendered artifacts + download URLs |
+| `GET` | `/packages/{id}/evaluation` | Per-stage scores, evidence, recommendations |
+| `GET` | `/packages/{id}/evaluation.pdf` | The same report as a PDF |
+| `GET` | `/evaluations` | The stored evaluation series |
+| `GET` | `/evaluations/benchmark` | Score distribution across history |
 | `GET` | `/samples` | Preloaded reference packages |
 | `GET` | `/options` | Boards, teaching styles, artifact kinds |
 | `GET` | `/healthz` `/readyz` `/metrics` | Ops |
@@ -325,26 +330,93 @@ More in [`docs/`](docs/) — [SRS](docs/01-srs.md), [HLD](docs/02-hld.md),
 
 ## Quality evaluation
 
-`make evals` scores a package on **nine dimensions, all deterministic** —
-objectives, Bloom distribution, coverage, sequencing, grounding, activities,
-differentiation, assessment integrity, classroom content. An LLM judge is
-optional and never load-bearing.
+Two graders, answering two different questions, deliberately never averaged
+together.
 
-The tests are about *discrimination*, not about the good package scoring well: a
-package sabotaged four ways scores **0.917 → 0.668**, each sabotage lands on the
-dimension that owns it, and coverage and sequencing do not move.
+**The rubric** (`evals.dimensions`) asks *is this good teaching?* — nine
+deterministic dimensions: objectives, Bloom distribution, coverage, sequencing,
+grounding, activities, differentiation, assessment integrity, classroom content.
+An LLM judge is optional and never load-bearing.
+
+**The per-stage framework** (`evals.stagewise`) asks *did stage n do its job?*
+— eleven evaluators checking each stage's contract with the next one. A package
+can score well on the rubric while stage 4 quietly scheduled a concept before
+its own prerequisite, because the rubric reads the finished artifact and this
+reads the seams.
+
+### Never generate arbitrary numbers
+
+Every metric declares **how it was arrived at**, and the type system enforces it:
+
+| | What it means | Confidence |
+|---|---|---|
+| `measured` | Computed from the package with arithmetic. Reproducible, no model. | up to 1.0 |
+| `judged` | A model read it. Carries its reasoning. | capped at 0.9 |
+| `not_measurable` | No ground truth, or the data does not exist. | **no score at all** |
+
+Constructing a `not_measurable` metric *with* a score raises. So does a judged
+metric claiming certainty, and any metric with no reasoning. Ten metrics report
+themselves unmeasurable on every run — subject-classification accuracy needs a
+labelled corpus, student learning effectiveness needs students, OCR accuracy
+needs OCR (this pipeline rejects scanned pages rather than guessing). Each says
+what it would take to measure. **A framework that reports 0.85 for "teacher
+satisfaction" has not measured teacher satisfaction.**
+
+Unmeasurable metrics are excluded from aggregates rather than counted as zero,
+and a stage that measured nothing scores `None` — not 0, because zero says "this
+is bad" and the truth is "we do not know".
+
+Every score carries **Score (0–100), Confidence, Reasoning, Evidence** (a JSON
+pointer into the package, so a reader can go and look) **and Recommendations**
+with a stated impact and severity.
+
+### What it catches
+
+Three classes of check recur, and the third is the one that finds real bugs:
+completeness, referential integrity, and **self-consistency** — a stage's own
+report of its work, independently recomputed. Stage 9 publishes a coverage
+summary; the framework recounts it from the package and compares.
+
+Building it surfaced two defects immediately: the narrative sample's blueprint
+claimed a `numerical` item its own profile designs away, and the reference
+fixture published provenance for 1 stage of 10. Both are fixed.
+
+The tests are about *discrimination*, not about a good package scoring well.
+Every guard is attacked directly — the suite tries to construct a fabricated
+score and asserts that it fails. Sabotage tests check a defect lands on the stage
+that owns it **and on no other**; a framework where every metric moves together
+is measuring one thing under eleven names.
 
 The property that matters most is that a humanities package is **not** marked
 down for absent STEM content. Coverage is identical across both profiles. A
 grader that rewarded subject shape would push the whole system toward producing
 it, and no other test here would notice.
 
+### Using it
+
+```bash
+make evals                                     # the discrimination suite
+python -m evals score samples/*/               # score every sample
+python -m evals score samples/x --pdf out.pdf  # export the report
+python -m evals benchmark --history evals.db   # distribution across runs
+```
+
+Exit code 1 on a high-severity finding, so it gates a build — never on the score
+itself, because a threshold on an aggregate invites tuning the aggregate.
+
+In the UI: the **Evaluation** tab on any package, and `/evaluation` for the
+cross-run dashboard. History is SQLite; set `EVAL_HISTORY_PATH` to keep the
+series across restarts. Regression detection stays silent below five comparable
+runs and says so — a baseline drawn from three runs is astrology, and history is
+partitioned by pedagogy profile because a narrative package does not regress by
+scoring below a corpus of quantitative ones.
+
 ---
 
 ## Testing
 
 ```bash
-make check     # 296 tests, no network, no API key, no model calls
+make check     # 360 tests, no network, no API key, no model calls
 ```
 
 Document fixtures are *real* generated PDF/DOCX/PPTX files — parser behaviour
