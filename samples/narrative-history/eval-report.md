@@ -1,8 +1,8 @@
 # Quality evaluation — History (narrative)
 
-**0.87 / 1.00 — exemplary**
+**0.88 / 1.00 — exemplary**
 
-`#################...`  profile `narrative`, grade band `9-10`, package `22222222-2222-4222-8222-222222222222`
+`##################..`  profile `narrative`, grade band `9-10`, package `22222222-2222-4222-8222-222222222222`
 
 Deterministic metrics only.
 
@@ -15,7 +15,7 @@ Deterministic metrics only.
 | Grounding |  0.74 | 0.15 | deterministic |  |
 | Activity variety and runnability |  0.88 | 0.14 | deterministic |  |
 | Differentiation |  0.97 | 0.08 | deterministic |  |
-| Assessment integrity |  0.83 | 0.12 | deterministic |  |
+| Assessment integrity |  0.88 | 0.12 | deterministic |  |
 | Classroom readiness |  0.81 | 0.08 | deterministic |  |
 
 ## Sub-metrics
@@ -77,12 +77,12 @@ Deterministic metrics only.
 - `extension_deepens` 1.00 (weight 0.15) — different demand, not more volume
 - `distinct_across_activities` 1.00 (weight 0.15) — not copy-pasted between activities
 
-**Assessment integrity** —  0.83
+**Assessment integrity** —  0.88
 
 - `mcq_structure` 1.00 (weight 0.20) — 1 MCQ(s) checked
 - `distractor_quality` 1.00 (weight 0.20) — plausible, explained, not filler
 - `rubric_discrimination` 0.71 (weight 0.25) — 1 rubric(s)
-- `marks_and_blueprint` 0.67 (weight 0.15) — 4 marks in the bank
+- `marks_and_blueprint` 1.00 (weight 0.15) — 4 marks in the bank
 - `kind_mix` 0.50 (weight 0.10) — against the narrative assessment mix
 - `misconception_linkage` 1.00 (weight 0.10) — items trace to a diagnosed error
 
@@ -103,7 +103,7 @@ Content this profile does not owe. Each line below is a **pass**, recorded so th
 - knowledge.formulae: empty, and the narrative profile does not require it — this is a pass, not a gap
 - assessments: no 'numerical' items, which is what the narrative profile designs for — their absence is scored as correct
 
-## Findings (13)
+## Findings (12)
 
 ### Objective quality
 
@@ -128,7 +128,6 @@ Content this profile does not owe. Each line below is a **pass**, recorded so th
 ### Assessment integrity
 
 - **ASM_RUBRIC_WEAK** `/assessments/items/1/rubric` — lacks descriptors with substance, descriptors tied to the content; two markers would not agree on a borderline script
-- **ASM_BLUEPRINT_DRIFT** `/assessments/blueprint` — blueprint item counts match the bank is false; the coverage story the package tells about itself no longer describes the bank it contains
 
 ### Classroom readiness
 

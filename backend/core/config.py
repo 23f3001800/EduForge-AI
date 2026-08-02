@@ -43,6 +43,11 @@ class Settings(BaseSettings):
     database_url: str = "postgresql+psycopg://eduforge:eduforge@localhost:5432/eduforge"
     blob_backend: Literal["local", "s3"] = "local"
     blob_local_path: Path = REPO_ROOT / "blob"
+    #: Where the evaluation series is kept. ``None`` means in-memory, which a
+    #: restart discards — correct for a scratch container, wrong for a deployment
+    #: whose trend line is meant to mean something. Point it at a mounted volume
+    #: and the same code becomes durable.
+    eval_history_path: Path | None = None
 
     # ── retrieval ───────────────────────────────────────────────────────────
     embeddings: Literal["none", "local", "api"] = "none"

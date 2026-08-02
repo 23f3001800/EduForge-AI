@@ -20,7 +20,7 @@ from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from api.middleware import ObservabilityMiddleware
-from api.routes import documents, events, jobs, options, stats
+from api.routes import documents, evaluations, events, jobs, options, stats
 from api.samples import seed_samples
 from contracts.primitives import SCHEMA_VERSION
 from core.config import REPO_ROOT, get_settings
@@ -91,6 +91,7 @@ def create_app() -> FastAPI:
     app.include_router(events.router, prefix=API_PREFIX)
     app.include_router(options.router, prefix=API_PREFIX)
     app.include_router(stats.router, prefix=API_PREFIX)
+    app.include_router(evaluations.router, prefix=API_PREFIX)
 
     # Every failure leaves through one of these three, so a client parses one
     # shape. This used to be true only of unhandled exceptions: a deliberate

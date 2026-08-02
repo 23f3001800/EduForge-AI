@@ -370,10 +370,24 @@
   "generator": {
     "app_version": "0.1.0",
     "models_by_stage": {
-      "knowledge-extraction": "claude-opus-5"
+      "activity-generation": "claude-opus-5",
+      "assessment-generation": "claude-opus-5",
+      "document-intelligence": "claude-opus-5",
+      "educational-classification": "claude-opus-5",
+      "gap-analysis": "claude-opus-5",
+      "knowledge-extraction": "claude-opus-5",
+      "lesson-generation": "claude-opus-5",
+      "teaching-planner": "claude-opus-5"
     },
     "providers_by_stage": {
-      "knowledge-extraction": "anthropic"
+      "activity-generation": "anthropic",
+      "assessment-generation": "anthropic",
+      "document-intelligence": "anthropic",
+      "educational-classification": "anthropic",
+      "gap-analysis": "anthropic",
+      "knowledge-extraction": "anthropic",
+      "lesson-generation": "anthropic",
+      "teaching-planner": "anthropic"
     }
   },
   "knowledge": {
@@ -612,8 +626,89 @@
       {
         "attempts": 1,
         "degraded": false,
+        "duration_ms": 4200,
+        "stage": "document-intelligence",
+        "tokens_cached": 0,
+        "tokens_in": 0,
+        "tokens_out": 0
+      },
+      {
+        "attempts": 1,
+        "degraded": false,
+        "duration_ms": 3100,
+        "stage": "educational-classification",
+        "tokens_cached": 0,
+        "tokens_in": 0,
+        "tokens_out": 0
+      },
+      {
+        "attempts": 1,
+        "degraded": false,
         "duration_ms": 31500,
         "stage": "knowledge-extraction",
+        "tokens_cached": 0,
+        "tokens_in": 0,
+        "tokens_out": 0
+      },
+      {
+        "attempts": 1,
+        "degraded": false,
+        "duration_ms": 6800,
+        "stage": "teaching-planner",
+        "tokens_cached": 0,
+        "tokens_in": 0,
+        "tokens_out": 0
+      },
+      {
+        "attempts": 1,
+        "degraded": false,
+        "duration_ms": 21400,
+        "stage": "lesson-generation",
+        "tokens_cached": 0,
+        "tokens_in": 0,
+        "tokens_out": 0
+      },
+      {
+        "attempts": 1,
+        "degraded": false,
+        "duration_ms": 11200,
+        "stage": "activity-generation",
+        "tokens_cached": 0,
+        "tokens_in": 0,
+        "tokens_out": 0
+      },
+      {
+        "attempts": 1,
+        "degraded": false,
+        "duration_ms": 9700,
+        "stage": "assessment-generation",
+        "tokens_cached": 0,
+        "tokens_in": 0,
+        "tokens_out": 0
+      },
+      {
+        "attempts": 1,
+        "degraded": false,
+        "duration_ms": 5100,
+        "stage": "gap-analysis",
+        "tokens_cached": 0,
+        "tokens_in": 0,
+        "tokens_out": 0
+      },
+      {
+        "attempts": 1,
+        "degraded": false,
+        "duration_ms": 1800,
+        "stage": "validation",
+        "tokens_cached": 0,
+        "tokens_in": 0,
+        "tokens_out": 0
+      },
+      {
+        "attempts": 1,
+        "degraded": false,
+        "duration_ms": 1200,
+        "stage": "publishing",
         "tokens_cached": 0,
         "tokens_in": 0,
         "tokens_out": 0

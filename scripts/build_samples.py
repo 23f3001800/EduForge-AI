@@ -76,6 +76,15 @@ def narrative() -> dict[str, Any]:
                     },
                 ],
             }
+
+    # Rebuild the blueprint from the items it describes. Substituting a kind and
+    # leaving the blueprint alone published a narrative sample claiming a
+    # numerical item that the profile designs away — caught by the stage-7
+    # consistency check in `evals.stagewise`, which recomputes exactly this.
+    by_kind: dict[str, int] = {}
+    for item in package["assessments"]["items"]:
+        by_kind[item["kind"]] = by_kind.get(item["kind"], 0) + 1
+    package["assessments"]["blueprint"]["items_by_kind"] = by_kind
     return package
 
 
