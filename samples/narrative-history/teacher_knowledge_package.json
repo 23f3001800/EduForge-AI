@@ -559,6 +559,23 @@
   ],
   "provenance": {
     "citations": [],
+    "decisions": [
+      {
+        "because": "derived from 2 concepts weighted by importance against a 40-minute period",
+        "stage": "teaching-planner",
+        "what": "2 periods of 40 minutes"
+      },
+      {
+        "because": "the quantitative profile sets the kind weighting from the content; the count follows concept and objective coverage, not a fixed number",
+        "stage": "assessment-generation",
+        "what": "7 items across 4 kinds"
+      },
+      {
+        "because": "high means later concepts depend on it, not that a model judged it serious",
+        "stage": "gap-analysis",
+        "what": "severity ranked from the concept graph"
+      }
+    ],
     "stage_timings": [
       {
         "attempts": 1,

@@ -1789,6 +1789,14 @@
           "title": "Citations",
           "type": "array"
         },
+        "decisions": {
+          "description": "Why the pipeline chose what it chose, in the order decided.",
+          "items": {
+            "$ref": "#/$defs/StageDecision"
+          },
+          "title": "Decisions",
+          "type": "array"
+        },
         "stage_timings": {
           "items": {
             "$ref": "#/$defs/StageTiming"
@@ -1965,6 +1973,47 @@
         "speaker_notes"
       ],
       "title": "ScriptSegment",
+      "type": "object"
+    },
+    "StageDecision": {
+      "additionalProperties": false,
+      "description": "A choice the pipeline made, and why.\n\nMost of what shapes a package is decided in Python before any model is\ncalled — how many periods, which assessment kinds, how severe a gap is — and\na teacher reading the result cannot tell a derived number from an arbitrary\none. \"5 periods\" invites the question; \"5 periods, because 9 concepts need\n210 minutes and a period is 40\" answers it.\n\nThis lives in the package rather than only in the logs because the person\nwho most needs the reasoning is the teacher deciding whether to trust the\noutput, not the operator debugging a run.",
+      "properties": {
+        "because": {
+          "description": "The reason, in a teacher's terms.",
+          "minLength": 1,
+          "title": "Because",
+          "type": "string"
+        },
+        "stage": {
+          "enum": [
+            "document-intelligence",
+            "educational-classification",
+            "knowledge-extraction",
+            "teaching-planner",
+            "lesson-generation",
+            "activity-generation",
+            "assessment-generation",
+            "gap-analysis",
+            "validation",
+            "publishing"
+          ],
+          "title": "Stage",
+          "type": "string"
+        },
+        "what": {
+          "description": "What was decided.",
+          "minLength": 1,
+          "title": "What",
+          "type": "string"
+        }
+      },
+      "required": [
+        "stage",
+        "what",
+        "because"
+      ],
+      "title": "StageDecision",
       "type": "object"
     },
     "StageTiming": {

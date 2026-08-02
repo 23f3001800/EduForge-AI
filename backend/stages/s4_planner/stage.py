@@ -270,17 +270,21 @@ class TeachingPlannerStage:
             )
 
             concept_count = len(knowledge.get("concepts") or [])
+            periods = skeleton.total_periods
             span.decide(
-                f"{skeleton.total_periods} periods of {duration} minutes",
-                f"derived from {concept_count} concepts weighted by importance against a "
-                f"{duration}-minute period"
+                f"{periods} {'period' if periods == 1 else 'periods'} of {duration} minutes",
+                f"derived from {concept_count} "
+                f"{'concept' if concept_count == 1 else 'concepts'} weighted by importance "
+                f"against a {duration}-minute period"
                 if not target
                 else f"requested explicitly by the caller ({target})",
             )
             if not options.get("period_duration_minutes"):
                 span.decide(
                     f"period length {duration} minutes",
-                    f"no length was given, so the {board.label} convention applies",
+                    "no length was given, so the default applies"
+                    if board.is_generic
+                    else f"no length was given, so the {board.label} convention applies",
                 )
             for note in skeleton.notes:
                 span.warn(note)

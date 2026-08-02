@@ -178,8 +178,16 @@ def _provenance_fields(reports: list[dict[str, Any]]) -> dict[str, Any]:
         for report in reports
         if report.get("stage")
     ]
+    decisions = [
+        {"stage": report["stage"], **decision}
+        for report in reports
+        for decision in (report.get("decisions") or [])
+        if decision.get("what") and decision.get("because")
+    ]
+
     return {
         "stage_timings": timings,
+        "decisions": decisions,
         "total_tokens_in": sum(t["tokens_in"] for t in timings),
         "total_tokens_out": sum(t["tokens_out"] for t in timings),
         "total_cost_usd": round(sum(float(r.get("cost_usd") or 0.0) for r in reports), 6),

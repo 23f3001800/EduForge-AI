@@ -63,6 +63,7 @@ from contracts import (
     Rubric,
     RubricLevel,
     ScriptSegment,
+    StageDecision,
     StageTiming,
     StructuredDocument,
     TeacherKnowledgePackage,
@@ -643,6 +644,38 @@ def teacher_knowledge_package() -> TeacherKnowledgePackage:
         validation=validation_report(),  # type: ignore[arg-type]
         provenance=Provenance(
             stage_timings=[StageTiming(stage="knowledge-extraction", duration_ms=31_500)],
+            # The decisions a real run of THIS package would record, restating
+            # the same derivations the deterministic halves actually perform —
+            # two periods for two concepts at 40 minutes, an assessment mix the
+            # quantitative profile produces, severity from the concept graph.
+            #
+            # The timings above are illustrative because this is a fixture, not
+            # a live run; the decisions are not, because they are recomputed
+            # from this package's own content and would come out the same way.
+            decisions=[
+                StageDecision(
+                    stage="teaching-planner",
+                    what="2 periods of 40 minutes",
+                    because=(
+                        "derived from 2 concepts weighted by importance against a 40-minute period"
+                    ),
+                ),
+                StageDecision(
+                    stage="assessment-generation",
+                    what="7 items across 4 kinds",
+                    because=(
+                        "the quantitative profile sets the kind weighting from the content; "
+                        "the count follows concept and objective coverage, not a fixed number"
+                    ),
+                ),
+                StageDecision(
+                    stage="gap-analysis",
+                    what="severity ranked from the concept graph",
+                    because=(
+                        "high means later concepts depend on it, not that a model judged it serious"
+                    ),
+                ),
+            ],
             total_tokens_in=184_300,
             total_tokens_out=41_200,
             total_cost_usd=2.14,
