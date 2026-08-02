@@ -227,3 +227,152 @@ export const getStats = () => request<Stats>("/stats");
 
 export const artifactUrl = (packageId: string, kind: string) =>
   `${API_BASE}/packages/${packageId}/artifacts/${kind}`;
+
+// ─────────────────────────────────────────────────── evaluation framework
+
+/**
+ * How a score was arrived at. The UI must render these three differently:
+ * a `not_measurable` metric has no number and showing a placeholder like "0"
+ * or "—" in the same slot a score usually occupies invites reading it as one.
+ */
+export type Measurability = "measured" | "judged" | "not_measurable";
+
+export interface MetricEvidence {
+  path: string;
+  observation: string;
+}
+
+export interface MetricRecommendation {
+  action: string;
+  impact: string;
+  severity: "info" | "low" | "medium" | "high";
+}
+
+export interface EvaluationMetric {
+  key: string;
+  label: string;
+  measurability: Measurability;
+  /** Null whenever `measurability` is `not_measurable`. Never render a fallback number. */
+  score: number | null;
+  confidence: number;
+  weight: number;
+  reasoning: string;
+  evidence: MetricEvidence[];
+  recommendations: MetricRecommendation[];
+}
+
+export interface StageEvaluation {
+  stage: string;
+  label: string;
+  score: number | null;
+  confidence: number;
+  measured: number;
+  judged: number;
+  not_measurable: number;
+  missing: string[];
+  metrics: EvaluationMetric[];
+}
+
+export interface Distribution {
+  n: number;
+  median: number | null;
+  min: number | null;
+  max: number | null;
+  p25: number | null;
+  p75: number | null;
+}
+
+export interface Benchmark {
+  profile: string;
+  runs: number;
+  sufficient: boolean;
+  overall: Distribution;
+  stages: Record<string, Distribution>;
+}
+
+export interface Comparison {
+  status: "insufficient_history" | "regression" | "ok";
+  detail: string;
+  runs?: number;
+  needed?: number;
+  threshold?: number;
+  overall_delta?: number | null;
+  regressions: { stage: string; score: number; baseline_median: number; delta: number }[];
+  improvements: { stage: string; score: number; baseline_median: number; delta: number }[];
+}
+
+export interface EvaluationDocument {
+  run_id: string;
+  package_id: string;
+  evaluated_at: string;
+  subject: string;
+  grade_band: string;
+  profile: PedagogyProfile;
+  summary: {
+    stage_score: number | null;
+    stage_confidence: number;
+    stages_scored: number;
+    stages_total: number;
+    rubric_score: number;
+    rubric_band: string;
+    band: string;
+    judged: boolean;
+    transferable: boolean;
+  };
+  stages: StageEvaluation[];
+  rubric: Record<string, unknown>;
+  recommendations: {
+    stage: string;
+    stage_label: string;
+    metric: string;
+    metric_label: string;
+    score: number | null;
+    severity: "info" | "low" | "medium" | "high";
+    action: string;
+    impact: string;
+  }[];
+  not_measurable: { stage: string; metric: string; label: string; reason: string }[];
+  benchmark: Benchmark;
+  comparison: Comparison;
+  history: {
+    run_id: string;
+    evaluated_at: string;
+    overall: number | null;
+    confidence: number;
+    profile: string;
+    subject: string;
+  }[];
+}
+
+export interface EvaluationSummary {
+  run_id: string;
+  package_id: string;
+  subject: string;
+  grade_band: string;
+  profile: string;
+  overall: number | null;
+  confidence: number;
+  stage_scores: Record<string, number | null>;
+  evaluated_at: string;
+  app_version: string;
+}
+
+/**
+ * `persist=false` when the caller is only looking.
+ *
+ * Every fetch appending to the trend line would mean a reviewer refreshing a
+ * page rewrites the baseline the next regression is judged against.
+ */
+export const getEvaluation = (packageId: string, persist = true) =>
+  request<EvaluationDocument>(`/packages/${packageId}/evaluation?persist=${persist}`);
+
+export const getEvaluations = (limit = 50) =>
+  request<{ durable: boolean; total: number; evaluations: EvaluationSummary[] }>(
+    `/evaluations?limit=${limit}`,
+  );
+
+export const getBenchmark = (profile?: string) =>
+  request<Benchmark>(`/evaluations/benchmark${profile ? `?profile=${profile}` : ""}`);
+
+export const evaluationPdfUrl = (packageId: string) =>
+  `${API_BASE}/packages/${packageId}/evaluation.pdf`;

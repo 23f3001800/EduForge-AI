@@ -1,6 +1,6 @@
 "use client";
 
-import { BarChart3, FileStack, Menu, Moon, Sun, Upload, X } from "lucide-react";
+import { BarChart3, FileStack, Gauge, Menu, Moon, Sun, Upload, X } from "lucide-react";
 import { useTheme } from "next-themes";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -11,6 +11,7 @@ import { cn } from "@/lib/cn";
 const NAV = [
   { href: "/upload", label: "New package", icon: Upload },
   { href: "/samples", label: "Samples", icon: FileStack },
+  { href: "/evaluation", label: "Evaluation", icon: Gauge },
   { href: "/analytics", label: "Analytics", icon: BarChart3 },
 ];
 

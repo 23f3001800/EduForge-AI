@@ -6,6 +6,7 @@ import {
   BookOpen,
   ClipboardCheck,
   GitBranch,
+  Gauge,
   GraduationCap,
   Layers,
   ShieldCheck,
@@ -15,6 +16,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 import { ArtifactsPanel } from "@/components/package/artifacts";
+import { EvaluationPanel } from "@/components/package/evaluation";
 import { PipelinePanel } from "@/components/package/pipeline";
 import { EvidenceList, type Evidence } from "@/components/package/evidence";
 import { Badge } from "@/components/ui/badge";
@@ -38,6 +40,7 @@ const TABS = [
   { id: "gaps", label: "Learning gaps", icon: TriangleAlert },
   { id: "validation", label: "Validation", icon: ShieldCheck },
   { id: "pipeline", label: "Pipeline", icon: GitBranch },
+  { id: "evaluation", label: "Evaluation", icon: Gauge },
 ];
 
 const VALIDATION_TONE: Record<string, "success" | "warning" | "danger"> = {
@@ -666,6 +669,11 @@ function ViewerBody() {
           </Tabs.Content>
           <Tabs.Content value="pipeline">
             <PipelinePanel provenance={tkp.provenance} generator={tkp.generator} />
+          </Tabs.Content>
+          <Tabs.Content value="evaluation">
+            {/* Mounted only when the tab is active — Radix unmounts inactive
+                content, so the evaluation request is not made until asked for. */}
+            {packageId ? <EvaluationPanel packageId={packageId} /> : null}
           </Tabs.Content>
         </div>
       </Tabs.Root>
