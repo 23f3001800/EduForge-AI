@@ -623,6 +623,37 @@ def job_options() -> JobOptions:
     return JobOptions(period_duration_minutes=PERIOD_MINUTES)
 
 
+#: Stages that call a model. Validation and publishing are deterministic.
+_GENERATIVE_STAGES = (
+    "document-intelligence",
+    "educational-classification",
+    "knowledge-extraction",
+    "teaching-planner",
+    "lesson-generation",
+    "activity-generation",
+    "assessment-generation",
+    "gap-analysis",
+)
+
+#: Illustrative, and summing to ``total_duration_ms`` — this is a fixture, not a
+#: live run. Every stage appears rather than only the interesting one, because
+#: the reference package is what a reviewer opens first, and a provenance block
+#: covering one stage of ten misrepresents what the pipeline actually records.
+#: The shape is taken from live runs: extraction and lesson generation dominate.
+_STAGE_TIMINGS: tuple[tuple[str, int], ...] = (
+    ("document-intelligence", 4_200),
+    ("educational-classification", 3_100),
+    ("knowledge-extraction", 31_500),
+    ("teaching-planner", 6_800),
+    ("lesson-generation", 21_400),
+    ("activity-generation", 11_200),
+    ("assessment-generation", 9_700),
+    ("gap-analysis", 5_100),
+    ("validation", 1_800),
+    ("publishing", 1_200),
+)
+
+
 def teacher_knowledge_package() -> TeacherKnowledgePackage:
     """The reference TKP. If this stops building, a contract change broke something."""
     return TeacherKnowledgePackage(
@@ -630,8 +661,11 @@ def teacher_knowledge_package() -> TeacherKnowledgePackage:
         generated_at=FIXED_TIME,
         generator=GeneratorInfo(
             app_version="0.1.0",
-            models_by_stage={"knowledge-extraction": "claude-opus-5"},
-            providers_by_stage={"knowledge-extraction": "anthropic"},
+            # Every stage that calls a model names the model that answered it.
+            # Validation and publishing are absent because they make no call —
+            # an empty entry there would suggest an attribution was lost.
+            models_by_stage=dict.fromkeys(_GENERATIVE_STAGES, "claude-opus-5"),
+            providers_by_stage=dict.fromkeys(_GENERATIVE_STAGES, "anthropic"),
         ),
         source=document_metadata(),
         classification=classification(),
@@ -643,7 +677,9 @@ def teacher_knowledge_package() -> TeacherKnowledgePackage:
         learning_gaps=learning_gaps(),
         validation=validation_report(),  # type: ignore[arg-type]
         provenance=Provenance(
-            stage_timings=[StageTiming(stage="knowledge-extraction", duration_ms=31_500)],
+            stage_timings=[
+                StageTiming(stage=stage, duration_ms=ms) for stage, ms in _STAGE_TIMINGS
+            ],
             # The decisions a real run of THIS package would record, restating
             # the same derivations the deterministic halves actually perform —
             # two periods for two concepts at 40 minutes, an assessment mix the
