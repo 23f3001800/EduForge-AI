@@ -57,7 +57,7 @@ async def _fail_job(store: Store, job_id: UUID, exc: Exception) -> None:
 def _spawn(store: Store, job: JobRecord, settings: Settings, roster: RosterBuilder) -> None:
     async def _run() -> None:
         try:
-            stages = await roster(store, job, settings)
+            stages, llm = await roster(store, job, settings)
         except Exception as exc:
             # Roster construction happens before run_job, so nothing else would
             # record this. Left unhandled it is the worst failure mode available:
@@ -68,7 +68,7 @@ def _spawn(store: Store, job: JobRecord, settings: Settings, roster: RosterBuild
         # From here run_job owns the lifecycle and records its own failures;
         # suppressing only silences an unretrieved-exception warning.
         with contextlib.suppress(Exception):
-            await run_job(store=store, job_id=job.id, stages=stages)
+            await run_job(store=store, job_id=job.id, stages=stages, llm=llm)
 
     task = asyncio.create_task(_run())
     # Hold a reference; without one the event loop may garbage-collect a running

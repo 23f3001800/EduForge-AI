@@ -18,7 +18,7 @@ it assembles and renders what the other nine produced.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, NamedTuple
 
 from core.config import Settings
 from core.llm.client import LLMClient
@@ -35,7 +35,26 @@ from stages.s8_gaps.stage import GapAnalysisStage
 from stages.s9_validation.stage import ValidationStage
 from stages.s10_publishing.stage import PublishingStage
 
-__all__ = ["REMAINING_STUBS", "build_stages", "roster_for_job"]
+__all__ = ["REMAINING_STUBS", "Roster", "build_stages", "roster_for_job"]
+
+
+class Roster(NamedTuple):
+    """The stages for one job, and the client they all share.
+
+    The client is returned rather than kept private because token, cost and model
+    attribution is computed by slicing its call log around each stage. A roster
+    that hands back only the stages leaves the runner with nothing to slice, and
+    the whole provenance block silently reports zeros — which is exactly what
+    happened until a live run was scored and stage 10 reported "0 of 8
+    model-calling stages record which model produced their output".
+
+    ``llm`` is optional because a stub roster in a test may make no model calls
+    at all; ``None`` means "no call log exists", not "attribution failed".
+    """
+
+    stages: list[Any]
+    llm: LLMClient | None = None
+
 
 #: Stages still served by fixtures. Now empty: every stage is real. The name and
 #: the roster test that reads it stay, because an empty list is the assertion —
@@ -80,7 +99,7 @@ def build_stages(
     ]
 
 
-async def roster_for_job(store: Store, job: JobRecord, settings: Settings) -> list[Any]:
+async def roster_for_job(store: Store, job: JobRecord, settings: Settings) -> Roster:
     """The production roster for one job, with its document bound into stage 1.
 
     Built at spawn time rather than at import time because stage 1 closes over
@@ -95,12 +114,16 @@ async def roster_for_job(store: Store, job: JobRecord, settings: Settings) -> li
     if payload is None:
         raise LookupError(f"no stored bytes for document {job.document_id}")
 
-    return build_stages(
-        llm=build_llm_client(settings),
-        payload=payload,
-        filename=document.filename,
-        mime=document.mime,
-        max_bytes=settings.max_upload_bytes,
-        max_pages=settings.max_pages,
-        parse_timeout_s=float(settings.parse_timeout_s),
+    llm = build_llm_client(settings)
+    return Roster(
+        stages=build_stages(
+            llm=llm,
+            payload=payload,
+            filename=document.filename,
+            mime=document.mime,
+            max_bytes=settings.max_upload_bytes,
+            max_pages=settings.max_pages,
+            parse_timeout_s=float(settings.parse_timeout_s),
+        ),
+        llm=llm,
     )

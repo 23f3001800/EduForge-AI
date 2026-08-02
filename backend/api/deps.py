@@ -8,12 +8,11 @@ dependency signature does not change, so no route is rewritten.
 from __future__ import annotations
 
 from collections.abc import Awaitable, Callable
-from typing import Any
 
 from core.config import Settings, get_settings
 from core.storage.base import JobRecord, Store
 from core.storage.memory import InMemoryStore
-from orchestration.pipeline import roster_for_job
+from orchestration.pipeline import Roster, roster_for_job
 
 __all__ = [
     "RosterBuilder",
@@ -24,8 +23,9 @@ __all__ = [
     "set_store",
 ]
 
-#: Produces the ordered stage list for one job.
-RosterBuilder = Callable[[Store, JobRecord, Settings], Awaitable[list[Any]]]
+#: Produces the ordered stage list for one job, plus the LLM client they share —
+#: the runner needs the client to attribute tokens and cost per stage.
+RosterBuilder = Callable[[Store, JobRecord, Settings], Awaitable[Roster]]
 
 _store: Store = InMemoryStore()
 
