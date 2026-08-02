@@ -99,6 +99,7 @@ from contracts.tkp import (
     Citation,
     GeneratorInfo,
     Provenance,
+    StageDecision,
     StageTiming,
     TeacherKnowledgePackage,
 )
@@ -187,6 +188,7 @@ __all__ = [
     "RubricLevel",
     "ScriptSegment",
     "Severity",
+    "StageDecision",
     "StageName",
     "StageTiming",
     "StandardRef",

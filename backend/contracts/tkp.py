@@ -28,7 +28,14 @@ from contracts.plan import TeachingPlan
 from contracts.primitives import SCHEMA_VERSION, Identifier, StageName, StrictModel
 from contracts.validation import ValidationReport
 
-__all__ = ["Citation", "GeneratorInfo", "Provenance", "StageTiming", "TeacherKnowledgePackage"]
+__all__ = [
+    "Citation",
+    "GeneratorInfo",
+    "Provenance",
+    "StageDecision",
+    "StageTiming",
+    "TeacherKnowledgePackage",
+]
 
 
 class StageTiming(StrictModel):
@@ -39,6 +46,25 @@ class StageTiming(StrictModel):
     tokens_cached: int = Field(default=0, ge=0)
     attempts: int = Field(default=1, ge=1)
     degraded: bool = False
+
+
+class StageDecision(StrictModel):
+    """A choice the pipeline made, and why.
+
+    Most of what shapes a package is decided in Python before any model is
+    called — how many periods, which assessment kinds, how severe a gap is — and
+    a teacher reading the result cannot tell a derived number from an arbitrary
+    one. "5 periods" invites the question; "5 periods, because 9 concepts need
+    210 minutes and a period is 40" answers it.
+
+    This lives in the package rather than only in the logs because the person
+    who most needs the reasoning is the teacher deciding whether to trust the
+    output, not the operator debugging a run.
+    """
+
+    stage: StageName
+    what: str = Field(min_length=1, description="What was decided.")
+    because: str = Field(min_length=1, description="The reason, in a teacher's terms.")
 
 
 class GeneratorInfo(StrictModel):
@@ -68,6 +94,10 @@ class Citation(StrictModel):
 class Provenance(StrictModel):
     citations: list[Citation] = Field(default_factory=list)
     stage_timings: list[StageTiming] = Field(default_factory=list)
+    decisions: list[StageDecision] = Field(
+        default_factory=list,
+        description="Why the pipeline chose what it chose, in the order decided.",
+    )
     total_tokens_in: int = Field(default=0, ge=0)
     total_tokens_out: int = Field(default=0, ge=0)
     total_cost_usd: float = Field(default=0.0, ge=0.0)

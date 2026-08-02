@@ -2,11 +2,20 @@
 
 import { useQuery } from "@tanstack/react-query";
 import * as Tabs from "@radix-ui/react-tabs";
-import { BookOpen, ClipboardCheck, GraduationCap, Layers, ShieldCheck, TriangleAlert } from "lucide-react";
+import {
+  BookOpen,
+  ClipboardCheck,
+  GitBranch,
+  GraduationCap,
+  Layers,
+  ShieldCheck,
+  TriangleAlert,
+} from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 import { ArtifactsPanel } from "@/components/package/artifacts";
+import { PipelinePanel } from "@/components/package/pipeline";
 import { EvidenceList, type Evidence } from "@/components/package/evidence";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
@@ -28,6 +37,7 @@ const TABS = [
   { id: "assessments", label: "Assessments", icon: ClipboardCheck },
   { id: "gaps", label: "Learning gaps", icon: TriangleAlert },
   { id: "validation", label: "Validation", icon: ShieldCheck },
+  { id: "pipeline", label: "Pipeline", icon: GitBranch },
 ];
 
 const VALIDATION_TONE: Record<string, "success" | "warning" | "danger"> = {
@@ -653,6 +663,9 @@ function ViewerBody() {
                 Every rule class — schema, coverage, consistency and grounding — passed.
               </EmptyState>
             )}
+          </Tabs.Content>
+          <Tabs.Content value="pipeline">
+            <PipelinePanel provenance={tkp.provenance} generator={tkp.generator} />
           </Tabs.Content>
         </div>
       </Tabs.Root>
