@@ -44,3 +44,7 @@ Thumbs.db
 
 # local Claude Code agent configs — kept on disk, never tracked or pushed
 .claude/
+
+# Test-corpus PDFs. Kept on disk for manual runs against real documents;
+# 98MB of textbooks has no business in a source repo.
+Books/
