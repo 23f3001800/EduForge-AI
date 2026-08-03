@@ -94,6 +94,28 @@ export interface JobOptions {
   include_artifacts?: string[];
 }
 
+/**
+ * Which pages a machine read, with what, and how sure it was.
+ *
+ * Mirrors `OcrProvenance` in `backend/contracts/document.py`, and is present on
+ * `package.source.ocr` ONLY when some page had no text layer. Absent is the
+ * normal case and means every page came from a real text layer.
+ *
+ * `confidence` is null when the engine does not report one. That is not zero and
+ * must never render as a score — the same rule the evaluation panel applies to a
+ * `not_measurable` metric, for the same reason: an invented number is worse than
+ * an admitted gap.
+ */
+export interface OcrProvenance {
+  engine: string;
+  /** 1-based pages read by OCR. */
+  pages: number[];
+  /** Pages with no text layer that could not be recognised either — content missing. */
+  failed_pages: number[];
+  confidence: number | null;
+  min_confidence: number | null;
+}
+
 export interface UploadResponse {
   document_id: string;
   sha256: string;
@@ -301,6 +323,56 @@ export interface Comparison {
   improvements: { stage: string; score: number; baseline_median: number; delta: number }[];
 }
 
+/**
+ * The rubric half of the report — `EvalReport.as_dict()` in `evals/types.py`.
+ *
+ * Its `dimensions` list is open: the backend adds members (content_fidelity and
+ * period_integrity are the two most recent), so nothing in the UI may hardcode
+ * which dimensions exist. Rendering is driven entirely by this array.
+ */
+export interface RubricMetric {
+  key: string;
+  /** 0-1. Carries no weight in the dimension score when `weight` is 0 — those are reported, not scored. */
+  value: number;
+  weight: number;
+  note: string;
+}
+
+export interface RubricFinding {
+  code: string;
+  /** A JSON pointer into the package. A finding without one is an opinion. */
+  path: string;
+  detail: string;
+}
+
+export interface RubricDimension {
+  key: string;
+  label: string;
+  method: string;
+  weight: number;
+  /** 0-1, and null exactly when `applicable` is false. Never render a fallback number. */
+  score: number | null;
+  applicable: boolean;
+  /** Why it was not applicable. Empty string when it was. */
+  reason: string;
+  metrics: RubricMetric[];
+  findings: RubricFinding[];
+}
+
+export interface Rubric {
+  package_id: string;
+  profile: string;
+  subject: string;
+  grade_band: string;
+  overall: number;
+  band: string;
+  judged: boolean;
+  llm_profile: string;
+  transferable: boolean;
+  absent_by_design: string[];
+  dimensions: RubricDimension[];
+}
+
 export interface EvaluationDocument {
   run_id: string;
   package_id: string;
@@ -320,7 +392,7 @@ export interface EvaluationDocument {
     transferable: boolean;
   };
   stages: StageEvaluation[];
-  rubric: Record<string, unknown>;
+  rubric: Rubric;
   recommendations: {
     stage: string;
     stage_label: string;

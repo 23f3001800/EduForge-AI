@@ -23,6 +23,7 @@ one is a worry, and a teacher already has those.
 
 from __future__ import annotations
 
+import asyncio
 from collections.abc import Mapping
 from typing import Any
 
@@ -216,12 +217,23 @@ class GapAnalysisStage:
                 f"{language_directive(options.get('output_language'))}"
             )
 
-            gaps: list[dict[str, Any]] = []
-            for index, seed in enumerate(seeds):
-                await span.progress(
-                    index / len(seeds),
-                    message=f"gap {index + 1} of {len(seeds)} ({seed.severity})",
-                )
+            total = len(seeds)
+            done = 0
+
+            async def generate(
+                index: int, seed: GapSeed
+            ) -> tuple[dict[str, Any] | None, list[str]]:
+                """One gap, start to finish.
+
+                Seeds are independent — each carries its own concepts and its own
+                observed-or-predicted status, decided already by ``severity.py`` —
+                so there is no ordering constraint between them, only within one.
+
+                Concurrency is bounded by the LLM client's own semaphore rather
+                than here, so the ceiling stays in one place and a provider's rate
+                limit is respected across every stage at once, not per stage.
+                """
+                nonlocal done
                 result = await self._llm.parse(
                     stage=self.name,
                     output_model=GapDraft,
@@ -236,12 +248,40 @@ class GapAnalysisStage:
                     span.warn(f"{seed.gap_id}: gap analysis degraded")
 
                 gap, notes = build_gap(seed, result.value)
+
+                done += 1
+                # Reported on completion rather than on start, and scaled below
+                # 1.0 — see stage 5's `ClassroomContentStage.run` for why: with
+                # gaps finishing out of submission order, reporting on start can
+                # run progress backwards.
+                await span.progress(
+                    0.95 * done / total, message=f"gap {index + 1} of {total} ({seed.severity})"
+                )
+                return (gap.model_dump(mode="json") if gap is not None else None), notes
+
+            # TaskGroup rather than asyncio.gather: gather does not cancel its
+            # siblings when one coroutine raises, so a mid-run failure would leave
+            # the other gaps' calls in flight, making billable LLM requests for a
+            # job that had already failed. TaskGroup cancels every sibling the
+            # instant one task raises.
+            #
+            # Tasks are appended in submission order and read back in that same
+            # order below, so gaps stay sequenced even though they complete out
+            # of order — the same guarantee `gather` gave for free.
+            tasks: list[asyncio.Task[tuple[dict[str, Any] | None, list[str]]]] = []
+            async with asyncio.TaskGroup() as tg:
+                for index, seed in enumerate(seeds):
+                    tasks.append(tg.create_task(generate(index, seed)))
+            results = [task.result() for task in tasks]
+
+            gaps: list[dict[str, Any]] = []
+            for seed, (gap, notes) in zip(seeds, results, strict=True):
                 if gap is None:
                     span.warn(f"{seed.gap_id}: dropped — {'; '.join(notes)}")
                     continue
                 for note in notes:
                     span.warn(f"{seed.gap_id}: {note}")
-                gaps.append(gap.model_dump(mode="json"))
+                gaps.append(gap)
 
             high = sum(1 for g in gaps if g["severity"] == "high")
             await span.progress(0.98, message=f"{len(gaps)} gaps, {high} high severity")

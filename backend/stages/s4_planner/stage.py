@@ -307,6 +307,19 @@ class TeachingPlannerStage:
             )
 
             # ── model: titles, rationales, minutes ──────────────────────────
+            #
+            # This loop stays sequential, unlike the fan-outs in stages 6, 7 and
+            # 8. `band_brief` below folds `previous_title` — the *decorated*
+            # title the model wrote for the period immediately before this one —
+            # into the next period's prompt, so period N's call genuinely depends
+            # on period N-1's model output, not just on the deterministic
+            # skeleton. Running this loop concurrently would mean every band
+            # either raced for a `previous_title` that was not there yet or was
+            # built from a stale one, and either way the "titled: {previous_title}"
+            # continuity a teacher reads across periods would depend on
+            # scheduling rather than on the plan. That is a real data dependency
+            # within the loop, not a leftover from before stage 5's pattern
+            # existed, so it is left as `await`-per-period rather than fanned out.
             periods: list[dict[str, Any]] = []
             previous_title: str | None = None
             for band in skeleton.bands:

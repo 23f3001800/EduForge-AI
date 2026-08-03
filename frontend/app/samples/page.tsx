@@ -10,7 +10,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState, ErrorState } from "@/components/ui/states";
 import { getSamples } from "@/lib/api";
 import { describeError } from "@/lib/errors";
-import { titleCase } from "@/lib/format";
+import { labelFor } from "@/lib/format";
 
 /**
  * The preloaded reference packages.
@@ -54,12 +54,12 @@ export default function SamplesPage() {
             <Card key={sample.package_id} className="flex flex-col">
               <CardContent className="flex flex-1 flex-col pt-5">
                 <div className="flex flex-wrap items-center gap-2">
-                  <Badge tone="accent">{titleCase(sample.pedagogy_profile)}</Badge>
+                  <Badge tone="accent">{labelFor(sample.pedagogy_profile)}</Badge>
                   <Badge>{sample.subject}</Badge>
                 </div>
                 <h2 className="mt-3 text-lg font-semibold">{sample.title}</h2>
                 <p className="mt-1 text-sm text-fg-muted">
-                  {sample.periods} periods · validation {titleCase(sample.validation_status)}
+                  {sample.periods} periods · validation {labelFor(sample.validation_status)}
                 </p>
                 <div className="mt-4 flex-1" />
                 <Button asChild variant="secondary" className="mt-4 w-full">

@@ -18,7 +18,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState, ErrorState } from "@/components/ui/states";
 import { getStats } from "@/lib/api";
 import { describeError } from "@/lib/errors";
-import { formatDuration, formatPercent, titleCase } from "@/lib/format";
+import { formatDuration, formatPercent, labelFor } from "@/lib/format";
 import { STAGE_LABELS, type StageKey } from "@/lib/stages";
 
 /**
@@ -58,7 +58,7 @@ function Distribution({ title, data }: { title: string; data: Record<string, num
   // Omitted rather than drawn empty — an axis with no series reads as broken.
   if (entries.length === 0) return null;
 
-  const chart = entries.map(([name, value]) => ({ name: titleCase(name), value }));
+  const chart = entries.map(([name, value]) => ({ name: labelFor(name), value }));
   return (
     <Card>
       <CardHeader>
@@ -123,7 +123,7 @@ export default function AnalyticsPage() {
 
   const stageRows = Object.entries(data.stages)
     .map(([stage, value]) => ({
-      name: STAGE_LABELS[stage as StageKey] ?? titleCase(stage),
+      name: STAGE_LABELS[stage as StageKey] ?? labelFor(stage),
       seconds: Number(value.mean_seconds.toFixed(2)),
     }))
     .filter((row) => row.seconds > 0);
@@ -230,7 +230,7 @@ export default function AnalyticsPage() {
                           : "warning"
                     }
                   >
-                    {titleCase(outcome)} · {count}
+                    {labelFor(outcome)} · {count}
                   </Badge>
                 </li>
               ))}

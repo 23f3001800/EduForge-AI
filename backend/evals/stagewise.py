@@ -264,13 +264,101 @@ def _stage_document_intelligence(ctx: EvalContext) -> StageEvaluation:
             )
         )
 
+    # OCR now runs, so this stopped being one metric and became two questions.
+    # How *sure* the recogniser was is reported by the engine and can be scored.
+    # Whether it was *right* still cannot: that needs a reference transcript of
+    # the scanned pages, which no uploader supplies.
+    ocr = source.get("ocr")
+    ocr = ocr if isinstance(ocr, Mapping) else None
+    if ocr is None:
+        metrics.append(
+            not_measurable(
+                "ocr_confidence",
+                "OCR confidence",
+                "No page needed OCR: every page carried a text layer, so nothing "
+                "was read from an image and there is no confidence to report.",
+                needed="a document with at least one scanned page",
+            )
+        )
+    else:
+        confidence = ocr.get("confidence")
+        engine = str(ocr.get("engine") or "unknown")
+        read = list(ocr.get("pages") or [])
+        unread = list(ocr.get("failed_pages") or [])
+
+        if isinstance(confidence, int | float):
+            threshold = ocr.get("min_confidence")
+            floor = float(threshold) if isinstance(threshold, int | float) else 0.8
+            metrics.append(
+                measured(
+                    "ocr_confidence",
+                    "OCR confidence",
+                    100.0 * float(confidence),
+                    f"{engine} read {len(read)} page(s) at a mean confidence of "
+                    f"{float(confidence):.0%} against a {floor:.0%} floor. This is the "
+                    "recogniser's own certainty, not a check that it was correct.",
+                    weight=2.0,
+                    confidence=0.9,
+                    evidence=[_ev("/source/ocr", f"pages {read} read by {engine}")],
+                    recommendations=(
+                        [
+                            _fix(
+                                "Have a teacher check the OCR'd pages against the "
+                                "original before teaching from them.",
+                                "Every citation downstream is verified against this "
+                                "text, so a misread is confirmed by those checks "
+                                "rather than caught by them.",
+                                "high",
+                            )
+                        ]
+                        if float(confidence) < floor
+                        else []
+                    ),
+                )
+            )
+        else:
+            metrics.append(
+                not_measurable(
+                    "ocr_confidence",
+                    "OCR confidence",
+                    f"{engine} read {len(read)} page(s) but reports no confidence, "
+                    "so how far to trust that text is genuinely unknown.",
+                    needed="an engine that scores its own output, such as Azure "
+                    "Document Intelligence or Tesseract",
+                )
+            )
+
+        if unread:
+            metrics.append(
+                measured(
+                    "ocr_page_recovery",
+                    "Scanned pages recovered",
+                    _pct(len(read), len(read) + len(unread)),
+                    f"{len(read)} of {len(read) + len(unread)} page(s) without a text "
+                    f"layer were recovered; page(s) {unread} were not, so their content "
+                    "is absent from this package.",
+                    weight=2.0,
+                    evidence=[_ev("/source/ocr/failed_pages", f"unrecovered: {unread}")],
+                    recommendations=[
+                        _fix(
+                            "Re-run with an OCR tier that has no per-request page cap.",
+                            "Content on those pages is missing entirely, and nothing "
+                            "downstream can tell it was ever there.",
+                            "high",
+                        )
+                    ],
+                )
+            )
+
     metrics.append(
         not_measurable(
             "ocr_accuracy",
             "OCR accuracy",
-            "This pipeline does not run OCR — it rejects image-only pages rather than "
-            "guessing at them, so there is no OCR output to score.",
-            needed="an OCR stage, plus reference transcriptions of scanned pages to score against",
+            "Accuracy is a comparison against what the page actually said, and no "
+            "uploader supplies a transcript of their own scan. Confidence is "
+            "reported instead, which is the recogniser's certainty, not its "
+            "correctness — the two come apart exactly when it matters.",
+            needed="reference transcriptions of the scanned pages to diff against",
         )
     )
     metrics.append(

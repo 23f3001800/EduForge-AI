@@ -12,7 +12,7 @@ import { ErrorState } from "@/components/ui/states";
 import { createJob, getOptions, uploadDocument, type JobOptions } from "@/lib/api";
 import { cn } from "@/lib/cn";
 import { describeError, traceIdOf } from "@/lib/errors";
-import { formatBytes, titleCase } from "@/lib/format";
+import { formatBytes, labelFor } from "@/lib/format";
 
 const ACCEPTED = [".pdf", ".docx", ".pptx", ".txt", ".md"];
 const MAX_BYTES = 25 * 1024 * 1024;
@@ -209,7 +209,7 @@ export default function UploadPage() {
               >
                 {(options?.teaching_styles ?? ["balanced"]).map((option) => (
                   <option key={option} value={option}>
-                    {titleCase(option)}
+                    {labelFor(option)}
                   </option>
                 ))}
               </select>

@@ -55,7 +55,7 @@ const STEPS = [
 ];
 
 const LIMITS = [
-  "First version. Scanned or photographed pages are rejected with a clear error, not OCR'd.",
+  "Pages with no text layer are read by OCR. The package names those pages and what the engine's confidence was, because a misread there is checked against itself by everything downstream — a teacher is the only one who can catch it.",
   "Runs on free-tier models by default, so quality is bounded by what those models can do — the config swaps to a stronger model unchanged.",
   "Uploaded documents live in memory today; a server restart clears them.",
 ];
@@ -93,7 +93,11 @@ export default function LandingPage() {
             </Button>
             {samples.length > 0 ? (
               <Button asChild variant="secondary" size="lg">
-                <Link href={`/packages/${(physics ?? samples[0]).package_id}`}>
+                {/* `/packages?id=` and never `/packages/<id>`: this is a static
+                    export, so there is no pre-built HTML at a path segment and
+                    the request falls through to the SPA fallback — which
+                    re-rendered this very page and made the primary CTA a no-op. */}
+                <Link href={`/packages?id=${(physics ?? samples[0]).package_id}`}>
                   See a sample package
                 </Link>
               </Button>
@@ -206,12 +210,18 @@ export default function LandingPage() {
         {physics || history ? (
           <div className="mt-4 flex flex-wrap gap-4 text-sm font-semibold">
             {physics ? (
-              <Link className="text-accent hover:underline" href={`/packages/${physics.package_id}`}>
+              <Link
+                className="inline-flex min-h-11 items-center text-accent hover:underline"
+                href={`/packages?id=${physics.package_id}`}
+              >
                 Open the physics sample →
               </Link>
             ) : null}
             {history ? (
-              <Link className="text-accent hover:underline" href={`/packages/${history.package_id}`}>
+              <Link
+                className="inline-flex min-h-11 items-center text-accent hover:underline"
+                href={`/packages?id=${history.package_id}`}
+              >
                 Open the history sample →
               </Link>
             ) : null}
