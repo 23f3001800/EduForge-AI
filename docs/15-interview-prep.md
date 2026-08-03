@@ -509,7 +509,7 @@ a frontier model to work at all, that would be a design smell.
 **Why a smaller model for validation:** validation checks are largely mechanical. Paying
 for a large model to answer "does this quote support this claim" in batches of 20 is waste.
 
-Groq and Gemini profiles exist as alternates. Anthropic is implemented but **off by
+A Gemini profile exists as an alternate. Anthropic is implemented but **off by
 default** — a key in the environment isn't enough, `ALLOW_ANTHROPIC=true` is also required.
 Billing against a key should be a decision, not a config typo. A `ci` profile replays
 recorded cassettes so the test suite makes zero network calls and needs no key.

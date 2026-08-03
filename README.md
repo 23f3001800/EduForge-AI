@@ -184,7 +184,7 @@ only `:free` models, so a run costs **$0.00**.
 |---|---|---|
 | `production` | OpenRouter (free) | Graded output, the deployment |
 | `dev` | OpenRouter (smallest) | Fast single-stage iteration |
-| `groq` / `gemini_dev` | Groq / Gemini | Alternatives |
+| `gemini_dev` | Gemini | Alternative |
 | `ci` | replay | Recorded cassettes — no network, no key |
 
 Anthropic is implemented but **off by default**: a key in the environment is not

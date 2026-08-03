@@ -606,26 +606,27 @@ def test_openai_compatible_schema_rewrite_satisfies_strict_mode() -> None:
 
 # ──────────────────────────────────────────────────────── token-ceiling handling
 
-#: Groq's actual 413 body, copied from the run this work came out of.
-GROQ_413 = (
-    "groq 413: Request too large for model `openai/gpt-oss-20b` in organization "
-    "org_x service tier on_demand on tokens per minute (TPM): Limit 8000, Used 0, "
-    "Requested 38566. Please try again in 4m37.302s."
+#: A real rate-limited-provider 413 body, in the shape that broke the previous
+#: parser: `Used` interposed between `Limit` and `Requested`.
+RATE_LIMITED_413 = (
+    "openrouter 413: Request too large for model `openai/gpt-oss-20b` in "
+    "organization org_x service tier on_demand on tokens per minute (TPM): "
+    "Limit 8000, Used 0, Requested 38566. Please try again in 4m37.302s."
 )
 
 
-def test_the_groq_rate_limit_message_is_actually_parsed() -> None:
+def test_the_rate_limit_message_with_interposed_fields_is_parsed() -> None:
     """The regression that made the fit-and-retry path dead code.
 
-    The pattern required `Requested` to follow `Limit` immediately. Groq's real
-    message interposes `Used`, so it matched nothing on the one provider it was
-    written for, and every oversized request went through four retries to the
-    same rejection.
+    The pattern required `Requested` to follow `Limit` immediately. A real
+    provider's message interposes `Used`, so it matched nothing on the one
+    provider it was written for, and every oversized request went through four
+    retries to the same rejection.
     """
     from core.llm.providers.openai_compat import OpenAICompatibleAdapter
 
-    spec = ModelSpec(provider="groq", model="openai/gpt-oss-20b", max_tokens=4000)
-    fitted = OpenAICompatibleAdapter._fit_to_token_ceiling(spec, LLMProviderError(GROQ_413))
+    spec = ModelSpec(provider="openrouter", model="openai/gpt-oss-20b", max_tokens=4000)
+    fitted = OpenAICompatibleAdapter._fit_to_token_ceiling(spec, LLMProviderError(RATE_LIMITED_413))
     # 38566 requested - 4000 reserved = 34566 of prompt, which alone exceeds 8000:
     # no reservation rescues this request, so shrinking one would be a lie.
     assert fitted is None
@@ -635,10 +636,10 @@ def test_a_reservation_that_can_be_shrunk_to_fit_is_shrunk() -> None:
     from core.llm.providers.openai_compat import OpenAICompatibleAdapter
 
     message = (
-        "groq 413: Request too large ... on tokens per minute (TPM): "
+        "openrouter 413: Request too large ... on tokens per minute (TPM): "
         "Limit 8000, Used 500, Requested 9000."
     )
-    spec = ModelSpec(provider="groq", model="openai/gpt-oss-20b", max_tokens=4000)
+    spec = ModelSpec(provider="openrouter", model="openai/gpt-oss-20b", max_tokens=4000)
     fitted = OpenAICompatibleAdapter._fit_to_token_ceiling(spec, LLMProviderError(message))
     assert fitted is not None
     # 9000 - 4000 = 5000 prompt; 8000 - 500 used - 5000 - 256 margin = 2244.
@@ -647,14 +648,14 @@ def test_a_reservation_that_can_be_shrunk_to_fit_is_shrunk() -> None:
 
 
 def test_a_429_about_tokens_per_minute_is_treated_as_a_ceiling_error() -> None:
-    """Groq answers a per-minute token overrun with 429 as often as 413."""
+    """A per-minute token overrun can arrive as a 429 as often as a 413."""
     from core.llm.providers.openai_compat import OpenAICompatibleAdapter
 
     message = (
-        "groq 429: Rate limit reached for model `openai/gpt-oss-20b` on tokens "
-        "per minute (TPM): Limit 8000, Used 1000, Requested 9500."
+        "openrouter 429: Rate limit reached for model `openai/gpt-oss-20b` on "
+        "tokens per minute (TPM): Limit 8000, Used 1000, Requested 9500."
     )
-    spec = ModelSpec(provider="groq", model="openai/gpt-oss-20b", max_tokens=4000)
+    spec = ModelSpec(provider="openrouter", model="openai/gpt-oss-20b", max_tokens=4000)
     assert OpenAICompatibleAdapter._fit_to_token_ceiling(spec, LLMProviderError(message))
 
 
@@ -663,8 +664,8 @@ def test_a_plain_request_rate_limit_is_left_to_normal_backoff() -> None:
     reservation would send a smaller request into the same closed window."""
     from core.llm.providers.openai_compat import OpenAICompatibleAdapter
 
-    message = "groq 429: Rate limit reached: requests per minute. Please try again in 12s."
-    spec = ModelSpec(provider="groq", model="openai/gpt-oss-20b", max_tokens=4000)
+    message = "openrouter 429: Rate limit reached: requests per minute. Please try again in 12s."
+    spec = ModelSpec(provider="openrouter", model="openai/gpt-oss-20b", max_tokens=4000)
     assert OpenAICompatibleAdapter._fit_to_token_ceiling(spec, LLMProviderError(message)) is None
 
 
@@ -673,7 +674,9 @@ def test_the_reservation_is_clamped_before_the_request_is_sent() -> None:
     ceiling is declared the arithmetic is available up front."""
     from core.llm.providers.openai_compat import OpenAICompatibleAdapter
 
-    spec = ModelSpec(provider="groq", model="openai/gpt-oss-20b", max_tokens=4000, tpm_ceiling=8000)
+    spec = ModelSpec(
+        provider="openrouter", model="openai/gpt-oss-20b", max_tokens=4000, tpm_ceiling=8000
+    )
     messages = [{"role": "user", "content": "x" * 16_000}]  # ~4000 tokens
     fitted = OpenAICompatibleAdapter._fit_before_sending(spec, messages, None)
     assert fitted.max_tokens == 8000 - 4000 - 256
@@ -685,7 +688,9 @@ def test_the_schema_counts_toward_the_ceiling_too() -> None:
     message, and for our contract models it is thousands of tokens."""
     from core.llm.providers.openai_compat import OpenAICompatibleAdapter
 
-    spec = ModelSpec(provider="groq", model="openai/gpt-oss-20b", max_tokens=4000, tpm_ceiling=8000)
+    spec = ModelSpec(
+        provider="openrouter", model="openai/gpt-oss-20b", max_tokens=4000, tpm_ceiling=8000
+    )
     messages = [{"role": "user", "content": "x" * 16_000}]
     bare = OpenAICompatibleAdapter._fit_before_sending(spec, messages, None)
     with_schema = OpenAICompatibleAdapter._fit_before_sending(
@@ -699,7 +704,9 @@ def test_a_prompt_that_cannot_fit_fails_loudly_rather_than_being_sent() -> None:
     identically. The message has to name the real problem: send less document."""
     from core.llm.providers.openai_compat import OpenAICompatibleAdapter
 
-    spec = ModelSpec(provider="groq", model="openai/gpt-oss-20b", max_tokens=4000, tpm_ceiling=8000)
+    spec = ModelSpec(
+        provider="openrouter", model="openai/gpt-oss-20b", max_tokens=4000, tpm_ceiling=8000
+    )
     messages = [{"role": "user", "content": "x" * 200_000}]
     with pytest.raises(LLMProviderError, match="prompt must be smaller"):
         OpenAICompatibleAdapter._fit_before_sending(spec, messages, None)
@@ -713,28 +720,17 @@ def test_a_route_without_a_declared_ceiling_is_left_alone() -> None:
     assert OpenAICompatibleAdapter._fit_before_sending(spec, messages, None) is spec
 
 
-def test_the_groq_profile_declares_the_ceiling_its_comment_describes() -> None:
-    """The constraint was prose next to the numbers it constrained, so nothing
-    enforced it and nothing could size a prompt against it."""
-    routing = load_routing(REPO / "config" / "models.yaml", "groq")
-    from contracts.primitives import STAGE_NAMES
-
-    for stage in STAGE_NAMES:
-        spec = routing.for_stage(stage)
-        assert spec.tpm_ceiling == 8000, f"{stage} inherits no ceiling"
-        assert spec.max_tokens < spec.tpm_ceiling, (
-            f"{stage} reserves {spec.max_tokens} of an {spec.tpm_ceiling} ceiling, "
-            "leaving nothing for the prompt"
-        )
-
-
 # ───────────────────────────────────────────────────────── the prompt budget
 
 
 def test_prompt_budget_subtracts_everything_that_is_not_document() -> None:
+    """No profile declares `tpm_ceiling` today — the only route that used to was
+    Groq's, now retired — but the field and this derivation stay: it is a general
+    provider-limit concept, not a Groq one, and the next capped provider needs it
+    to already work rather than being re-derived from scratch."""
     from core.llm.base import TPM_SAFETY_MARGIN
 
-    spec = ModelSpec(provider="groq", model="m", max_tokens=3000, tpm_ceiling=8000)
+    spec = ModelSpec(provider="openrouter", model="m", max_tokens=3000, tpm_ceiling=8000)
     client = LLMClient(routing=ProviderRouting(default=spec), adapters={})
     assert client.prompt_budget(overhead_tokens=1500) == 8000 - 3000 - TPM_SAFETY_MARGIN - 1500
 
@@ -747,7 +743,7 @@ def test_prompt_budget_is_none_when_no_ceiling_is_declared() -> None:
 
 
 def test_prompt_budget_never_goes_negative() -> None:
-    spec = ModelSpec(provider="groq", model="m", max_tokens=3000, tpm_ceiling=8000)
+    spec = ModelSpec(provider="openrouter", model="m", max_tokens=3000, tpm_ceiling=8000)
     client = LLMClient(routing=ProviderRouting(default=spec), adapters={})
     assert client.prompt_budget(overhead_tokens=99_999) == 0
 
@@ -755,48 +751,24 @@ def test_prompt_budget_never_goes_negative() -> None:
 # ────────────────────────────────────────────── configured knobs are honoured
 
 
-def test_reasoning_effort_reaches_the_groq_request() -> None:
-    """It was configured on every stage of every profile and sent on none of them.
-    A config that lies is worse than one that is silent."""
-    from core.llm.providers.groq_provider import GroqAdapter
-
-    spec = ModelSpec(
-        provider="groq",
-        model="openai/gpt-oss-20b",
-        reasoning=ReasoningConfig(effort="low"),
-    )
-    assert GroqAdapter("key")._depth_controls(spec) == {"reasoning_effort": "low"}
-
-
 def test_effort_beyond_this_protocols_range_maps_down_rather_than_vanishing() -> None:
-    """`xhigh` asks for the deepest available; `high` is the deepest here."""
-    from core.llm.providers.groq_provider import GroqAdapter
+    """`xhigh` asks for the deepest available; `high` is the deepest the shared
+    five-to-N effort table maps to, so it collapses rather than vanishing."""
+    from core.llm.providers.openrouter_provider import OpenRouterAdapter
 
     spec = ModelSpec(
-        provider="groq", model="openai/gpt-oss-20b", reasoning=ReasoningConfig(effort="xhigh")
+        provider="openrouter", model="x:free", reasoning=ReasoningConfig(effort="xhigh")
     )
-    assert GroqAdapter("key")._depth_controls(spec) == {"reasoning_effort": "high"}
-
-
-def test_a_model_that_cannot_reason_is_not_sent_the_field() -> None:
-    """Groq 400s on `reasoning_effort` for non-reasoning models, and an advisory
-    knob must never be able to fail a call."""
-    from core.llm.providers.groq_provider import GroqAdapter
-
-    spec = ModelSpec(
-        provider="groq",
-        model="llama-3.1-8b-instant",
-        reasoning=ReasoningConfig(effort="high"),
-    )
-    assert GroqAdapter("key")._depth_controls(spec) == {}
+    controls = OpenRouterAdapter("key")._depth_controls(spec)
+    assert controls == {"extra_body": {"reasoning": {"effort": "high"}}}
 
 
 def test_a_route_with_no_configured_effort_sends_nothing() -> None:
     """`None` means 'provider default' and must stay distinguishable from a value."""
-    from core.llm.providers.groq_provider import GroqAdapter
+    from core.llm.providers.openrouter_provider import OpenRouterAdapter
 
-    spec = ModelSpec(provider="groq", model="openai/gpt-oss-20b")
-    assert GroqAdapter("key")._depth_controls(spec) == {}
+    spec = ModelSpec(provider="openrouter", model="x:free")
+    assert OpenRouterAdapter("key")._depth_controls(spec) == {}
 
 
 def test_openrouter_sends_its_own_reasoning_shape() -> None:
@@ -832,15 +804,11 @@ def test_every_depth_control_is_a_keyword_the_sdk_accepts() -> None:
 
     from openai.resources.chat.completions import AsyncCompletions
 
-    from core.llm.providers.groq_provider import GroqAdapter
     from core.llm.providers.openrouter_provider import OpenRouterAdapter
 
     accepted = set(inspect.signature(AsyncCompletions.create).parameters)
 
-    for adapter, model in (
-        (GroqAdapter("key"), "openai/gpt-oss-20b"),
-        (OpenRouterAdapter("key"), "x:free"),
-    ):
+    for adapter, model in ((OpenRouterAdapter("key"), "x:free"),):
         spec = ModelSpec(
             provider=adapter.name,  # type: ignore[arg-type]
             model=model,

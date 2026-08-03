@@ -16,11 +16,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
-#: `groq` is a full alternative to `production` (same 8 generative stages routed
-#: to a real model), not a dev-only shortcut — see config/models.yaml for why:
-#: an independent free-tier quota, at the cost of a much tighter per-minute
-#: token budget.
-LLMProfile = Literal["production", "groq", "dev", "ci"]
+LLMProfile = Literal["production", "dev", "ci"]
 
 
 class Settings(BaseSettings):
@@ -32,8 +28,6 @@ class Settings(BaseSettings):
     llm_profile: LLMProfile = "production"
     open_router_api_key: str | None = None
     open_router_base_url: str = "https://openrouter.ai/api/v1"
-    groq_api_key: str | None = None
-    groq_base_url: str = "https://api.groq.com/openai/v1"
     gemini_api_key: str | None = None
 
     # Anthropic is implemented but off by default. A key being present in the
@@ -130,7 +124,6 @@ class Settings(BaseSettings):
         requirement = {
             "production": ("Open_Router_API_KEY", self.open_router_api_key),
             "dev": ("Open_Router_API_KEY", self.open_router_api_key),
-            "groq": ("GROQ_API_KEY", self.groq_api_key),
         }.get(self.llm_profile)
         if requirement is None:
             return self

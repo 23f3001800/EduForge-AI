@@ -16,7 +16,6 @@ Provider selection policy (docs/02 ADR #11):
 * ``openrouter`` — production, the deployed demo, and end-to-end runs. One
   credential reaches many vendors, and the ``:free`` models are enough to
   run all ten stages repeatedly.
-* ``groq``      — alternative fast provider, used when a key is present.
 * ``gemini``    — local development and single-stage iteration.
 * ``replay``    — CI. Serves recorded cassettes: deterministic, free, offline.
 * ``anthropic`` — implemented but **disabled by default**. Calling it requires
@@ -45,7 +44,7 @@ __all__ = [
     "ReasoningConfig",
 ]
 
-LLMProvider = Literal["anthropic", "gemini", "groq", "openrouter", "replay"]
+LLMProvider = Literal["anthropic", "gemini", "openrouter", "replay"]
 
 #: Reasoning depth, expressed provider-neutrally. Each provider maps it to its own
 #: native control: Anthropic to ``output_config.effort`` with adaptive thinking,
@@ -75,11 +74,14 @@ class ModelSpec(StrictModel):
         ge=1,
         description="Hard tokens-per-minute ceiling this route must fit inside, "
         "where `max_tokens` counts as RESERVED budget rather than measured usage — "
-        "so the real constraint is `prompt + max_tokens <= tpm_ceiling`. Groq's "
-        "free tier is 8000 and rejects an oversized reservation with a 413 before "
-        "the model ever runs. None means 'no ceiling worth planning around'; the "
-        "adapter still handles a rejection, but a stage cannot size its prompts in "
-        "advance, which is the difference between fitting and retrying.",
+        "so the real constraint is `prompt + max_tokens <= tpm_ceiling`. A "
+        "free-tier provider typically rejects an oversized reservation with a 413 "
+        "before the model ever runs. None means 'no ceiling worth planning "
+        "around'; the adapter still handles a rejection, but a stage cannot size "
+        "its prompts in advance, which is the difference between fitting and "
+        "retrying. Unset on every profile today — kept for the next capped "
+        "provider, since re-deriving this machinery from scratch is how an "
+        "oversized request reaches a live run a second time.",
     )
     reasoning: ReasoningConfig | None = Field(
         default=None,

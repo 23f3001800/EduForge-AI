@@ -37,10 +37,11 @@ __all__ = ["KnowledgeExtractionStage", "derive_objectives"]
 #: long chapter degrades badly — recall drops and citations get vaguer.
 #:
 #: It is a *fallback* now rather than the rule. As a constant it was a guess about
-#: a provider it never named, and on the groq profile it was wrong by a factor of
-#: eight: the real window there is `8000 - max_tokens - schema - system - margin`.
-#: A run packed to 12,000 and was rejected before the model ran. Where a ceiling
-#: is declared the number is computed from it; see :func:`_document_budget`.
+#: a provider it never named, and on a route with a real per-minute ceiling it was
+#: wrong by a factor of eight: the real window there is
+#: `ceiling - max_tokens - schema - system - margin`. A run packed to 12,000 was
+#: rejected before the model ran. Where a ceiling is declared the number is
+#: computed from it; see :func:`_document_budget`.
 SINGLE_CALL_TOKEN_BUDGET = 12_000
 
 #: Never plan a document window smaller than this. Below it the per-call overhead
@@ -336,10 +337,10 @@ def _document_budget(
     Everything that is not document text is not small. The strict JSON schema for
     ``CoreKnowledge`` is ~1.2k tokens and ``PedagogicalKnowledge`` ~1.8k, the
     system prompt with its pedagogy guidance is ~600, and the evidence rules list
-    up to 60 chunk ids. On the groq profile the whole ceiling is 8000 and the
-    answer reserves 3000 of it, so the fixed cost is most of what remains. A
-    window chosen without subtracting it is not a window, which is how a pass
-    packed to "12,000 tokens" became a 38,566-token request.
+    up to 60 chunk ids. On a route with a tight per-minute ceiling — say, 8000,
+    with 3000 of it reserved for the answer — the fixed cost is most of what
+    remains. A window chosen without subtracting it is not a window, which is how
+    a pass packed to "12,000 tokens" became a 38,566-token request.
 
     The second return value is the one that changes behaviour elsewhere. ``True``
     means the route declared a ceiling and this number is a wall: a prompt over it
@@ -586,8 +587,8 @@ class KnowledgeExtractionStage:
 
             # What this route can actually spend on document text, rather than a
             # constant. On a large-context production model this is the old
-            # recall-driven 12k; on the groq profile, whose real ceiling is 8000
-            # tokens including the reservation for the answer, it is a fraction of
+            # recall-driven 12k; on a route with a real per-minute ceiling
+            # including the reservation for the answer, it is a fraction of
             # that — and packing to 12k there produced requests the provider
             # rejected outright. The budget is asked for, not assumed.
             core_budget, hard = _document_budget(

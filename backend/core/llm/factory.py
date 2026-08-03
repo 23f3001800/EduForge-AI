@@ -26,8 +26,6 @@ def build_llm_client(settings: Settings) -> LLMClient:
         adapters=build_adapters(
             openrouter_key=settings.open_router_api_key,
             openrouter_base_url=settings.open_router_base_url,
-            groq_key=settings.groq_api_key,
-            groq_base_url=settings.groq_base_url,
             gemini_key=settings.gemini_api_key,
             anthropic_key=settings.anthropic_api_key,
             allow_anthropic=settings.allow_anthropic,
