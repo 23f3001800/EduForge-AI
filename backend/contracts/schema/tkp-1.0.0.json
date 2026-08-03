@@ -1263,6 +1263,19 @@
           "title": "Models By Stage",
           "type": "object"
         },
+        "output_language": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "BCP-47 tag the teaching content was written in, when the run asked for one. Distinct from source.detected_language, which describes the input.",
+          "title": "Output Language"
+        },
         "providers_by_stage": {
           "additionalProperties": {
             "type": "string"

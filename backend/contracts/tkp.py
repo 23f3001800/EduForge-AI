@@ -77,6 +77,13 @@ class GeneratorInfo(StrictModel):
         default_factory=dict, description='e.g. {"knowledge-extraction": "claude-opus-5"}.'
     )
     providers_by_stage: dict[str, str] = Field(default_factory=dict)
+    output_language: str | None = Field(
+        default=None,
+        description=(
+            "BCP-47 tag the teaching content was written in, when the run asked for "
+            "one. Distinct from source.detected_language, which describes the input."
+        ),
+    )
 
 
 class Citation(StrictModel):

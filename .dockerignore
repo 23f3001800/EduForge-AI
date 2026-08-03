@@ -40,6 +40,13 @@ frontend/node_modules/**
 frontend/dist/
 frontend/.vite/
 
+# sample payloads the seeder never opens. It reads each directory's
+# teacher_knowledge_package.json and the rendered PDFs, and nothing else — the
+# source documents alone are ~12 MB of a 13 MB directory, and the bundle is a
+# regenerated view of packages the image already carries.
+samples/*/source.pdf
+samples/teacher_knowledge_packages.json
+
 # local artifacts / dev-only files
 /data/
 /uploads/

@@ -233,14 +233,22 @@ export default function UploadPage() {
 
             <label className="flex flex-col gap-1.5 text-sm">
               <span className="font-medium">Output language</span>
-              <input
+              <select
                 value={language}
                 onChange={(e) => setLanguage(e.target.value)}
-                placeholder="en"
                 className="min-h-11 rounded-md border border-input bg-raised px-3"
-              />
+              >
+                {(options?.output_languages ?? [{ value: "en", label: "English", script: "Latin" }]).map(
+                  (option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ),
+                )}
+              </select>
               <span className="text-xs text-fg-faint">
-                BCP-47. Values are translated; the structure stays in English.
+                Teaching content is written in this language. Source quotes stay in the
+                document&apos;s own language, so citations still match it word for word.
               </span>
             </label>
 
