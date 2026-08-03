@@ -562,6 +562,7 @@ def build_adapters(
     gemini_key: str | None = None,
     anthropic_key: str | None = None,
     allow_anthropic: bool = False,
+    ollama_base_url: str | None = None,
 ) -> dict[str, ProviderAdapter]:
     """Register only the providers that are both credentialled and permitted.
 
@@ -571,10 +572,26 @@ def build_adapters(
     Anthropic is deliberately gated on allow_anthropic rather than on key
     presence alone. A key sitting in the environment should not be sufficient to
     bill against it — that has to be an explicit decision.
+
+    Ollama is the exception to the credential rule: it runs on this machine and
+    has nothing to authenticate against, so it is registered unconditionally.
+    Naming it in a profile it cannot reach fails with a connection error at call
+    time, which is the honest failure — the alternative, inventing a key for it
+    to be gated on, would be theatre.
     """
     from core.llm.providers.replay_provider import ReplayAdapter
 
     adapters: dict[str, ProviderAdapter] = {"replay": ReplayAdapter()}
+
+    from core.llm.providers.ollama_provider import (
+        DEFAULT_BASE_URL as OLLAMA_DEFAULT_BASE_URL,
+    )
+    from core.llm.providers.ollama_provider import OllamaAdapter
+
+    # The OpenAI SDK requires an api_key argument; Ollama ignores it entirely.
+    adapters["ollama"] = OllamaAdapter(
+        "ollama-local-no-key-required", ollama_base_url or OLLAMA_DEFAULT_BASE_URL
+    )
 
     if openrouter_key:
         from core.llm.providers.openrouter_provider import (

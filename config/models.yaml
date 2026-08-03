@@ -64,6 +64,42 @@ profiles:
       educational-classification: { max_tokens: 4000, reasoning: { effort: medium } }
       validation:                 { max_tokens: 4000, reasoning: { effort: low } }
 
+  local:
+    # Open-weight models on this machine, through Ollama. No key, no quota, no
+    # network — which is the entire reason it exists. A hosted free tier is
+    # generous until the day it is not, and "the demo could not run because a
+    # daily limit resets at midnight UTC" is a bad answer to give anyone.
+    #
+    # It buys that with latency. CPU inference is one to two orders of magnitude
+    # slower than a hosted GPU, so `max_tokens` here is a fraction of the
+    # production values: on a CPU every output token is paid for in seconds, and
+    # a 12,000-token ceiling that a hosted model fills in 20s takes tens of
+    # minutes locally. Smaller budgets keep a full run finishable.
+    #
+    # Use this to prove the pipeline runs end to end and to develop without
+    # burning quota. Do NOT read pedagogical quality off it — a 4B model on a
+    # laptop is not what the production profile ships.
+    default:
+      provider: ollama
+      model: qwen3:4b
+      max_tokens: 2000
+      cache_prefix: false
+    stages:
+      # A short judgement over a document sample; the smallest budget that can
+      # still return the full classification object.
+      educational-classification: { max_tokens: 1200 }
+      # Everything downstream teaches what extraction produces, so it keeps the
+      # largest local budget that still returns in reasonable time.
+      knowledge-extraction:  { max_tokens: 3000 }
+      teaching-planner:      { max_tokens: 2000 }
+      lesson-generation:     { max_tokens: 2500 }
+      activity-generation:   { max_tokens: 2000 }
+      assessment-generation: { max_tokens: 2000 }
+      gap-analysis:          { max_tokens: 2000 }
+      # Validation judges the ambiguous middle band of claims only, so it is the
+      # one stage whose budget can stay small without losing anything.
+      validation:            { max_tokens: 1200 }
+
   dev:
     # Single-stage iteration on the cheapest capable free model.
     default:
