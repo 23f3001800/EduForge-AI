@@ -25,7 +25,14 @@ from typing import Any, ClassVar
 from pydantic import BaseModel
 
 from contracts.llm import LLMUsage, ModelSpec
-from core.llm.base import ContentRefused, LLMProviderError, RawCompletion
+from core.llm.base import (
+    MIN_USEFUL_MAX_TOKENS,
+    TPM_SAFETY_MARGIN,
+    ContentRefused,
+    LLMProviderError,
+    RawCompletion,
+    estimate_tokens,
+)
 
 __all__ = ["OpenAICompatibleAdapter", "rewrite_schema_for_strict_mode"]
 
@@ -33,16 +40,29 @@ _RETRYABLE_STATUS = {408, 409, 429, 500, 502, 503, 504, 529}
 
 #: Providers with a tokens-per-minute cap count `max_tokens` as *reserved*
 #: budget, not as measured usage — so an oversized reservation is rejected before
-#: the model runs. The error states both numbers, which is enough to compute a
-#: reservation that fits.
-_TPM_LIMIT = re.compile(r"Limit\s+(\d+),\s*Requested\s+(\d+)", re.IGNORECASE)
+#: the model runs. The error states the numbers needed to compute a reservation
+#: that fits, but not in a fixed shape: Groq's real message is
+#:
+#:     Limit 8000, Used 0, Requested 38566
+#:
+#: and the previous pattern required `Requested` to follow `Limit` immediately,
+#: so it matched nothing and the fit-and-retry path below was dead code on the
+#: one provider it was written for. Fields are read independently instead, which
+#: also survives them being reordered or a fourth one appearing.
+_TPM_FIELD = re.compile(r"\b(limit|used|requested)\b\s*[:=]?\s*(\d+)", re.IGNORECASE)
 
-#: Leave room for tokeniser disagreement between our estimate and theirs.
-_TPM_SAFETY_MARGIN = 256
-
-#: Below this an answer is not worth attempting; failing loudly beats returning
-#: a truncated package that looks complete.
-_MIN_USEFUL_MAX_TOKENS = 512
+#: Status codes and phrases that mean "your token reservation did not fit".
+#: Groq answers a per-minute token overrun with 429 and prose about tokens per
+#: minute, not with the 413 the previous gate looked for alone.
+_TPM_MARKERS = (
+    "tokens per minute",
+    "tokens-per-minute",
+    "token rate limit",
+    "request too large",
+    "too large",
+    " tpm",
+    "tpm ",
+)
 
 #: Substrings identifying "this model cannot do that response_format", as opposed
 #: to a transport failure. Seeing one triggers a step down, not a retry.
@@ -201,6 +221,10 @@ class OpenAICompatibleAdapter:
             messages, response_format = self._build_request(
                 mode, base_messages, user_content, schema, output_model
             )
+            # Sized against the declared ceiling before anything is sent. The
+            # error-driven path below stays as the backstop for a ceiling we were
+            # not told about.
+            spec = self._fit_before_sending(spec, messages, response_format)
             try:
                 response = await self._call(spec, messages, response_format)
             except _SalvageableGenerationError as salvaged:
@@ -244,31 +268,126 @@ class OpenAICompatibleAdapter:
         return any(marker in str(exc).lower() for marker in _SCHEMA_UNSUPPORTED)
 
     @staticmethod
+    def _is_token_ceiling_error(message: str) -> bool:
+        """Whether this rejection is "your token reservation did not fit"."""
+        lowered = message.lower()
+        status_hit = "413" in lowered or "429" in lowered
+        return status_hit and any(marker in lowered for marker in _TPM_MARKERS)
+
+    @staticmethod
     def _fit_to_token_ceiling(spec: ModelSpec, exc: LLMProviderError) -> ModelSpec | None:
         """Shrink ``max_tokens`` to fit a per-minute token ceiling, or None.
 
         Returns None when the error is not a reservation-too-large rejection, or
         when the remaining headroom is too small to be worth attempting — a
-        truncated package that looks complete is worse than a clear failure.
+        truncated package that looks complete is worse than a clear failure, and
+        a 429 whose window is genuinely exhausted wants the retry-after wait the
+        client already applies, not a smaller request sent immediately.
         """
         message = str(exc)
-        if "413" not in message and "too large" not in message.lower():
+        if not OpenAICompatibleAdapter._is_token_ceiling_error(message):
             return None
 
-        match = _TPM_LIMIT.search(message)
-        if match is None:
+        fields = {name.lower(): int(value) for name, value in _TPM_FIELD.findall(message)}
+        limit, requested = fields.get("limit"), fields.get("requested")
+        if limit is None or requested is None:
             return None
 
-        limit, requested = int(match.group(1)), int(match.group(2))
         # `requested` is prompt + reservation, so removing our reservation leaves
-        # the prompt cost, and the rest of the ceiling is what we may ask for.
+        # the prompt cost. `used` is what this minute's window already spent and
+        # is not available to us either — omitting it is how a "corrected" request
+        # gets rejected a second time for the same reason.
         prompt_cost = max(requested - spec.max_tokens, 0)
-        headroom = limit - prompt_cost - _TPM_SAFETY_MARGIN
+        headroom = limit - fields.get("used", 0) - prompt_cost - TPM_SAFETY_MARGIN
 
-        if headroom < _MIN_USEFUL_MAX_TOKENS or headroom >= spec.max_tokens:
+        if headroom < MIN_USEFUL_MAX_TOKENS or headroom >= spec.max_tokens:
             return None
 
         return spec.model_copy(update={"max_tokens": headroom})
+
+    @staticmethod
+    def _fit_before_sending(
+        spec: ModelSpec,
+        messages: list[dict[str, Any]],
+        response_format: dict[str, Any] | None,
+    ) -> ModelSpec:
+        """Clamp the reservation to the declared ceiling *before* the request.
+
+        Reacting to a 413 works, but it costs a round trip and leaves correctness
+        depending on parsing a prose error message from a provider that is free to
+        reword it — which is exactly how the previous regex came to match nothing.
+        When ``tpm_ceiling`` is declared the arithmetic is available up front, so
+        the rejection becomes unreachable rather than merely recoverable.
+
+        The schema is counted too. Under ``json_schema`` mode it travels in
+        ``response_format`` rather than in a message, and it is thousands of
+        tokens for our contract models — counting only the messages understates
+        the request by more than the safety margin covers.
+
+        Raising when the prompt alone will not fit is deliberate. No reservation
+        is small enough to rescue that request; the caller has to send less
+        document, and saying so here names the real problem instead of burning
+        four retries on a rejection that cannot succeed.
+        """
+        if spec.tpm_ceiling is None:
+            return spec
+
+        parts = [str(message.get("content") or "") for message in messages]
+        if response_format is not None:
+            parts.append(json.dumps(response_format))
+        prompt = estimate_tokens(*parts)
+
+        headroom = spec.tpm_ceiling - prompt - TPM_SAFETY_MARGIN
+        if headroom >= spec.max_tokens:
+            return spec
+        if headroom < MIN_USEFUL_MAX_TOKENS:
+            raise LLMProviderError(
+                f"prompt of ~{prompt} tokens leaves {headroom} of the {spec.tpm_ceiling}"
+                f"-token ceiling for the answer, below the {MIN_USEFUL_MAX_TOKENS} needed "
+                f"for a usable one. The prompt must be smaller — see "
+                f"LLMClient.prompt_budget(), which exists to size it in advance.",
+                retryable=False,
+            )
+        return spec.model_copy(update={"max_tokens": headroom})
+
+    #: Our five-step provider-neutral effort onto the three steps this wire
+    #: protocol actually has. `xhigh`/`max` collapse to `high` rather than being
+    #: dropped: the caller asked for the deepest available, and `high` is it here.
+    _EFFORT: ClassVar[dict[str, str]] = {
+        "low": "low",
+        "medium": "medium",
+        "high": "high",
+        "xhigh": "high",
+        "max": "high",
+    }
+
+    def _depth_controls(self, spec: ModelSpec) -> dict[str, Any]:
+        """Translate ``reasoning.effort`` into this protocol's own knob.
+
+        ``reasoning`` was configured for every stage in every profile and silently
+        discarded here, which is the worst of both: the config asserted a
+        quality/latency trade the runtime never made, and the only way to find out
+        was to diff an outgoing request against the YAML. A config that lies is
+        worse than one that is silent.
+
+        Empty in the base class because "OpenAI compatible" does not agree on the
+        field — Groq takes ``reasoning_effort``, OpenRouter takes a ``reasoning``
+        object — and a guess that a given endpoint rejects turns an advisory knob
+        into a 400 on every call. Subclasses that know their own wire format
+        override; one that does not, honestly sends nothing.
+
+        ``cache_prefix`` is deliberately not translated anywhere in this file.
+        This protocol has no request-level cache control at all: Groq and
+        OpenRouter cache prefixes automatically or not at all, so there is nothing
+        to send. Its contract already says adapters that cannot honour it must
+        ignore it rather than fail, and Anthropic and Gemini do act on it.
+        """
+        return {}
+
+    def _effort(self, spec: ModelSpec) -> str | None:
+        if spec.reasoning is None:
+            return None
+        return self._EFFORT.get(spec.reasoning.effort)
 
     def _build_request(
         self,
@@ -350,6 +469,7 @@ class OpenAICompatibleAdapter:
         }
         if response_format is not None:
             request["response_format"] = response_format
+        request.update(self._depth_controls(spec))
 
         try:
             return await self._client.chat.completions.create(**request)

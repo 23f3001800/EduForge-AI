@@ -34,7 +34,7 @@ __all__ = ["KEY", "LABEL", "METHOD", "WEIGHT", "criterion_is_observable", "score
 
 KEY = "activities"
 LABEL = "Activity variety and runnability"
-WEIGHT = 0.14
+WEIGHT = 0.07
 METHOD = "hybrid"
 
 #: A step shorter than this is a label, not an instruction.
@@ -204,8 +204,8 @@ def score(ctx: EvalContext) -> DimensionScore:
 
     metrics = (
         Metric("type_variety", variety, 0.25, f"{distinct} distinct type(s) across {len(types)}"),
-        Metric("profile_fit", mean(fit), 0.10, f"types the {ctx.profile} profile weights"),
-        Metric("observable_criteria", mean(criteria_scores), 0.25, "visible during the lesson"),
+        Metric("profile_fit", mean(fit), 0.05, f"types the {ctx.profile} profile weights"),
+        Metric("observable_criteria", mean(criteria_scores), 0.30, "visible during the lesson"),
         Metric("instruction_specificity", mean(instruction_scores), 0.20, "runnable without edits"),
         Metric(
             "materials_realism",

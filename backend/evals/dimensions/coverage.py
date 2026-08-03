@@ -24,14 +24,14 @@ formulae in narrative content is not a coverage hole and is not counted as one.
 
 from __future__ import annotations
 
-from evals.context import EvalContext
+from evals.context import EvalContext, coerce_int
 from evals.types import DimensionScore, Finding, Metric
 
 __all__ = ["KEY", "LABEL", "METHOD", "WEIGHT", "score"]
 
 KEY = "coverage"
 LABEL = "Coverage"
-WEIGHT = 0.15
+WEIGHT = 0.12
 METHOD = "deterministic"
 
 
@@ -153,8 +153,8 @@ def score(ctx: EvalContext) -> DimensionScore:
     marks_by_concept: dict[str, int] = {}
     for item in ctx.items:
         for cid in item.get("concept_ids") or []:
-            marks_by_concept[str(cid)] = marks_by_concept.get(str(cid), 0) + int(
-                item.get("marks") or 0
+            marks_by_concept[str(cid)] = marks_by_concept.get(str(cid), 0) + coerce_int(
+                item.get("marks")
             )
     core = {str(c.get("concept_id")) for c in ctx.concepts if str(c.get("importance")) == "core"}
     core_marked = [1.0 if marks_by_concept.get(cid, 0) > 0 else 0.0 for cid in sorted(core)]

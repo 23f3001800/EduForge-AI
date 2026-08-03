@@ -26,6 +26,7 @@ from core.storage.memory import InMemoryStore
 from orchestration.pipeline import Roster
 from stages.s10_publishing.stage import PublishingStage
 from stages.stubs import STUB_STAGES
+from tests.fixtures.seeding import seed_packages
 
 PDF = b"%PDF-1.7\n" + b"x" * 512
 
@@ -449,7 +450,7 @@ async def seeded_client() -> Any:
     store = InMemoryStore()
     set_store(store)
     set_roster_builder(_stub_roster)
-    await seed_samples(store)
+    await seed_packages(store)
     app = create_app()
     async with httpx.AsyncClient(
         transport=httpx.ASGITransport(app=app), base_url="http://test"
@@ -504,15 +505,29 @@ async def test_sample_pdfs_download(seeded_client: httpx.AsyncClient) -> None:
         assert downloaded.content[:4] == b"%PDF"
 
 
-async def test_sample_ids_are_stable_across_restarts() -> None:
+async def test_sample_ids_are_stable_across_restarts(tmp_path: Any) -> None:
     """A bookmarked sample URL must survive a redeploy.
 
     Random ids per boot would break every link to a sample on every restart, and
     App Service restarts on each deployment.
+
+    Seeded from a directory this test writes, not from ``samples/``. That
+    directory holds the output of real pipeline runs, so its contents change
+    whenever the samples are regenerated — and when it is empty this assertion
+    compares two empty sets and passes while proving nothing.
     """
+    from tests.fixtures import factories as fx
+
+    package = fx.teacher_knowledge_package().model_dump(mode="json")
+    directory = tmp_path / "samples"
+    (directory / "a-sample").mkdir(parents=True)
+    (directory / "a-sample" / "teacher_knowledge_package.json").write_text(
+        json.dumps(package), encoding="utf-8"
+    )
+
     first, second = InMemoryStore(), InMemoryStore()
-    await seed_samples(first)
-    await seed_samples(second)
+    assert await seed_samples(first, directory) == 1
+    assert await seed_samples(second, directory) == 1
     assert {p.id for p in await first.list_samples()} == {p.id for p in await second.list_samples()}
 
 

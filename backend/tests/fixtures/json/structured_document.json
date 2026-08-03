@@ -52,6 +52,7 @@
     "detected_language": "en",
     "filename": "newtons-laws.pdf",
     "mime": "application/pdf",
+    "ocr": null,
     "page_count": 12,
     "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
     "size_bytes": 184320,

@@ -18,7 +18,61 @@ from pydantic import BaseModel
 
 from contracts.llm import LLMUsage, ModelSpec
 
-__all__ = ["ContentRefused", "LLMProviderError", "ProviderAdapter", "RawCompletion"]
+__all__ = [
+    "MIN_USEFUL_MAX_TOKENS",
+    "TPM_SAFETY_MARGIN",
+    "ContentRefused",
+    "LLMProviderError",
+    "ProviderAdapter",
+    "RawCompletion",
+    "estimate_tokens",
+    "schema_tokens",
+]
+
+#: Headroom left between what we compute a request will cost and the provider's
+#: hard ceiling. Our estimate and their tokeniser will not agree exactly, and the
+#: penalty for being 1% low is a rejected request, not a slightly larger bill.
+TPM_SAFETY_MARGIN = 256
+
+#: Below this an answer is not worth attempting: the model will be cut off
+#: mid-object and return something that fails schema validation anyway. Failing
+#: loudly beats returning a truncated package that looks complete.
+MIN_USEFUL_MAX_TOKENS = 512
+
+#: Characters per token. Deliberately one shared constant rather than a per-caller
+#: guess: the client's budget check, the adapter's pre-flight clamp, and the
+#: stage's prompt-budget arithmetic must agree, or the stage packs to a size the
+#: adapter then rejects. ~4 is the usual English/JSON figure and errs high enough
+#: for prose; :data:`TPM_SAFETY_MARGIN` covers the remainder.
+CHARS_PER_TOKEN = 4
+
+
+def estimate_tokens(*parts: str) -> int:
+    """Cheap, provider-neutral token estimate for one or more prompt fragments.
+
+    A real tokeniser would be more accurate and would mean shipping (and picking)
+    one per provider for a number that only ever feeds a conservative bound. The
+    safety margin exists precisely so this can stay an estimate.
+    """
+    return sum(len(part) for part in parts) // CHARS_PER_TOKEN
+
+
+def schema_tokens(output_model: type[BaseModel]) -> int:
+    """What the output schema costs in the request, whichever way it travels.
+
+    Under ``response_format: json_schema`` it rides in the request body; under the
+    weaker negotiated modes the adapter puts it in the user message instead.
+    Either way the provider counts it, and for our contract models it is thousands
+    of tokens — the largest fixed cost in an extraction prompt after the document.
+    A stage sizing its document window has to subtract it or the window is fiction.
+
+    The quarter added on top covers the strict-mode rewrite, which republishes
+    every property name in a ``required`` list and stamps ``additionalProperties``
+    on every object. Erring high here is free; erring low is a rejected request.
+    """
+    import json
+
+    return estimate_tokens(json.dumps(output_model.model_json_schema())) * 5 // 4
 
 
 class LLMProviderError(RuntimeError):

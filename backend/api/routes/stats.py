@@ -45,17 +45,22 @@ def _counter_totals(prefix: str, label: str) -> dict[str, float]:
 
 
 def _histogram_stats(name: str, label: str) -> dict[str, dict[str, float]]:
-    """Count and mean per label value, from the recorded observations."""
+    """Count and mean per label value, from each series' exact count and sum.
+
+    ``metrics.histograms()`` reports bucket counters now rather than every raw
+    observation (unbounded growth for the life of the process otherwise), but
+    count and sum are tracked exactly regardless, which is all a mean needs.
+    """
     out: dict[str, dict[str, float]] = {}
-    for (metric, labels), values in metrics.histograms().items():
-        if metric != name or not values:
+    for (metric, labels), aggregate in metrics.histograms().items():
+        if metric != name or not aggregate.get("count"):
             continue
         key = dict(labels).get(label)
         if key is None:
             continue
         bucket = out.setdefault(key, {"count": 0.0, "total_seconds": 0.0})
-        bucket["count"] += len(values)
-        bucket["total_seconds"] += sum(values)
+        bucket["count"] += aggregate["count"]
+        bucket["total_seconds"] += aggregate["sum"]
     for bucket in out.values():
         bucket["mean_seconds"] = (
             bucket["total_seconds"] / bucket["count"] if bucket["count"] else 0.0

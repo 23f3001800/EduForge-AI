@@ -150,12 +150,18 @@ def _usage_of(calls: list[Any]) -> dict[str, Any]:
     reporting a price nobody paid. ``degraded`` is true when any attempt fell
     back to a placeholder, which is the difference between "this section is
     thin" and "this section is thin *and we know why*".
+
+    The ``degraded`` record the client writes is a marker, not a provider call:
+    it reserves no tokens and was never sent anywhere, so it is excluded from
+    ``attempts`` and only read for the flag. Counting it would report a price
+    nobody paid in the other direction.
     """
     if not calls:
         return {"attempts": 1, "tokens_in": 0, "tokens_out": 0, "degraded": False}
 
+    sent = [call for call in calls if call.outcome != "degraded"]
     return {
-        "attempts": len(calls),
+        "attempts": len(sent) or 1,
         "tokens_in": sum(call.usage.tokens_in for call in calls),
         "tokens_out": sum(call.usage.tokens_out for call in calls),
         "tokens_cached": sum(call.usage.tokens_cached for call in calls),

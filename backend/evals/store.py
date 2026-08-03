@@ -305,19 +305,46 @@ def compare(record: EvaluationRecord, benchmark: dict[str, Any]) -> dict[str, An
             ),
             "regressions": [],
             "improvements": [],
+            "skipped": [],
         }
 
     regressions: list[dict[str, Any]] = []
     improvements: list[dict[str, Any]] = []
+    skipped: list[dict[str, Any]] = []
     for stage, score in record.stage_scores.items():
         stats = benchmark["stages"].get(stage)
         if score is None or not stats or stats["median"] is None:
             continue
+
+        # The overall history being long enough does not make *this stage's*
+        # history long enough. A stage added last week, or one that is only
+        # measurable on some packages, can have a single observation sitting
+        # inside a benchmark of fifty runs — and calling a regression against a
+        # median of one, while the report says "over 50 comparable runs", is the
+        # dashboard stating a confidence nobody has. Same rule as the top-level
+        # gate, applied where the arithmetic actually happens.
+        if int(stats.get("n") or 0) < MIN_BASELINE_RUNS:
+            skipped.append(
+                {
+                    "stage": stage,
+                    "score": round(float(score), 2),
+                    "baseline_n": int(stats.get("n") or 0),
+                    "needed": MIN_BASELINE_RUNS,
+                    "detail": (
+                        f"{stats.get('n') or 0} prior observation(s) of this stage; a median "
+                        f"needs {MIN_BASELINE_RUNS} before a fall below it means anything, "
+                        "however many runs the overall baseline contains"
+                    ),
+                }
+            )
+            continue
+
         delta = float(score) - float(stats["median"])
         entry = {
             "stage": stage,
             "score": round(float(score), 2),
             "baseline_median": stats["median"],
+            "baseline_n": int(stats["n"]),
             "delta": round(delta, 2),
         }
         if delta <= -REGRESSION_POINTS:
@@ -332,6 +359,13 @@ def compare(record: EvaluationRecord, benchmark: dict[str, Any]) -> dict[str, An
         else round(record.overall - overall_stats["median"], 2)
     )
 
+    skipped_note = (
+        f" {len(skipped)} stage(s) were not compared for want of their own history: "
+        f"{', '.join(sorted(e['stage'] for e in skipped))}."
+        if skipped
+        else ""
+    )
+
     return {
         "status": "regression" if regressions else "ok",
         "runs": benchmark["runs"],
@@ -343,9 +377,11 @@ def compare(record: EvaluationRecord, benchmark: dict[str, Any]) -> dict[str, An
             if regressions
             else f"No stage fell {REGRESSION_POINTS:.0f}+ points below its baseline median "
             f"over {benchmark['runs']} comparable runs."
-        ),
+        )
+        + skipped_note,
         "regressions": sorted(regressions, key=lambda e: e["delta"]),
         "improvements": sorted(improvements, key=lambda e: -e["delta"]),
+        "skipped": sorted(skipped, key=lambda e: e["stage"]),
     }
 
 

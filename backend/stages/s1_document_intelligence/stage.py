@@ -5,15 +5,36 @@ Makes **zero model calls**: the same bytes in must always produce the same
 structure out, which is asserted in the test suite.
 
 This stage is a trust boundary. Input arrives from the public internet, so limits
-are enforced here rather than assumed upstream, and a parser is given a hard
-wall-clock budget so a malformed file becomes a bounded rejection instead of a
-hung worker (NFR-09).
+are enforced here rather than assumed upstream (NFR-09), in this order:
+
+1. **byte size** — cheapest possible rejection;
+2. **archive shape** — for the two OOXML container types, before a parser is
+   handed the bytes, because a small upload can declare gigabytes of members;
+3. **wall clock, address space and CPU** — the parser runs in a child process, so
+   exceeding the budget ends the work rather than merely abandoning the wait.
+
+That third point is the one worth being precise about. ``asyncio.wait_for``
+around ``asyncio.to_thread`` cancels the *awaiter*, not the thread: the parse
+keeps running, keeps allocating, and keeps burning CPU with nothing left waiting
+for it — measured at 67 seconds past a 3 second budget. A child process can be
+killed, so that is what happens here. Where a deployment cannot create one, the
+in-thread path is used instead and the guarantee degrades to "the request is
+bounded" rather than "the work is bounded"; that is a deliberate, documented
+fallback, not an accident.
 """
 
 from __future__ import annotations
 
 import asyncio
+import functools
 import hashlib
+import math
+import multiprocessing
+import threading
+import weakref
+from collections.abc import Callable, MutableMapping
+from concurrent.futures import BrokenExecutor, ProcessPoolExecutor
+from dataclasses import dataclass
 from typing import Any
 from uuid import UUID
 
@@ -23,18 +44,20 @@ from contracts.document import (
     DocumentStats,
     StructuredDocument,
 )
+from core.obs.logging import get_logger
 from stages.base import StageContext, stage_span
 from stages.s1_document_intelligence import parsers
 from stages.s1_document_intelligence.chunking import chunk_blocks
 from stages.s1_document_intelligence.errors import (
     DocumentTooLarge,
     EmptyDocument,
+    ParseFailure,
     ParseTimeout,
     UnsupportedMediaType,
 )
 from stages.s1_document_intelligence.structure import assign_section_paths, build_outline
 
-__all__ = ["DocumentIntelligenceStage", "parse_document"]
+__all__ = ["DocumentIntelligenceStage", "ParseLimits", "parse_document"]
 
 PARSER_BY_MIME = {
     "application/pdf": parsers.parse_pdf,
@@ -43,6 +66,262 @@ PARSER_BY_MIME = {
     "text/plain": parsers.parse_text,
     "text/markdown": parsers.parse_text,
 }
+
+#: How long a parse child gets to come up before the subprocess path is judged
+#: unavailable and the thread path is used instead. A warm forkserver answers in
+#: ~25 ms; this is generous enough that a loaded machine is not misdiagnosed.
+_CHILD_STARTUP_TIMEOUT_S = 15.0
+
+#: CPU seconds a child may burn beyond its wall-clock budget before the kernel
+#: kills it. RLIMIT_CPU is the backstop for the case where the explicit kill
+#: below cannot run; it must exceed the wall clock or it would fire first on a
+#: perfectly healthy parse.
+_CPU_GRACE_S = 30
+
+_log = get_logger(__name__)
+
+
+@dataclass(frozen=True)
+class ParseLimits:
+    """The resource envelope one parse is allowed, resolved once per call."""
+
+    archive_uncompressed_bytes: int = parsers.DEFAULT_MAX_ARCHIVE_BYTES
+    archive_ratio: int = parsers.DEFAULT_MAX_ARCHIVE_RATIO
+    archive_members: int = parsers.DEFAULT_MAX_ARCHIVE_MEMBERS
+    max_blocks: int = parsers.DEFAULT_MAX_BLOCKS
+    max_chars: int = parsers.DEFAULT_MAX_TEXT_CHARS
+    in_subprocess: bool = True
+    workers: int = 2
+    memory_bytes: int = 2048 * 1024 * 1024
+
+
+def _limits_from_settings() -> ParseLimits:
+    """Read the envelope from settings, falling back to the module defaults.
+
+    Deliberately total: a settings object that cannot be constructed must not be
+    the reason a parse fails open *or* fails closed. The defaults here are the
+    same values the settings declare.
+    """
+    try:
+        from core.config import get_settings
+
+        settings = get_settings()
+        return ParseLimits(
+            archive_uncompressed_bytes=settings.max_archive_uncompressed_bytes,
+            archive_ratio=settings.max_archive_ratio,
+            archive_members=settings.max_archive_members,
+            max_blocks=settings.max_blocks_per_document,
+            max_chars=settings.max_text_chars,
+            in_subprocess=settings.parse_in_subprocess,
+            workers=settings.parse_workers,
+            memory_bytes=settings.parse_memory_bytes,
+        )
+    except Exception:
+        return ParseLimits()
+
+
+# ─────────────────────────────────────────────────────── bounded child process ───
+
+
+def _apply_child_limits(address_space_bytes: int, cpu_seconds: int) -> None:
+    """Child-process initializer: cap address space and CPU before any work.
+
+    Runs in the child, so a parser that allocates without bound gets
+    ``MemoryError`` and a parser that spins gets ``SIGXCPU`` — either way the
+    child dies and the parent sees a broken pool instead of a dying host.
+    ``resource`` is POSIX-only and some sandboxes refuse the call; neither is a
+    reason to fail the parse, so both are tolerated.
+    """
+    try:
+        import resource
+    except ImportError:  # pragma: no cover - non-POSIX
+        return
+
+    for which, wanted in (
+        (resource.RLIMIT_AS, address_space_bytes),
+        (resource.RLIMIT_CPU, cpu_seconds),
+    ):
+        try:
+            _soft, hard = resource.getrlimit(which)
+            limit = wanted if hard == resource.RLIM_INFINITY else min(wanted, hard)
+            resource.setrlimit(which, (limit, limit))
+        except (ValueError, OSError):  # pragma: no cover - platform dependent
+            continue
+
+
+def _child_is_alive() -> bool:
+    """Trivial round trip that proves a child can start and answer."""
+    return True
+
+
+_CONTEXT_LOCK = threading.Lock()
+_mp_context: Any | None = None
+_subprocess_unavailable = False
+_fallback_warned = False
+
+
+def _get_mp_context() -> Any | None:
+    """A start method whose children are forked from a clean template.
+
+    ``fork`` is refused on purpose: this process runs an event loop and a thread
+    pool, and forking it copies locks held by threads that do not exist in the
+    child. ``forkserver`` forks from a single-threaded template instead, and
+    ``spawn`` starts fresh; either is safe, both are cheap enough (~25 ms warm).
+    """
+    global _mp_context, _subprocess_unavailable
+    if _subprocess_unavailable:
+        return None
+    if _mp_context is not None:
+        return _mp_context
+    with _CONTEXT_LOCK:
+        if _mp_context is not None:
+            return _mp_context
+        try:
+            available = multiprocessing.get_all_start_methods()
+            method = next((m for m in ("forkserver", "spawn") if m in available), None)
+            if method is None:
+                raise RuntimeError("no safe multiprocessing start method available")
+            context = multiprocessing.get_context(method)
+            if method == "forkserver":
+                # Pre-importing the parsers keeps the per-parse cost at a fork
+                # rather than a full interpreter warm-up.
+                context.set_forkserver_preload(
+                    ["stages.s1_document_intelligence.parsers"]
+                )
+            _mp_context = context
+        except Exception:
+            _subprocess_unavailable = True
+            return None
+    return _mp_context
+
+
+_SLOTS: MutableMapping[Any, asyncio.Semaphore] = weakref.WeakKeyDictionary()
+
+
+def _parse_slot(workers: int) -> asyncio.Semaphore:
+    """Bound how many parse children exist at once, per event loop.
+
+    Keyed on the loop rather than module-global because a semaphore belongs to
+    the loop that first awaits it, and the test suite runs a loop per test.
+    """
+    loop = asyncio.get_running_loop()
+    slot = _SLOTS.get(loop)
+    if slot is None:
+        slot = asyncio.Semaphore(workers)
+        _SLOTS[loop] = slot
+    return slot
+
+
+class _SubprocessUnavailableError(Exception):
+    """The child-process path could not be used; the caller should use threads."""
+
+
+def _terminate(executor: ProcessPoolExecutor) -> None:
+    """Kill the child outright. This is the whole point of the process path."""
+    for process in list((getattr(executor, "_processes", None) or {}).values()):
+        try:
+            process.kill()
+        except Exception:  # pragma: no cover - already dead
+            continue
+
+
+def _timed_out(timeout_s: float, *, killed: bool) -> ParseTimeout:
+    detail = "and the parser was killed" if killed else "and was abandoned"
+    return ParseTimeout(
+        f"Parsing exceeded {timeout_s:.0f}s {detail}.",
+        timeout_s=timeout_s,
+        work_terminated=killed,
+    )
+
+
+async def _run_in_subprocess(
+    call: Callable[[], list[Block]], *, timeout_s: float, limits: ParseLimits
+) -> list[Block]:
+    """Parse in a child process whose memory, CPU and lifetime are all capped."""
+    context = _get_mp_context()
+    if context is None:
+        raise _SubprocessUnavailableError("no usable multiprocessing context")
+
+    cpu_seconds = max(1, math.ceil(timeout_s) + _CPU_GRACE_S)
+    loop = asyncio.get_running_loop()
+
+    async with _parse_slot(limits.workers):
+        try:
+            executor = ProcessPoolExecutor(
+                max_workers=1,
+                mp_context=context,
+                initializer=_apply_child_limits,
+                initargs=(limits.memory_bytes, cpu_seconds),
+            )
+        except Exception as exc:
+            raise _SubprocessUnavailableError("could not create a process pool") from exc
+
+        try:
+            # Prove a child can start *before* the parse is committed to it. A
+            # pool that fails here is an environment that forbids subprocesses,
+            # and the caller falls back to threads. A pool that breaks after
+            # this point had its child killed by its own limits — that is a
+            # rejection, and retrying it in-thread would be re-running the
+            # attack with the limits removed.
+            try:
+                await asyncio.wait_for(
+                    loop.run_in_executor(executor, _child_is_alive),
+                    timeout=_CHILD_STARTUP_TIMEOUT_S,
+                )
+            except Exception as exc:
+                _terminate(executor)
+                raise _SubprocessUnavailableError("no parse child could be started") from exc
+
+            try:
+                return await asyncio.wait_for(
+                    loop.run_in_executor(executor, call), timeout=timeout_s
+                )
+            except TimeoutError as exc:
+                _terminate(executor)
+                raise _timed_out(timeout_s, killed=True) from exc
+            except BrokenExecutor as exc:
+                _terminate(executor)
+                raise ParseFailure(
+                    "Parsing exhausted the memory or CPU allowed for one document "
+                    "and was stopped.",
+                    reason="child_resource_limit",
+                ) from exc
+        finally:
+            executor.shutdown(wait=False, cancel_futures=True)
+
+
+async def _run_in_thread(call: Callable[[], list[Block]], *, timeout_s: float) -> list[Block]:
+    """Fallback path. Bounds the wait; cannot bound the work — see module docs."""
+    try:
+        return await asyncio.wait_for(asyncio.to_thread(call), timeout=timeout_s)
+    except TimeoutError as exc:
+        raise _timed_out(timeout_s, killed=False) from exc
+
+
+async def _run_parser(
+    call: Callable[[], list[Block]], *, timeout_s: float, limits: ParseLimits
+) -> list[Block]:
+    if limits.in_subprocess:
+        try:
+            return await _run_in_subprocess(call, timeout_s=timeout_s, limits=limits)
+        except _SubprocessUnavailableError as exc:
+            # Logged once per process, at WARNING: a control that quietly stops
+            # applying is worse than one that was never configured, because
+            # nothing tells you the timeout no longer ends the work.
+            global _fallback_warned
+            if not _fallback_warned:
+                _fallback_warned = True
+                _log.warning(
+                    "parse_subprocess_unavailable",
+                    extra={
+                        "reason": str(exc),
+                        "consequence": "parse timeout bounds the wait, not the work",
+                    },
+                )
+    return await _run_in_thread(call, timeout_s=timeout_s)
+
+
+# ────────────────────────────────────────────────────────────────── the stage ───
 
 
 def _stats(blocks: list[Block]) -> DocumentStats:
@@ -68,6 +347,7 @@ async def parse_document(
     max_bytes: int,
     max_pages: int,
     timeout_s: float,
+    limits: ParseLimits | None = None,
 ) -> tuple[StructuredDocument, list[Any]]:
     """Parse bytes into a structured document and its chunks."""
     if len(payload) > max_bytes:
@@ -85,17 +365,27 @@ async def parse_document(
             supported=sorted(PARSER_BY_MIME),
         )
 
-    # Parsers are synchronous and CPU-bound; run off the event loop so one hostile
-    # file cannot stall every other request in the process.
-    try:
-        blocks: list[Block] = await asyncio.wait_for(
-            asyncio.to_thread(parser, payload, max_pages=max_pages),
-            timeout=timeout_s,
+    limits = limits or _limits_from_settings()
+
+    # Before the parser, not inside it. DOCX and PPTX are ZIP archives, and the
+    # byte-size check above says nothing about what they expand to: a 2.18 MB
+    # DOCX declaring 2.9 GB of members passes every limit upstream of here.
+    if mime in parsers.OOXML_MIMES:
+        parsers.inspect_ooxml_archive(
+            payload,
+            max_total_bytes=limits.archive_uncompressed_bytes,
+            max_ratio=limits.archive_ratio,
+            max_members=limits.archive_members,
         )
-    except TimeoutError as exc:
-        raise ParseTimeout(
-            f"Parsing exceeded {timeout_s:.0f}s and was abandoned.", timeout_s=timeout_s
-        ) from exc
+
+    call = functools.partial(
+        parser,
+        payload,
+        max_pages=max_pages,
+        max_blocks=limits.max_blocks,
+        max_chars=limits.max_chars,
+    )
+    blocks: list[Block] = await _run_parser(call, timeout_s=timeout_s, limits=limits)
 
     if not blocks:
         raise EmptyDocument(
@@ -139,6 +429,7 @@ class DocumentIntelligenceStage:
         max_bytes: int,
         max_pages: int,
         timeout_s: float,
+        limits: ParseLimits | None = None,
     ) -> None:
         self._payload = payload
         self._filename = filename
@@ -146,6 +437,7 @@ class DocumentIntelligenceStage:
         self._max_bytes = max_bytes
         self._max_pages = max_pages
         self._timeout_s = timeout_s
+        self._limits = limits
 
     async def run(self, ctx: StageContext, state: dict[str, Any]) -> dict[str, Any]:
         async with stage_span(ctx, self.name) as span:
@@ -157,6 +449,7 @@ class DocumentIntelligenceStage:
                 max_bytes=self._max_bytes,
                 max_pages=self._max_pages,
                 timeout_s=self._timeout_s,
+                limits=self._limits,
             )
             await span.progress(0.8, message=f"{len(document.blocks)} blocks, {len(chunks)} chunks")
             if document.stats.equations:

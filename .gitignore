@@ -48,3 +48,6 @@ Thumbs.db
 # Test-corpus PDFs. Kept on disk for manual runs against real documents;
 # 98MB of textbooks has no business in a source repo.
 Books/
+
+# Agent scratch: throwaway probe scripts, never source.
+.probe/

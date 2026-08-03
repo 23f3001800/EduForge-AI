@@ -33,7 +33,7 @@ __all__ = ["KEY", "LABEL", "METHOD", "WEIGHT", "score", "specificity"]
 
 KEY = "differentiation"
 LABEL = "Differentiation"
-WEIGHT = 0.08
+WEIGHT = 0.04
 METHOD = "hybrid"
 
 #: Under this, there is no room for an instruction — only for a sentiment.

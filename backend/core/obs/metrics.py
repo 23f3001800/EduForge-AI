@@ -41,9 +41,20 @@ __all__ = [
 #: put almost everything in +Inf and tell us nothing.
 _DURATION_BUCKETS = (0.5, 1, 2, 5, 10, 30, 60, 120, 300, 600)
 
+Key = tuple[str, tuple[tuple[str, str], ...]]
+
 _lock = threading.Lock()
-_counters: dict[tuple[str, tuple[tuple[str, str], ...]], float] = defaultdict(float)
-_histograms: dict[tuple[str, tuple[tuple[str, str], ...]], list[float]] = defaultdict(list)
+_counters: dict[Key, float] = defaultdict(float)
+#: Cumulative counts per bucket bound (plus "+Inf"), not raw observations.
+#: A process that lives for weeks records stage durations and request
+#: latencies continuously; keeping every observation ever made in a
+#: never-trimmed list is unbounded growth for the lifetime of the process.
+#: Bucket counters are the standard Prometheus representation for exactly
+#: this reason — O(len(_DURATION_BUCKETS)) per series forever, regardless of
+#: how many observations were made.
+_histogram_buckets: dict[Key, dict[str, int]] = defaultdict(lambda: defaultdict(int))
+_histogram_sum: dict[Key, float] = defaultdict(float)
+_histogram_count: dict[Key, int] = defaultdict(int)
 
 _HELP = {
     "eduforge_requests_total": ("counter", "HTTP requests by method, route and status."),
@@ -66,8 +77,18 @@ def _inc(name: str, labels: dict[str, str], value: float = 1.0) -> None:
 
 
 def _observe(name: str, labels: dict[str, str], value: float) -> None:
+    key = (name, _key(labels))
     with _lock:
-        _histograms[(name, _key(labels))].append(value)
+        buckets = _histogram_buckets[key]
+        # Prometheus buckets are cumulative: a bound counts every observation
+        # at or below it, so one observation increments every bound it clears,
+        # not just the tightest one.
+        for bound in _DURATION_BUCKETS:
+            if value <= bound:
+                buckets[str(bound)] += 1
+        buckets["+Inf"] += 1
+        _histogram_sum[key] += value
+        _histogram_count[key] += 1
 
 
 def record_request(method: str, route: str, status: int, seconds: float) -> None:
@@ -133,7 +154,9 @@ def render() -> str:
     """The registry in Prometheus text exposition format."""
     with _lock:
         counters = dict(_counters)
-        histograms = {k: list(v) for k, v in _histograms.items()}
+        buckets = {k: dict(v) for k, v in _histogram_buckets.items()}
+        sums = dict(_histogram_sum)
+        counts = dict(_histogram_count)
 
     lines: list[str] = []
     emitted: set[str] = set()
@@ -150,20 +173,23 @@ def render() -> str:
         header(name)
         lines.append(f"{name}{_format_labels(labels)} {value}")
 
-    for (name, labels), values in sorted(histograms.items()):
+    for key in sorted(buckets):
+        name, labels = key
         header(name)
-        ordered = sorted(values)
+        series = buckets[key]
         for bound in _DURATION_BUCKETS:
-            count = sum(1 for v in ordered if v <= bound)
+            count = series.get(str(bound), 0)
             lines.append(f"{name}_bucket{_format_labels((*labels, ('le', str(bound))))} {count}")
-        lines.append(f"{name}_bucket{_format_labels((*labels, ('le', '+Inf')))} {len(ordered)}")
-        lines.append(f"{name}_sum{_format_labels(labels)} {sum(ordered)}")
-        lines.append(f"{name}_count{_format_labels(labels)} {len(ordered)}")
+        lines.append(
+            f"{name}_bucket{_format_labels((*labels, ('le', '+Inf')))} {series.get('+Inf', 0)}"
+        )
+        lines.append(f"{name}_sum{_format_labels(labels)} {sums.get(key, 0.0)}")
+        lines.append(f"{name}_count{_format_labels(labels)} {counts.get(key, 0)}")
 
     return "\n".join(lines) + "\n"
 
 
-def counters() -> dict[tuple[str, tuple[tuple[str, str], ...]], float]:
+def counters() -> dict[Key, float]:
     """A snapshot of every counter.
 
     A copy, taken under the lock: handing out the live dict would let a caller
@@ -174,14 +200,25 @@ def counters() -> dict[tuple[str, tuple[tuple[str, str], ...]], float]:
         return dict(_counters)
 
 
-def histograms() -> dict[tuple[str, tuple[tuple[str, str], ...]], list[float]]:
-    """A snapshot of every recorded observation, same copying rule."""
+def histograms() -> dict[Key, dict[str, float]]:
+    """A snapshot of every series' exact count and sum, same copying rule.
+
+    Individual observations are not retained (see the bucket-counter comment
+    above), so this reports the two numbers that survive aggregation exactly —
+    enough to compute a mean, which is the only thing any caller has ever
+    needed from it. The per-bucket distribution is in ``render()``.
+    """
     with _lock:
-        return {key: list(values) for key, values in _histograms.items()}
+        return {
+            key: {"count": float(_histogram_count[key]), "sum": _histogram_sum[key]}
+            for key in _histogram_count
+        }
 
 
 def reset() -> None:
     """Clear the registry. For tests — one test's counts must not leak into another."""
     with _lock:
         _counters.clear()
-        _histograms.clear()
+        _histogram_buckets.clear()
+        _histogram_sum.clear()
+        _histogram_count.clear()

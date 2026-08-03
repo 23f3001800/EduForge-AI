@@ -21,7 +21,7 @@ from __future__ import annotations
 
 from collections import Counter
 
-from evals.context import EvalContext
+from evals.context import EvalContext, coerce_int
 from evals.lexicons import bloom_index
 from evals.types import DimensionScore, Finding, Metric
 
@@ -29,7 +29,7 @@ __all__ = ["KEY", "LABEL", "METHOD", "WEIGHT", "score"]
 
 KEY = "bloom"
 LABEL = "Bloom distribution"
-WEIGHT = 0.08
+WEIGHT = 0.05
 METHOD = "deterministic"
 
 #: A level holding less than this share of the marks is a token gesture, not
@@ -60,7 +60,7 @@ def score(ctx: EvalContext) -> DimensionScore:
 
     marks_by_level: Counter[str] = Counter()
     for item in items:
-        marks_by_level[str(item.get("bloom_level") or "")] += int(item.get("marks") or 0)
+        marks_by_level[str(item.get("bloom_level") or "")] += coerce_int(item.get("marks"))
     total_marks = sum(marks_by_level.values()) or 1
 
     findings: list[Finding] = []

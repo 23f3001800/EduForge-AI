@@ -11,34 +11,173 @@ without adding separation.
 DOCX and PPTX carry explicit styles, so their headings and tables are read
 directly and are reliable. PDF has no markup, so structure is inferred from
 typography — see ``structure.py`` for the heuristics and their limits.
+
+Every parser here runs on attacker-supplied bytes, so all four take the *same*
+explicit limits and none of them accepts ``**kwargs``. A parser that silently
+swallowed a limit it was handed is the bug that signature shape exists to make
+impossible.
 """
 
 from __future__ import annotations
 
 import io
+import zipfile
 from collections.abc import Iterator
 from typing import Any
 
 from contracts.document import Block, TableData
 from stages.s1_document_intelligence.equations import is_probable_equation, to_latex
-from stages.s1_document_intelligence.errors import ParseFailure, TooManyPages
+from stages.s1_document_intelligence.errors import (
+    DocumentTooLarge,
+    IngestionError,
+    ParseFailure,
+    TooManyPages,
+)
 from stages.s1_document_intelligence.structure import (
     TextSpan,
     body_font_size,
     infer_heading_level,
 )
 
-__all__ = ["parse_docx", "parse_pdf", "parse_pptx", "parse_text"]
+__all__ = [
+    "DEFAULT_MAX_ARCHIVE_BYTES",
+    "DEFAULT_MAX_ARCHIVE_MEMBERS",
+    "DEFAULT_MAX_ARCHIVE_RATIO",
+    "DEFAULT_MAX_BLOCKS",
+    "DEFAULT_MAX_TEXT_CHARS",
+    "OOXML_MIMES",
+    "inspect_ooxml_archive",
+    "parse_docx",
+    "parse_pdf",
+    "parse_pptx",
+    "parse_text",
+]
 
 _LIST_MARKERS = ("- ", "* ", "• ", "– ")
 
+#: The two OOXML container types this pipeline accepts. Both are ZIP archives,
+#: which is what makes the archive inspection below necessary.
+OOXML_MIMES = frozenset(
+    {
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    }
+)
+
+#: Extraction ceilings. Calibrated against the benchmark input named in FAQ.md —
+#: an NCERT Class 11 Physics chapter (44 pages) yields ~2.7k blocks and ~98k
+#: characters, so these sit two to three orders of magnitude above a legitimate
+#: chapter and only a document engineered to exhaust memory can reach them.
+DEFAULT_MAX_BLOCKS = 200_000
+DEFAULT_MAX_TEXT_CHARS = 20_000_000
+
+#: Archive-bomb thresholds. See :func:`inspect_ooxml_archive`.
+DEFAULT_MAX_ARCHIVE_BYTES = 200 * 1024 * 1024
+DEFAULT_MAX_ARCHIVE_RATIO = 200
+DEFAULT_MAX_ARCHIVE_MEMBERS = 2000
+
+#: A member smaller than this cannot exhaust anything however well it compressed,
+#: so the ratio rule ignores it. Without this floor a small run of repeated
+#: whitespace — which real Word documents contain — would trip the check.
+_RATIO_FLOOR_BYTES = 1024 * 1024
+
+
+# ─────────────────────────────────────────────────── archive bomb inspection ───
+
+
+def inspect_ooxml_archive(
+    payload: bytes,
+    *,
+    max_total_bytes: int = DEFAULT_MAX_ARCHIVE_BYTES,
+    max_ratio: int = DEFAULT_MAX_ARCHIVE_RATIO,
+    max_members: int = DEFAULT_MAX_ARCHIVE_MEMBERS,
+) -> None:
+    """Reject a decompression bomb before any parser opens the container.
+
+    DOCX and PPTX are ZIP archives. ``python-docx`` and ``python-pptx`` hand the
+    whole of ``document.xml`` to lxml as one string, so a 2 MB upload declaring a
+    3 GB member is a 3 GB allocation in a worker — the upload size limit never
+    sees it, because the upload really is 2 MB.
+
+    Only the central directory is read here: no member is decompressed, so the
+    check costs microseconds and cannot itself be turned into the attack. Reading
+    *declared* sizes is sound rather than merely cheap, because :mod:`zipfile`
+    truncates every read at the declared ``file_size`` (``ZipExtFile._read1``),
+    so a lying directory yields a short read and a CRC error, not a bomb.
+
+    Three independent rules, because a bomb only has to fail one:
+
+    * **total declared size** — the aggregate a parser could be asked to hold;
+    * **per-member ratio** — one hostile member hiding inside a normal archive;
+    * **member count** — thousands of small parts, each cheap, ruinous in bulk.
+
+    Raises :class:`DocumentTooLarge` (HTTP 413) on any of the three, and
+    :class:`ParseFailure` when the container is not a readable archive.
+    """
+    try:
+        with zipfile.ZipFile(io.BytesIO(payload)) as archive:
+            infos = archive.infolist()
+    except zipfile.BadZipFile as exc:
+        raise ParseFailure(f"Not a readable OOXML container: {exc}") from exc
+
+    members = [info for info in infos if not info.is_dir()]
+    if len(members) > max_members:
+        raise DocumentTooLarge(
+            f"Archive declares {len(members)} members; limit is {max_members}.",
+            reason="archive_member_count",
+            members=len(members),
+            limit_members=max_members,
+        )
+
+    total = 0
+    for info in members:
+        total += info.file_size
+        if total > max_total_bytes:
+            raise DocumentTooLarge(
+                f"Archive expands to at least {total} bytes; limit is {max_total_bytes}.",
+                reason="archive_uncompressed_size",
+                uncompressed_bytes=total,
+                limit_bytes=max_total_bytes,
+            )
+        if info.file_size < _RATIO_FLOOR_BYTES:
+            continue
+        # A stored member has a ratio of 1 and is already caught by the total;
+        # only a member that actually expands is interesting here.
+        ratio = (
+            float(info.file_size)
+            if info.compress_size <= 0
+            else info.file_size / info.compress_size
+        )
+        if ratio > max_ratio:
+            raise DocumentTooLarge(
+                f"Archive member {info.filename!r} expands {ratio:.0f}:1; "
+                f"limit is {max_ratio}:1.",
+                reason="archive_compression_ratio",
+                member=info.filename,
+                ratio=round(ratio, 1),
+                limit_ratio=max_ratio,
+                uncompressed_bytes=info.file_size,
+            )
+
 
 class _BlockBuilder:
-    """Assigns ids and character offsets so blocks stay addressable."""
+    """Assigns ids and character offsets so blocks stay addressable.
 
-    def __init__(self) -> None:
+    Also the single choke point for extraction volume. Every block of every
+    format is created here, so capping here caps all four parsers uniformly —
+    the alternative, a per-parser check, is four places to forget.
+    """
+
+    def __init__(
+        self,
+        *,
+        max_blocks: int = DEFAULT_MAX_BLOCKS,
+        max_chars: int = DEFAULT_MAX_TEXT_CHARS,
+    ) -> None:
         self.blocks: list[Block] = []
         self._cursor = 0
+        self._max_blocks = max_blocks
+        self._max_chars = max_chars
 
     def add(
         self,
@@ -53,6 +192,24 @@ class _BlockBuilder:
         text = text.strip()
         if not text and table is None:
             return
+
+        # Checked before the block is built, so the ceiling bounds what is held
+        # rather than what has already been held. Truncating silently would be
+        # worse than rejecting: a package built from half a document still looks
+        # complete, and nothing downstream can tell that it is not.
+        if len(self.blocks) >= self._max_blocks:
+            raise DocumentTooLarge(
+                f"Document yields more than {self._max_blocks} blocks.",
+                reason="block_ceiling",
+                limit_blocks=self._max_blocks,
+            )
+        if self._cursor + len(text) > self._max_chars:
+            raise DocumentTooLarge(
+                f"Document yields more than {self._max_chars} characters of text.",
+                reason="character_ceiling",
+                limit_chars=self._max_chars,
+            )
+
         start = self._cursor
         self._cursor += len(text) + 1
         self.blocks.append(
@@ -139,10 +296,16 @@ def _pdf_spans(
         )
 
 
-def parse_pdf(payload: bytes, *, max_pages: int) -> list[Block]:
+def parse_pdf(
+    payload: bytes,
+    *,
+    max_pages: int,
+    max_blocks: int = DEFAULT_MAX_BLOCKS,
+    max_chars: int = DEFAULT_MAX_TEXT_CHARS,
+) -> list[Block]:
     import pdfplumber
 
-    builder = _BlockBuilder()
+    builder = _BlockBuilder(max_blocks=max_blocks, max_chars=max_chars)
     try:
         with pdfplumber.open(io.BytesIO(payload)) as pdf:
             if len(pdf.pages) > max_pages:
@@ -171,7 +334,9 @@ def parse_pdf(payload: bytes, *, max_pages: int) -> list[Block]:
                     _classify_line(builder, span, body_size)
                 for raw in tables:
                     _add_table(builder, raw, page=index)
-    except TooManyPages:
+    except IngestionError:
+        # A limit was hit. It is already the right rejection carrying the right
+        # code and details; re-wrapping it as a parse failure would lose both.
         raise
     except Exception as exc:
         raise ParseFailure(f"Could not parse PDF: {exc}") from exc
@@ -199,12 +364,49 @@ def _add_table(builder: _BlockBuilder, raw: list[list[Any]], *, page: int | None
 # ──────────────────────────────────────────────────────────────────── DOCX ───
 
 
-def parse_docx(payload: bytes, **_: Any) -> list[Block]:
+def _docx_declared_pages(document: Any) -> int | None:
+    """Pages a DOCX *declares*, or ``None`` when it declares none.
+
+    A DOCX has no page count until it is laid out, so this reads the only two
+    things the file actually records: explicit page breaks the author inserted,
+    and the ``lastRenderedPageBreak`` markers Word writes on save. Returning
+    ``None`` when neither is present is deliberate — an estimate derived from
+    paragraph counts would reject real documents, and a limit that fires on a
+    guess is worse than no limit at all. Volume is still bounded, by the
+    builder's block and character ceilings.
+    """
+    try:
+        from docx.oxml.ns import qn  # type: ignore[import-untyped]
+
+        body = document.element.body
+        rendered = len(body.findall(f".//{qn('w:lastRenderedPageBreak')}"))
+        explicit = sum(1 for br in body.iter(qn("w:br")) if br.get(qn("w:type")) == "page")
+    except Exception:
+        return None
+    breaks = max(rendered, explicit)
+    return breaks + 1 if breaks else None
+
+
+def parse_docx(
+    payload: bytes,
+    *,
+    max_pages: int = 300,
+    max_blocks: int = DEFAULT_MAX_BLOCKS,
+    max_chars: int = DEFAULT_MAX_TEXT_CHARS,
+) -> list[Block]:
     from docx import Document  # type: ignore[import-untyped]
 
-    builder = _BlockBuilder()
+    builder = _BlockBuilder(max_blocks=max_blocks, max_chars=max_chars)
     try:
         document = Document(io.BytesIO(payload))
+
+        declared_pages = _docx_declared_pages(document)
+        if declared_pages is not None and declared_pages > max_pages:
+            raise TooManyPages(
+                f"Document declares {declared_pages} pages; limit is {max_pages}.",
+                page_count=declared_pages,
+                limit=max_pages,
+            )
 
         for paragraph in document.paragraphs:
             text = paragraph.text.strip()
@@ -227,6 +429,8 @@ def parse_docx(payload: bytes, **_: Any) -> list[Block]:
         for table in document.tables:
             rows = [[cell.text.strip() for cell in row.cells] for row in table.rows]
             _add_table(builder, rows, page=None)
+    except IngestionError:
+        raise
     except Exception as exc:
         raise ParseFailure(f"Could not parse DOCX: {exc}") from exc
 
@@ -236,10 +440,16 @@ def parse_docx(payload: bytes, **_: Any) -> list[Block]:
 # ──────────────────────────────────────────────────────────────────── PPTX ───
 
 
-def parse_pptx(payload: bytes, *, max_pages: int = 300, **_: Any) -> list[Block]:
+def parse_pptx(
+    payload: bytes,
+    *,
+    max_pages: int = 300,
+    max_blocks: int = DEFAULT_MAX_BLOCKS,
+    max_chars: int = DEFAULT_MAX_TEXT_CHARS,
+) -> list[Block]:
     from pptx import Presentation  # type: ignore[import-untyped]
 
-    builder = _BlockBuilder()
+    builder = _BlockBuilder(max_blocks=max_blocks, max_chars=max_chars)
     try:
         presentation = Presentation(io.BytesIO(payload))
         slides = list(presentation.slides)
@@ -280,7 +490,7 @@ def parse_pptx(payload: bytes, *, max_pages: int = 300, **_: Any) -> list[Block]
                 notes = slide.notes_slide.notes_text_frame.text.strip()
                 if notes:
                     builder.add("paragraph", notes, page=index)
-    except TooManyPages:
+    except IngestionError:
         raise
     except Exception as exc:
         raise ParseFailure(f"Could not parse PPTX: {exc}") from exc
@@ -291,11 +501,21 @@ def parse_pptx(payload: bytes, *, max_pages: int = 300, **_: Any) -> list[Block]
 # ─────────────────────────────────────────────────────────────── plain text ───
 
 
-def parse_text(payload: bytes, **_: Any) -> list[Block]:
+def parse_text(
+    payload: bytes,
+    *,
+    max_pages: int = 300,
+    max_blocks: int = DEFAULT_MAX_BLOCKS,
+    max_chars: int = DEFAULT_MAX_TEXT_CHARS,
+) -> list[Block]:
     """Plain text and Markdown.
 
     Markdown ``#`` prefixes are honoured as explicit heading levels; otherwise the
     same shape heuristics apply, with no font size to work from.
+
+    ``max_pages`` is accepted and unused on purpose: plain text has no pages, and
+    a uniform signature across the four parsers is what stops a limit being
+    dropped on the floor by a ``**kwargs``. Volume is bounded by the builder.
     """
     try:
         content = payload.decode("utf-8")
@@ -305,7 +525,7 @@ def parse_text(payload: bytes, **_: Any) -> list[Block]:
         except Exception as exc:
             raise ParseFailure("Could not decode text document.") from exc
 
-    builder = _BlockBuilder()
+    builder = _BlockBuilder(max_blocks=max_blocks, max_chars=max_chars)
     for raw_line in content.splitlines():
         line = raw_line.rstrip()
         if not line.strip():

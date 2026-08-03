@@ -12,8 +12,9 @@ the graded package.
 
 from __future__ import annotations
 
-from typing import ClassVar
+from typing import Any, ClassVar
 
+from contracts.llm import ModelSpec
 from core.llm.providers.openai_compat import OpenAICompatibleAdapter
 
 __all__ = ["DEFAULT_BASE_URL", "GroqAdapter"]
@@ -35,3 +36,23 @@ class GroqAdapter(OpenAICompatibleAdapter):
         "moonshotai/kimi-k2-instruct": (1.00, 3.00),
         "qwen/qwen3-32b": (0.29, 0.59),
     }
+
+    #: Model families that accept `reasoning_effort`. Groq rejects the field with
+    #: a 400 on models that do not reason, so this is an allow-list rather than a
+    #: hope — an advisory knob must never be able to fail a call.
+    reasoning_models: ClassVar[tuple[str, ...]] = ("openai/gpt-oss", "qwen/qwen3")
+
+    def _depth_controls(self, spec: ModelSpec) -> dict[str, Any]:
+        """Groq's `reasoning_effort`, for the models that have one.
+
+        The stage-level effort in `config/models.yaml` reached nothing before
+        this: every profile configured it and the request never carried it. On
+        this profile it is not cosmetic — effort drives how many tokens the model
+        spends thinking, and thinking tokens are billed against the same 8000 TPM
+        ceiling as everything else, so `effort: low` on the validation stage is
+        part of how the profile fits at all.
+        """
+        effort = self._effort(spec)
+        if effort is None or not spec.model.startswith(self.reasoning_models):
+            return {}
+        return {"reasoning_effort": effort}

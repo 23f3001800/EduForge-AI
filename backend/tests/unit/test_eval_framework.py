@@ -287,6 +287,162 @@ def test_every_recommendation_says_what_it_buys() -> None:
     assert severities == sorted(severities, key=["high", "medium", "low", "info"].index)
 
 
+# ───────────────────────── defects found by reviewing the evaluator itself
+#
+# Every one of these was a bug in the measuring instrument rather than in the
+# thing measured, which is the class of bug no other test in this repo can see:
+# the evaluator reported a confident number and the number was wrong.
+
+
+def test_an_empty_concept_list_is_not_charged_to_the_stage_that_had_nothing_to_plan() -> None:
+    """``_pct(0, max(0, 1))`` returned 0.0 rather than "nothing to measure".
+
+    A run where stage 3 extracted no concepts scored stage 4 at zero on
+    ``concept_scheduling`` — weight 2.0, the heaviest metric in that stage —
+    for failing to schedule concepts that did not exist. The stage that broke was
+    stage 3, and the stage that got the mark against it was stage 4.
+    """
+    package = _package()
+    package["knowledge"]["concepts"] = []
+
+    metric = _metric(package, "teaching-planner", "concept_scheduling")
+    assert metric.measurability is Measurability.NOT_MEASURABLE
+    assert metric.score is None
+    assert "stage 3" in metric.reasoning
+
+
+def test_a_malformed_package_is_scored_rather_than_crashing_the_evaluator() -> None:
+    """This module's stated promise is that it can score a published package off
+    disk *including one that no longer satisfies the contract* — that being the
+    package a reviewer most wants a number for. Seven bare ``int()`` calls broke
+    that promise: one string page count and the whole evaluation raised."""
+    package = _package()
+    package["source"]["page_count"] = "twelve"
+    package["teaching_plan"]["period_duration_minutes"] = 40
+    package["teaching_plan"]["periods"][0]["time_allocation"][0]["minutes"] = None
+    package["teaching_plan"]["periods"][0]["period_no"] = "one"
+    package["assessments"]["items"][0]["marks"] = "three"
+    package["assessments"]["total_marks"] = "lots"
+    package["assessments"]["blueprint"]["items_by_kind"] = {"mcq": "1"}
+    package["activities"][0]["duration_minutes"] = "a while"
+    package["validation"]["coverage"]["concepts_total"] = "two"
+    package["provenance"]["total_tokens_in"] = "many"
+
+    evaluations = evaluate_stages(_ctx(package))
+    assert evaluations, "the evaluator gave up on a package it promises to score"
+    assert any(e.score is not None for e in evaluations)
+
+
+def test_stage_one_is_not_asked_to_name_a_model_it_never_called() -> None:
+    """``model_attribution`` counted document-intelligence as generative.
+
+    Stage 1 is constructed with no LLM client (``pipeline.build_stages``) and is
+    deliberately omitted from ``models_by_stage``
+    (``s10_publishing.assemble._generator_fields``), so a flawless live run was
+    capped at 87.5% on this metric — a permanent deduction for a stage doing
+    exactly what it is supposed to do. Validation, which *does* call the judge,
+    was excluded instead.
+    """
+    package = _package()
+    package["generator"]["models_by_stage"] = {
+        stage: "some-model"
+        for stage in package["generator"]["models_by_stage"]
+        if stage != "document-intelligence"
+    }
+    package["generator"]["models_by_stage"].pop("document-intelligence", None)
+    for stage in (
+        "educational-classification",
+        "knowledge-extraction",
+        "teaching-planner",
+        "lesson-generation",
+        "activity-generation",
+        "assessment-generation",
+        "gap-analysis",
+        "validation",
+    ):
+        package["generator"]["models_by_stage"][stage] = "some-model"
+
+    metric = _metric(package, "publishing", "model_attribution")
+    assert metric.score == 100.0, metric.reasoning
+    assert "document-intelligence" in metric.reasoning
+
+
+def test_a_stage_with_a_thin_history_of_its_own_is_not_called_a_regression() -> None:
+    """The overall baseline being long enough does not make every stage's own
+    baseline long enough.
+
+    ``compare`` checked ``benchmark["sufficient"]`` once, at the top, and then
+    compared every stage against its median regardless of how many observations
+    that median came from. A stage added last week had one prior run, and a fall
+    against it was reported as a regression "over 5 comparable runs" — a
+    confidence nobody had.
+    """
+    store = EvaluationStore()
+    for i in range(MIN_BASELINE_RUNS):
+        store.record(
+            EvaluationRecord(
+                run_id=f"base-{i}",
+                package_id="p",
+                subject="Physics",
+                grade_band="9-10",
+                profile="quantitative",
+                overall=95.0,
+                confidence=0.9,
+                # `publishing` is present in every run; `outcomes` appears once.
+                stage_scores={"publishing": 95.0, **({"outcomes": 95.0} if i == 0 else {})},
+            )
+        )
+
+    regressed = EvaluationRecord(
+        run_id="new",
+        package_id="p",
+        subject="Physics",
+        grade_band="9-10",
+        profile="quantitative",
+        overall=80.0,
+        confidence=0.9,
+        stage_scores={"publishing": 60.0, "outcomes": 40.0},
+    )
+    verdict = compare(regressed, store.benchmark(profile="quantitative"))
+
+    assert [r["stage"] for r in verdict["regressions"]] == ["publishing"], (
+        "a stage with one prior observation was called a regression"
+    )
+    assert [s["stage"] for s in verdict["skipped"]] == ["outcomes"]
+    assert verdict["skipped"][0]["baseline_n"] == 1
+    assert "outcomes" in verdict["detail"], "a skipped stage must be reported, not swallowed"
+
+
+def test_a_compared_stage_reports_how_much_history_it_had() -> None:
+    """A delta is only readable next to the number of observations behind it."""
+    store = EvaluationStore()
+    for i in range(MIN_BASELINE_RUNS):
+        store.record(
+            EvaluationRecord(
+                run_id=f"base-{i}",
+                package_id="p",
+                subject="Physics",
+                grade_band="9-10",
+                profile="quantitative",
+                overall=95.0,
+                confidence=0.9,
+                stage_scores={"validation": 95.0},
+            )
+        )
+    record = EvaluationRecord(
+        run_id="new",
+        package_id="p",
+        subject="Physics",
+        grade_band="9-10",
+        profile="quantitative",
+        overall=60.0,
+        confidence=0.9,
+        stage_scores={"validation": 60.0},
+    )
+    verdict = compare(record, store.benchmark(profile="quantitative"))
+    assert verdict["regressions"][0]["baseline_n"] == MIN_BASELINE_RUNS
+
+
 def test_no_stage_key_names_a_subject() -> None:
     """The same rule the pipeline lives under (NFR-01): nothing branches on a
     subject name. An evaluator that rewarded STEM shape would push the generator

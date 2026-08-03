@@ -34,10 +34,22 @@ from pydantic import BaseModel, ValidationError
 
 from contracts.llm import LLMResult, LLMUsage, ModelSpec, ProviderRouting
 from contracts.primitives import StageName
-from core.llm.base import ContentRefused, LLMProviderError, ProviderAdapter
+from core.llm.base import (
+    TPM_SAFETY_MARGIN,
+    ContentRefused,
+    LLMProviderError,
+    ProviderAdapter,
+    estimate_tokens,
+)
 from core.obs import metrics
 
-__all__ = ["BudgetExhausted", "CallRecord", "LLMClient", "TokenBudget"]
+__all__ = [
+    "BudgetExhausted",
+    "CallRecord",
+    "LLMClient",
+    "PlaceholderUnavailable",
+    "TokenBudget",
+]
 
 MAX_ATTEMPTS = 4
 #: Cap for *guessed* exponential backoff.
@@ -53,6 +65,13 @@ _FENCE = re.compile(r"^\s*```(?:json)?\s*|\s*```\s*$", re.MULTILINE)
 
 class BudgetExhausted(RuntimeError):
     """The job's token ceiling was reached. Publish partial rather than continue."""
+
+
+class PlaceholderUnavailable(TypeError):
+    """No honest placeholder exists for a required field of a degraded model.
+
+    Raised rather than guessed. See :func:`_placeholders`.
+    """
 
 
 @dataclass(slots=True)
@@ -145,12 +164,50 @@ def _validate_tolerantly[T: BaseModel](payload: str, model: type[T]) -> T:
         return model.model_validate({k: v for k, v in data.items() if k not in extra_keys})
 
 
+#: Literal members that mean "we do not know", in preference order. A degraded
+#: object may only be filled with a member that *says* it carries no information.
+_NEUTRAL_LITERALS = ("unknown", "unspecified", "mixed", "other", "none", "n/a", "na")
+
+
+def _neutral_literal(name: str, args: tuple[Any, ...]) -> Any:
+    """The member of a Literal that honestly means "no answer", or raise.
+
+    The alternative — taking ``args[0]`` — is the bug this exists to prevent.
+    Literal member order is a declaration accident, but every member is a
+    *semantic* value that something downstream routes on. ``PedagogyProfile``
+    happens to start with ``quantitative``, so a failed classification call used
+    to route a poetry chapter through the quantitative strategy for the remaining
+    eight stages, while the stage's own warning claimed it had defaulted to
+    ``mixed``. Nothing in the package distinguished that from a real judgement.
+
+    So: take a member that means "unknown" if the vocabulary offers one, and
+    otherwise refuse. A caller that needs a degraded instance of such a model
+    knows what its neutral value is and can pass ``degraded_value`` to
+    :meth:`LLMClient.parse`; this generic helper does not and must not guess.
+    """
+    lowered = {str(arg).strip().casefold(): arg for arg in args}
+    for candidate in _NEUTRAL_LITERALS:
+        if candidate in lowered:
+            return lowered[candidate]
+    raise PlaceholderUnavailable(
+        f"cannot build a degraded placeholder for {name!r}: none of its allowed "
+        f"values {list(args)} means 'unknown', and picking one would invent a "
+        f"semantic judgement the model never made. Pass an explicit "
+        f"`degraded_value` to LLMClient.parse() for this output model."
+    )
+
+
 def _placeholders(model: type[BaseModel]) -> dict[str, Any]:
     """Typed empty values for every field, for a degraded instance.
 
     Constraints are deliberately ignored — validation has already failed, and the
     point is an object downstream code can read without exploding, clearly marked
     degraded, rather than one that satisfies constraints it never earned.
+
+    *Semantics* are not ignored, which is the distinction that matters: an empty
+    string, an empty list, and a zero all announce that nothing was extracted,
+    whereas an arbitrary Literal member announces a decision. See
+    :func:`_neutral_literal`.
     """
     from typing import get_args, get_origin
 
@@ -172,8 +229,7 @@ def _placeholders(model: type[BaseModel]) -> dict[str, Any]:
         elif annotation in (int, float):
             values[name] = 0
         elif get_origin(annotation) is Literal:
-            args = get_args(annotation)
-            values[name] = args[0] if args else ""
+            values[name] = _neutral_literal(f"{model.__name__}.{name}", get_args(annotation))
         elif isinstance(annotation, type) and issubclass(annotation, BaseModel):
             values[name] = annotation.model_construct(**_placeholders(annotation))
         else:
@@ -224,6 +280,34 @@ class LLMClient:
             total.cost_usd += call.usage.cost_usd
         return total
 
+    def prompt_budget(
+        self,
+        stage: StageName | None = None,
+        *,
+        spec: ModelSpec | None = None,
+        overhead_tokens: int = 0,
+    ) -> int | None:
+        """How many prompt tokens this route can actually spend, or ``None``.
+
+        Providers with a tokens-per-minute cap count ``max_tokens`` as *reserved*
+        budget rather than as measured usage, so the real constraint is
+        ``prompt + max_tokens <= tpm_ceiling``. A stage that wants to *fit* rather
+        than to be clamped after the fact has to know that number before it builds
+        a prompt, and it is the only party that knows its own fixed overhead — the
+        system prompt, the JSON schema, the evidence rules — so that comes in as
+        ``overhead_tokens`` and what comes back is the room left for document text.
+
+        ``None`` means the route declares no ceiling worth planning around; the
+        caller keeps whatever default it had. That is deliberately distinct from
+        ``0``, which means "this route has a ceiling and the overhead has already
+        consumed it" — a real, reportable configuration problem.
+        """
+        resolved = spec or (self.routing.for_stage(stage) if stage else self.routing.default)
+        if resolved.tpm_ceiling is None:
+            return None
+        room = resolved.tpm_ceiling - resolved.max_tokens - TPM_SAFETY_MARGIN - overhead_tokens
+        return max(room, 0)
+
     async def parse[T: BaseModel](
         self,
         *,
@@ -232,7 +316,18 @@ class LLMClient:
         system: str,
         user_content: str,
         spec: ModelSpec | None = None,
+        degraded_value: T | None = None,
     ) -> LLMResult[T]:
+        """Call the model and return a validated instance of ``output_model``.
+
+        ``degraded_value`` is the caller's own fallback for the case where the
+        schema could not be satisfied. Supply it whenever the output model has a
+        required field whose value carries meaning that cannot be expressed as
+        "empty" — a Literal routing key, most obviously. The generic placeholder
+        builder refuses to invent those (see :func:`_neutral_literal`), so without
+        one such a model raises instead of degrading, which is the correct
+        outcome: the choice belongs to the stage that understands the vocabulary.
+        """
         resolved = spec or self.routing.for_stage(stage)
         adapter = self.adapters.get(resolved.provider)
         if adapter is None:
@@ -244,7 +339,7 @@ class LLMClient:
         if self.budget is not None:
             # Rough projection from prompt size plus the output ceiling. Only has
             # to be conservative enough to stop a runaway before it runs away.
-            self.budget.check(len(system + user_content) // 4 + resolved.max_tokens)
+            self.budget.check(estimate_tokens(system, user_content) + resolved.max_tokens)
 
         assert self._semaphore is not None
         async with self._semaphore:
@@ -255,6 +350,7 @@ class LLMClient:
                 output_model=output_model,
                 system=system,
                 user_content=user_content,
+                degraded_value=degraded_value,
             )
 
     async def _attempt_loop[T: BaseModel](
@@ -266,6 +362,7 @@ class LLMClient:
         output_model: type[T],
         system: str,
         user_content: str,
+        degraded_value: T | None = None,
     ) -> LLMResult[T]:
         content = user_content
         repaired = False
@@ -291,12 +388,14 @@ class LLMClient:
                 # Not retryable: the same prompt refuses again. Degrade so the
                 # remaining nine stages still produce a package.
                 return self._degraded(
-                    output_model,
-                    adapter.name,
-                    spec.model,
-                    total,
-                    attempt,
-                    [f"provider refused: {exc}"],
+                    stage=stage,
+                    output_model=output_model,
+                    provider=adapter.name,
+                    model=spec.model,
+                    usage=total,
+                    attempts=attempt,
+                    issues=[f"provider refused: {exc}"],
+                    degraded_value=degraded_value,
                 )
             except LLMProviderError as exc:
                 last_error = str(exc)
@@ -343,12 +442,14 @@ class LLMClient:
                     # One repair is the budget. A model that fails the schema twice
                     # is not going to succeed on a third identical nudge.
                     return self._degraded(
-                        output_model,
-                        adapter.name,
-                        raw.model,
-                        total,
-                        attempt,
-                        [f"schema validation failed: {last_error[:300]}"],
+                        stage=stage,
+                        output_model=output_model,
+                        provider=adapter.name,
+                        model=raw.model,
+                        usage=total,
+                        attempts=attempt,
+                        issues=[f"schema validation failed: {last_error[:300]}"],
+                        degraded_value=degraded_value,
                     )
                 repaired = True
                 content = self._repair_prompt(user_content, raw.text, last_error)
@@ -387,30 +488,62 @@ class LLMClient:
             "No prose, no explanation, no code fences."
         )
 
-    @staticmethod
     def _degraded[T: BaseModel](
+        self,
+        *,
+        stage: StageName,
         output_model: type[T],
         provider: str,
         model: str,
         usage: LLMUsage,
         attempts: int,
         issues: list[str],
+        degraded_value: T | None = None,
     ) -> LLMResult[T]:
         """Minimal valid instance so the pipeline continues, flagged as degraded.
 
         The flag propagates into the validation report, so a shortfall is visible
         in the finished package rather than silently shipped as if it were fine.
+
+        That propagation is why this records a ``CallRecord`` of its own. The
+        per-stage provenance in the published package derives ``degraded`` from
+        ``any(call.outcome == "degraded")``, and every path that reached here used
+        to record only the *attempt* that failed — ``refused`` or ``error`` — and
+        then return without recording the fallback. ``"degraded"`` was therefore
+        never a recorded outcome anywhere in the system, so that flag was hardcoded
+        false in every package ever published: a stage could fall back to a
+        placeholder and the provenance would still say the run was clean. The
+        record carries no usage, because the fallback cost nothing; it exists to
+        state that a placeholder, not a model, produced this stage's output.
         """
-        try:
-            value = output_model.model_validate({})
-        except ValidationError:
-            # model_construct() with no values yields an object that looks valid
-            # and then raises AttributeError on the first field access — which
-            # would turn "degrade gracefully" into a crash two lines later, in a
-            # different module, with a misleading traceback. Supply a typed
-            # placeholder for every required field so the object is genuinely
-            # usable and the `degraded` flag is what callers react to.
-            value = output_model.model_construct(**_placeholders(output_model))
+        if degraded_value is not None:
+            # The caller's own fallback. Preferred whenever it exists: it is the
+            # only party that knows what "no answer" means for its vocabulary.
+            value = degraded_value
+        else:
+            try:
+                value = output_model.model_validate({})
+            except ValidationError:
+                # model_construct() with no values yields an object that looks
+                # valid and then raises AttributeError on the first field access —
+                # which would turn "degrade gracefully" into a crash two lines
+                # later, in a different module, with a misleading traceback.
+                # Supply a typed placeholder for every required field so the
+                # object is genuinely usable and `degraded` is what callers react
+                # to. May raise PlaceholderUnavailable; see _neutral_literal.
+                value = output_model.model_construct(**_placeholders(output_model))
+
+        self._record(
+            CallRecord(
+                stage,
+                provider,
+                model,
+                attempts,
+                "degraded",
+                LLMUsage(),
+                "; ".join(issues)[:300] or None,
+            )
+        )
         return LLMResult[T](
             value=value,
             provider=provider,  # type: ignore[arg-type]

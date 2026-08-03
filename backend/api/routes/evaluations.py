@@ -19,6 +19,8 @@ the series, which is the part a cache could not reconstruct.
 
 from __future__ import annotations
 
+import asyncio
+import threading
 from typing import Any
 from uuid import UUID
 
@@ -37,14 +39,36 @@ router = APIRouter(tags=["evaluations"])
 #: makes it durable without a code change.
 _history: EvaluationStore | None = None
 
+#: Guards the lazy construction of `_history` above. Two concurrent cold
+#: requests can both read `_history is None` as true before either acquires
+#: this, race to construct their own `EvaluationStore`, and the second
+#: assignment silently replaces the first — along with any run the first
+#: store had already recorded between the two constructions. Reproduced 5/5
+#: under concurrent cold requests before this lock existed.
+_init_lock = threading.Lock()
+
+#: Guards the single `sqlite3.Connection` `EvaluationStore` wraps
+#: (`check_same_thread=False`). That flag only disables sqlite3's own
+#: same-thread assertion; it does not make the connection safe for concurrent
+#: use from multiple threads at once. `evaluate_package`/`to_pdf` below run on
+#: a worker thread (`asyncio.to_thread`) precisely because they are CPU-bound
+#: enough to block the event loop — which means they can now run at the same
+#: instant as a plain `async def` route reading `history` synchronously on the
+#: loop thread. Serializing every call that touches `history` behind this lock
+#: is what keeps that safe; without it two threads can interleave writes to
+#: the same sqlite connection and corrupt it.
+_db_lock = threading.Lock()
+
 
 def get_history() -> EvaluationStore:
     global _history
     if _history is None:
-        from core.config import get_settings
+        with _init_lock:
+            if _history is None:  # re-check inside the lock, see comment above
+                from core.config import get_settings
 
-        path = getattr(get_settings(), "eval_history_path", None)
-        _history = EvaluationStore(path)
+                path = getattr(get_settings(), "eval_history_path", None)
+                _history = EvaluationStore(path)
     return _history
 
 
@@ -78,6 +102,26 @@ async def _chunks_for(record: PackageRecord, store: Store) -> list[dict[str, Any
     return [c for c in chunks if isinstance(c, dict)] if isinstance(chunks, list) else []
 
 
+def _evaluate_locked(
+    tkp: dict[str, Any],
+    chunks: list[dict[str, Any]],
+    run_id: str,
+    history: EvaluationStore,
+    persist: bool,
+) -> dict[str, Any]:
+    """``evaluate_package`` under the connection lock, for the worker thread.
+
+    Scoring itself needs no lock — it touches no shared state — but
+    ``persist=True`` calls ``history.record()``, which does, and the lock has
+    to span the whole call rather than wrap ``history`` internally: this
+    module does not own ``evals/store.py`` and must not change it, so
+    serialization is enforced here, at every call site that reaches the
+    connection.
+    """
+    with _db_lock:
+        return evaluate_package(tkp, chunks=chunks, run_id=run_id, store=history, persist=persist)
+
+
 @router.get("/packages/{package_id}/evaluation")
 async def evaluate_one(
     package_id: UUID,
@@ -88,12 +132,11 @@ async def evaluate_one(
     """Score one package: per-stage metrics, rubric, recommendations, benchmark."""
     record = await _load(package_id, store)
     chunks = await _chunks_for(record, store)
-    return evaluate_package(
-        record.tkp,
-        chunks=chunks,
-        run_id=str(package_id),
-        store=history,
-        persist=persist,
+    # Off the event loop: scoring walks every stage of the package, and stage 10
+    # proved fpdf2-scale work inline here would stall every other job's SSE
+    # stream and every other request in the process for the duration.
+    return await asyncio.to_thread(
+        _evaluate_locked, record.tkp, chunks, str(package_id), history, persist
     )
 
 
@@ -105,10 +148,12 @@ async def list_evaluations(
     history: EvaluationStore = Depends(get_history),
 ) -> dict[str, Any]:
     """The stored series, most recent first."""
-    records = history.history(profile=profile, subject=subject, limit=limit)
+    with _db_lock:
+        records = history.history(profile=profile, subject=subject, limit=limit)
+        total = history.count()
     return {
         "durable": history.path is not None,
-        "total": history.count(),
+        "total": total,
         "evaluations": [r.as_dict() for r in records],
     }
 
@@ -124,7 +169,8 @@ async def get_benchmark(
     percentiles are still returned — they are the honest summary of what little
     is on record — but nothing should be called a regression against them.
     """
-    return history.benchmark(profile=profile)
+    with _db_lock:
+        return history.benchmark(profile=profile)
 
 
 @router.get("/evaluations/{run_id}")
@@ -132,7 +178,8 @@ async def get_evaluation(
     run_id: str,
     history: EvaluationStore = Depends(get_history),
 ) -> dict[str, Any]:
-    record = history.get(run_id)
+    with _db_lock:
+        record = history.get(run_id)
     if record is None:
         raise HTTPException(404, detail={"code": "evaluation_not_found"})
     return record.as_dict()
@@ -153,11 +200,16 @@ async def export_evaluation_pdf(
 
     record = await _load(package_id, store)
     chunks = await _chunks_for(record, store)
-    document = evaluate_package(
-        record.tkp, chunks=chunks, run_id=str(package_id), store=history, persist=False
+    # persist=False, so this call never touches the sqlite connection — but it
+    # still runs on a worker thread, both for consistency with `evaluate_one`
+    # and because `to_pdf` right below it is the actually expensive half: it
+    # drives the same fpdf2 renderer stage 10 offloads for the same reason.
+    document = await asyncio.to_thread(
+        _evaluate_locked, record.tkp, chunks, str(package_id), history, False
     )
+    pdf_bytes = await asyncio.to_thread(to_pdf, document)
     return Response(
-        content=to_pdf(document),
+        content=pdf_bytes,
         media_type="application/pdf",
         headers={
             "Content-Disposition": f'attachment; filename="evaluation-{package_id}.pdf"',

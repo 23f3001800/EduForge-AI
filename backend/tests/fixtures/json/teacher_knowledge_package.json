@@ -600,7 +600,8 @@
           "rationale": "Isolates friction as the cause of stopping, not the absence of force."
         }
       ],
-      "severity": "high"
+      "severity": "high",
+      "why_it_happens": null
     }
   ],
   "provenance": {
@@ -726,6 +727,7 @@
     "detected_language": "en",
     "filename": "newtons-laws.pdf",
     "mime": "application/pdf",
+    "ocr": null,
     "page_count": 12,
     "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
     "size_bytes": 184320,

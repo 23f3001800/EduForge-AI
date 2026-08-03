@@ -86,6 +86,17 @@ async def _stream(store: Store, job_id: UUID, cursor: int, request: Request) -> 
         # connection per such client, indefinitely.
         job = await store.get_job(job_id)
         if job is not None and job.status in TERMINAL_JOB_STATUSES:
+            # Defensive re-check: the job's terminal event and its terminal
+            # status are two separate writes (worker.runner, jobs._fail_job),
+            # not one atomic one. Even with that write order fixed — event
+            # persisted before status flips — a reader can still land exactly
+            # in the gap: `events_since` above ran, saw nothing new, and only
+            # then did the writer finish appending the event and flip the
+            # status this `get_job` just observed. One more read catches that
+            # window before giving up and closing the stream; without it the
+            # terminal frame the client is waiting on silently never arrives.
+            if await store.events_since(job_id, cursor):
+                continue
             return
 
         # Nothing new: block until there is, then loop. On timeout emit a comment

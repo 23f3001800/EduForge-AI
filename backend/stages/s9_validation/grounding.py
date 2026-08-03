@@ -43,6 +43,20 @@ work for this" from "the judge confirmed something close to the text" — and no
 longer decides anything on its own. The only deterministic failure left is a
 citation whose chunk id does not resolve, which is dispositive: there is no
 source to be entailed by.
+
+The one thing the surviving auto-pass could not see is polarity. Overlap is a bag
+of tokens, so it is blind to word order and therefore to negation: a claim built
+by inserting "not" into its own source, or by swapping "attract" for "repel",
+keeps almost every token it started with and scores *above* ``TAU_HIGH``. A claim
+asserting the exact opposite of its chunk measured 0.70 and was marked
+``supported`` without a model ever reading it — the worst failure this rule can
+have, because it is the hallucination-detector reporting no hallucination.
+
+:func:`contradiction_risk` closes that. It runs only where the auto-pass would
+otherwise fire, so the common path — every claim already destined for the judge —
+pays nothing, and it routes to the judge rather than deciding anything itself: a
+lexical polarity signal is evidence that a model should look, never evidence of
+what the answer is.
 """
 
 from __future__ import annotations
@@ -65,6 +79,7 @@ __all__ = [
     "Verdicted",
     "check_grounding",
     "collect_claims",
+    "contradiction_risk",
     "judge_claims",
     "lexical_overlap",
     "normalise",
@@ -118,6 +133,146 @@ def lexical_overlap(claim: str, span: str) -> float:
     span_tokens = set(normalise(span).split())
     hits = sum(1 for token in claim_tokens if token in span_tokens)
     return hits / len(claim_tokens)
+
+
+# ─────────────────────────────────────────────────────── the contradiction gate
+
+#: Punctuation-stripped for the gate only. ``lexical_overlap`` deliberately splits
+#: on whitespace, but "not." and "not" must not be different negators.
+_GATE_TOKEN = re.compile(r"[a-z0-9]+(?:'[a-z0-9]+)?")
+
+#: Closed-class negators. Kept closed on purpose: an open list of "negative-ish"
+#: words (fails, lacks, absent) would fire on ordinary prose and push the judge
+#: bill up for no signal.
+_NEGATIONS = frozenset(
+    {
+        "no", "not", "never", "none", "nor", "neither", "nothing", "nobody", "cannot",
+        "without", "cant", "can't", "dont", "don't", "doesnt", "doesn't", "didnt",
+        "didn't", "isnt", "isn't", "arent", "aren't", "wasnt", "wasn't", "werent",
+        "weren't", "wont", "won't", "wouldnt", "wouldn't", "shouldnt", "shouldn't",
+        "couldnt", "couldn't", "hasnt", "hasn't", "havent", "haven't", "hadnt",
+        "hadn't", "unlike", "unable",
+    }
+)  # fmt: skip
+
+#: Antonym pairs, as (side, other side) token sets so morphological variants share
+#: one entry. Every pair is general-purpose English polarity — nothing here names a
+#: subject, which is the same constraint the rest of the pipeline works under
+#: (NFR-01): the gate must behave identically on a physics chapter and a history one.
+_ANTONYMS: tuple[tuple[frozenset[str], frozenset[str]], ...] = tuple(
+    (frozenset(left.split()), frozenset(right.split()))
+    for left, right in (
+        (
+            "increase increases increased increasing rise rises rising rose grow grows",
+            "decrease decreases decreased decreasing fall falls falling fell shrink shrinks",
+        ),
+        (
+            "more greater larger higher bigger longer stronger faster heavier maximum",
+            "less fewer smaller lower shorter weaker slower lighter minimum",
+        ),
+        ("positive positively", "negative negatively"),
+        (
+            "attract attracts attracted attraction attractive",
+            "repel repels repelled repulsion repulsive",
+        ),
+        (
+            "same identical equal equals alike similar",
+            "different differs differing unequal opposite",
+        ),
+        ("above over up upward upwards", "below under down downward downwards"),
+        ("before prior earlier preceding", "after later subsequent following"),
+        ("directly direct proportional", "inversely inverse"),
+        ("always all every", "sometimes some few"),
+        ("possible possibly can", "impossible cannot"),
+        ("gain gains gained", "lose loses lost"),
+        ("true correct valid", "false incorrect invalid"),
+    )
+)
+
+#: Tokens after a negator that it plausibly scopes over. Six is roughly a clause.
+_NEGATION_SCOPE = 6
+#: Ignore short function words when deciding whether a claim echoes a negated
+#: clause; "is", "the", "a" are in every sentence and prove nothing.
+_MIN_CONTENT_LEN = 4
+#: Share of a negated clause's content words that must reappear in the claim.
+#: Not 1.0: the window is a fixed token count, not a parsed clause, so it runs a
+#: word or two past the end of what the negator scopes over and picks up whatever
+#: the next phrase starts with.
+_NEGATION_ECHO = 0.75
+
+
+def _gate_tokens(text: str) -> list[str]:
+    return _GATE_TOKEN.findall(normalise(text))
+
+
+def _polarity_conflict(claim_tokens: set[str], span_tokens: set[str]) -> str | None:
+    """One side of an antonym pair in the claim, the other side in the passage.
+
+    Both directions require the conflicting term to be *absent* from the other
+    text. A passage that says both "increase" and "decrease" is discussing both
+    and tells us nothing about which one the claim took.
+    """
+    for left, right in _ANTONYMS:
+        claim_left, claim_right = claim_tokens & left, claim_tokens & right
+        span_left, span_right = span_tokens & left, span_tokens & right
+        if claim_left and not claim_right and span_right and not span_left:
+            return f"claim says {min(claim_left)!r} where its source says {min(span_right)!r}"
+        if claim_right and not claim_left and span_left and not span_right:
+            return f"claim says {min(claim_right)!r} where its source says {min(span_left)!r}"
+    return None
+
+
+def _dropped_negation(claim_tokens: set[str], span_sequence: list[str]) -> str | None:
+    """The passage negates a clause that the claim restates affirmatively.
+
+    Deliberately strict — nearly every content word the negator scopes over has to
+    reappear in the claim — because a long passage contains negations about all
+    sorts of things, and only the one this claim is actually about is a signal.
+    """
+    for index, token in enumerate(span_sequence):
+        if token not in _NEGATIONS:
+            continue
+        window = span_sequence[index + 1 : index + 1 + _NEGATION_SCOPE]
+        content = [word for word in window if len(word) >= _MIN_CONTENT_LEN]
+        if len(content) < 2:
+            continue
+        echoed = sum(1 for word in content if word in claim_tokens)
+        if echoed >= _NEGATION_ECHO * len(content):
+            phrase = " ".join([token, *window])
+            return f"source negates {phrase!r}; the claim restates it affirmatively"
+    return None
+
+
+def contradiction_risk(claim: str, span: str) -> str | None:
+    """Why this claim might assert the opposite of its source, or ``None``.
+
+    Purely lexical and deliberately cheap: three set operations and one linear
+    scan, run only on claims the overlap threshold was about to wave through. It
+    never decides a verdict — a hit routes the claim to the judge, which is the
+    only thing that can actually read for entailment.
+    """
+    claim_sequence = _gate_tokens(claim)
+    claim_tokens = set(claim_sequence)
+    span_sequence = _gate_tokens(span)
+    span_tokens = set(span_sequence)
+
+    # Inserted negation: the claim negates something its source never negates.
+    # High overlap means the claim near-copies the passage, so a negator the
+    # passage does not contain anywhere is the claim's own addition.
+    added = (claim_tokens & _NEGATIONS) - span_tokens
+    if added:
+        return f"claim contains the negation {min(added)!r}, which its source does not"
+
+    conflict = _polarity_conflict(claim_tokens, span_tokens)
+    if conflict is not None:
+        return conflict
+
+    # Dropped negation, the mirror image. Only checked when the claim itself is
+    # affirmative; otherwise the negators simply moved and the first two rules
+    # already had their chance.
+    if not (claim_tokens & _NEGATIONS):
+        return _dropped_negation(claim_tokens, span_sequence)
+    return None
 
 
 @dataclass(slots=True, frozen=True)
@@ -208,11 +363,13 @@ def prefilter(
             continue
 
         overlap = lexical_overlap(claim.text, span)
-        if overlap >= TAU_HIGH:
+        if overlap >= TAU_HIGH and contradiction_risk(claim.text, span) is None:
             decided.append(Verdicted(claim, "supported", f"lexical overlap {overlap:.2f}"))
         else:
             # Everything else needs a real read. Low overlap is a paraphrase
-            # signal, not a fabrication signal — see the module docstring.
+            # signal, not a fabrication signal — see the module docstring. High
+            # overlap with a polarity conflict is the reverse: the tokens match
+            # because the claim was built by flipping its own source.
             ambiguous.append(claim)
 
     return decided, ambiguous
