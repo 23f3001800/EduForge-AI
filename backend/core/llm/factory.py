@@ -29,7 +29,6 @@ def build_llm_client(settings: Settings) -> LLMClient:
             gemini_key=settings.gemini_api_key,
             anthropic_key=settings.anthropic_api_key,
             allow_anthropic=settings.allow_anthropic,
-            ollama_base_url=settings.ollama_base_url,
         ),
         budget=TokenBudget(limit=settings.job_token_budget),
         concurrency=settings.llm_concurrency,

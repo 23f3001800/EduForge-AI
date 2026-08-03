@@ -15,6 +15,29 @@ export function formatDuration(seconds: number): string {
   return `${minutes}m ${Math.round(seconds % 60)}s`;
 }
 
+/**
+ * A duration the way a stopwatch shows it — `0:42`, `12:07`, `1:04:30`.
+ *
+ * Distinct from `formatDuration`, which writes durations as prose ("12m 7s").
+ * Both are correct; they are read differently. Prose is right for a single
+ * figure in a sentence, and wrong for a column, because "9m 3s" and "11m 40s"
+ * do not line up under each other. The run log is read by scanning down it, so
+ * it gets the aligned form and a `tabular-nums` face to go with it.
+ *
+ * Clamps rather than returning a placeholder: every caller here is displaying a
+ * measured elapsed time next to a live one, and a stray "—" in that column
+ * reads as a fault rather than as the sub-second rounding it actually is.
+ */
+export function formatClock(seconds: number): string {
+  if (!Number.isFinite(seconds) || seconds < 0) return "0:00";
+  const whole = Math.floor(seconds);
+  const secs = String(whole % 60).padStart(2, "0");
+  const mins = Math.floor(whole / 60) % 60;
+  const hours = Math.floor(whole / 3600);
+  if (hours > 0) return `${hours}:${String(mins).padStart(2, "0")}:${secs}`;
+  return `${mins}:${secs}`;
+}
+
 /** Percentages that are unknown must read as unknown, never as zero. */
 export function formatPercent(value: number | null | undefined): string {
   return value === null || value === undefined ? "—" : `${Math.round(value * 100)}%`;

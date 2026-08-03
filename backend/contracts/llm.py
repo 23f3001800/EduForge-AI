@@ -44,7 +44,7 @@ __all__ = [
     "ReasoningConfig",
 ]
 
-LLMProvider = Literal["anthropic", "gemini", "ollama", "openrouter", "replay"]
+LLMProvider = Literal["anthropic", "gemini", "openrouter", "replay"]
 
 #: Reasoning depth, expressed provider-neutrally. Each provider maps it to its own
 #: native control: Anthropic to ``output_config.effort`` with adaptive thinking,

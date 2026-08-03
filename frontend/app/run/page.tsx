@@ -1,7 +1,6 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { AnimatePresence, motion } from "framer-motion";
 import {
   AlertTriangle,
   Check,
@@ -23,9 +22,18 @@ import { EmptyState, ErrorState } from "@/components/ui/states";
 import { getJob, retryJob, type JobSnapshot } from "@/lib/api";
 import { cn } from "@/lib/cn";
 import { describeError } from "@/lib/errors";
-import { formatCost, formatTokens } from "@/lib/format";
-import { expectedSeconds, STAGE_BLURBS, STAGE_LABELS, STAGE_ORDER, type StageKey } from "@/lib/stages";
+import { formatClock, formatCost, formatDuration, formatTokens } from "@/lib/format";
+import { findingsFrom } from "@/lib/run-findings";
+import {
+  expectedSeconds,
+  isStageKey,
+  STAGE_BLURBS,
+  STAGE_LABELS,
+  STAGE_ORDER,
+  type StageKey,
+} from "@/lib/stages";
 import { clearTimeline, useJobStream, type StreamEvent } from "@/lib/use-job-stream";
+import { ActivityLog } from "./activity-log";
 
 type StageState = "pending" | "running" | "done" | "warned" | "failed";
 
@@ -51,6 +59,13 @@ function asString(value: unknown): string | null {
   if (typeof value !== "string") return null;
   const trimmed = value.trim();
   return trimmed ? trimmed : null;
+}
+
+/** An ISO timestamp as epoch ms, or null if it was absent or unparseable. */
+function parseTime(value: string | null | undefined): number | null {
+  if (typeof value !== "string") return null;
+  const ms = Date.parse(value);
+  return Number.isFinite(ms) ? ms : null;
 }
 
 /**
@@ -80,6 +95,12 @@ function lastFailureMessage(events: StreamEvent[]): string | null {
   return null;
 }
 
+/** When each stage first and last spoke, on the server's clock. */
+interface StageTiming {
+  firstMs: number;
+  lastMs: number;
+}
+
 /**
  * Live progress.
  *
@@ -93,12 +114,26 @@ function lastFailureMessage(events: StreamEvent[]): string | null {
  * arrives at all when EventSource is blocked, which a corporate proxy and some
  * mobile networks both do. Reading only the stream left the bar at 0% for a
  * whole run and then jumped it to 100%.
+ *
+ * On time. Three clocks are in play and mixing them produces nonsense, so each
+ * number below states which one it is on:
+ *
+ *   - Server timestamps (`ts`, `created_at`) compared to each other give exact
+ *     durations regardless of what this browser thinks the time is.
+ *   - The browser's clock compared to a server timestamp gives "how long ago",
+ *     and is wrong by whatever the two clocks disagree by.
+ *   - The browser's clock compared to a moment this page recorded itself is
+ *     exact, but only measures the part of the run it was open for.
+ *
+ * Nothing here interpolates. Every duration shown is the distance between two
+ * things that actually happened.
  */
 function RunView() {
   const params = useSearchParams();
   const jobId = params?.get("job") ?? null;
   const { events, progress: streamProgress, connection, terminal } = useJobStream(jobId);
   const [stageStartedAt, setStageStartedAt] = useState<number>(() => Date.now());
+  const [lastEventAt, setLastEventAt] = useState<number>(() => Date.now());
   const [now, setNow] = useState(() => Date.now());
   const [retrying, setRetrying] = useState(false);
   const [retryError, setRetryError] = useState<string | null>(null);
@@ -198,11 +233,48 @@ function RunView() {
     return { states, active };
   }, [events, job?.completed_stages, job?.current_stage, done, failed, cancelled]);
 
+  /**
+   * The first and last server timestamp seen for each stage, plus the run's own
+   * bounds. Events arrive sorted by `seq`, so first and last are simply the
+   * first and last usable `ts` in each group.
+   */
+  const timing = useMemo(() => {
+    const stages = new Map<StageKey, StageTiming>();
+    let first: number | null = null;
+    let last: number | null = null;
+
+    for (const event of events) {
+      const ms = parseTime(event.ts);
+      if (ms === null) continue;
+      if (first === null) first = ms;
+      last = ms;
+
+      if (!isStageKey(event.stage)) continue;
+      const existing = stages.get(event.stage);
+      if (existing) existing.lastMs = ms;
+      else stages.set(event.stage, { firstMs: ms, lastMs: ms });
+    }
+
+    return { stages, first, last };
+  }, [events]);
+
+  const findings = useMemo(() => findingsFrom(events), [events]);
+
   // Reset the per-stage clock whenever the active stage changes, so "slow"
   // measures this stage rather than the whole run.
   useEffect(() => {
     setStageStartedAt(Date.now());
   }, [stageStates.active]);
+
+  // When the newest frame arrived, on this browser's clock. Seeded at mount so
+  // a page opened onto a restored timeline measures silence from the moment it
+  // could first have observed one, never from a server timestamp it cannot
+  // trust — this understates a gap that began before the page opened, which is
+  // the safe direction: it delays the warning rather than inventing one.
+  const newestSeq = events.length ? events[events.length - 1].seq : null;
+  useEffect(() => {
+    setLastEventAt(Date.now());
+  }, [newestSeq]);
 
   useEffect(() => {
     if (finished) return;
@@ -217,7 +289,57 @@ function RunView() {
   const budget = stageStates.active
     ? expectedSeconds(stageStates.active) * 2.5
     : SILENT_BEFORE_FIRST_EVENT_SECONDS;
-  const slow = !finished && elapsedOnStage > budget;
+  const sinceLastEvent = Math.max(0, (now - lastEventAt) / 1000);
+  // Either the stage has outrun its budget or the stream has gone quiet for
+  // longer than the stage should have taken in total. The second case is the
+  // one a local Ollama profile hits: a single call can hold for minutes.
+  const slow = !finished && (elapsedOnStage > budget || sinceLastEvent > budget);
+
+  /**
+   * Total wall-clock time, floored by the stream's own span.
+   *
+   * The anchor is `created_at`, so the queue wait counts — a job sitting behind
+   * another one has genuinely been running that long from the operator's chair.
+   * Comparing that server timestamp to `Date.now()` is the one figure here that
+   * a skewed browser clock can distort, so it is floored by first-to-last event
+   * distance, which is measured entirely server-side. A slow clock can no
+   * longer report a twelve-minute run as four minutes old.
+   */
+  const finishedMs = parseTime(job?.finished_at);
+  const createdMs = parseTime(job?.created_at);
+  const endMs = finished && finishedMs !== null ? finishedMs : now;
+  const streamSpan =
+    timing.first !== null && timing.last !== null ? (timing.last - timing.first) / 1000 : 0;
+  const anchorMs = createdMs ?? timing.first;
+  const elapsed = Math.max(0, anchorMs !== null ? (endMs - anchorMs) / 1000 : 0, streamSpan);
+
+  /** `+0:00` on the log is the first thing the run said. */
+  const logOrigin = timing.first ?? createdMs;
+
+  /**
+   * How long the current stage has been going.
+   *
+   * Server-measured from its first event to its most recent one, plus the time
+   * this page has watched since that event arrived. Both halves are differences
+   * within a single clock, so neither carries skew. Falls back to the page's own
+   * stage clock when the stage has not produced a timestamped event yet.
+   */
+  const activeTiming = stageStates.active ? timing.stages.get(stageStates.active) : undefined;
+  const activeStageElapsed = activeTiming
+    ? (activeTiming.lastMs - activeTiming.firstMs) / 1000 + sinceLastEvent
+    : elapsedOnStage;
+
+  /** A finished stage's duration, or null when it cannot be measured honestly. */
+  function stageDuration(stage: StageKey): number | null {
+    const measured = timing.stages.get(stage);
+    if (!measured) return null;
+    // A stage still holding the baton has not got a duration yet, only an
+    // elapsed — reporting the gap between its first and latest event as a
+    // duration would show it finishing over and over.
+    if (!finished && stage === stageStates.active) return null;
+    const seconds = (measured.lastMs - measured.firstMs) / 1000;
+    return Number.isFinite(seconds) && seconds >= 0 ? seconds : null;
+  }
 
   async function retry() {
     // Guarded rather than merely relabelled: a second POST while the first is in
@@ -272,6 +394,9 @@ function RunView() {
         : "Building your package";
 
   const usage = job?.usage;
+  // Zero tokens on a run that has not finished is the worker not having written
+  // its total yet, not a run that spent nothing. The two must not render alike.
+  const usageCounted = typeof usage?.tokens === "number" && usage.tokens > 0;
 
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-6">
@@ -291,34 +416,77 @@ function RunView() {
 
       <Card>
         <CardContent className="pt-5">
-          <div className="flex items-center justify-between text-sm">
-            <span className="font-medium">
-              {done ? "Complete" : failed || cancelled ? "Stopped" : "In progress"}
-            </span>
-            <span className="font-mono tabular-nums text-fg-muted">{progress}%</span>
+          {/* Elapsed leads. Someone watching a twenty-five minute build is
+              asking "is this moving?", and a percentage that legitimately sits
+              still for four minutes answers that badly where a clock that
+              visibly ticks answers it well. */}
+          <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+            <p className="flex items-baseline gap-2">
+              <span className="font-mono text-3xl font-bold tabular-nums">
+                {formatClock(elapsed)}
+              </span>
+              <span className="text-sm text-fg-muted">elapsed</span>
+            </p>
+            <p className="flex items-baseline gap-2 text-sm">
+              <span className="font-medium">
+                {done ? "Complete" : failed || cancelled ? "Stopped" : "In progress"}
+              </span>
+              <span className="font-mono tabular-nums text-fg-muted">{progress}%</span>
+            </p>
           </div>
+
           <div
-            className="mt-2 h-2 overflow-hidden rounded-full bg-fg/10"
+            className="mt-3 h-2 overflow-hidden rounded-full bg-fg/10"
             role="progressbar"
             aria-valuenow={progress}
             aria-valuemin={0}
             aria-valuemax={100}
             aria-label="Overall progress"
           >
-            <motion.div
+            {/* A CSS transition, not an animation library: it moves only when
+                `progress` actually changes, and the global reduced-motion rule
+                already neutralises it. Dropping framer-motion from this route
+                took ~40 kB off its first load. */}
+            <div
               className={cn(
-                "h-full rounded-full",
+                "h-full rounded-full transition-[width] duration-500 ease-out",
                 failed || cancelled ? "bg-danger" : partialLikely ? "bg-warning" : "bg-accent",
               )}
-              animate={{ width: `${progress}%` }}
-              transition={{ duration: 0.4, ease: "easeOut" }}
+              style={{ width: `${progress}%` }}
             />
           </div>
 
+          {/* Liveness, all of it measured. The pulse says the page is connected
+              and the clock says when the run last spoke; neither implies work is
+              happening that the server has not reported. */}
+          {!finished ? (
+            <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-fg-muted">
+              <span className="inline-flex items-center gap-2">
+                <span className="relative flex size-2 shrink-0" aria-hidden>
+                  <span className="absolute inline-flex size-full animate-ping rounded-full bg-accent opacity-70 motion-reduce:hidden" />
+                  <span className="relative inline-flex size-2 rounded-full bg-accent" />
+                </span>
+                Working
+              </span>
+              {stageStates.active ? (
+                <span className="tabular-nums">
+                  {STAGE_LABELS[stageStates.active]} · {formatClock(activeStageElapsed)}
+                </span>
+              ) : null}
+              <span className="tabular-nums">
+                Last update {formatClock(sinceLastEvent)} ago
+              </span>
+            </div>
+          ) : null}
+
           {/* Politely announced, so a screen reader learns of stage changes
-              without every heartbeat interrupting the user. */}
+              without every heartbeat interrupting the user. The percentage is
+              deliberately not in here: it changes on every one of a few hundred
+              events, and re-announcing the whole sentence each time buries the
+              stage change that actually matters. It stays available on demand
+              through the progressbar's aria-valuenow above. */}
           <p className="sr-only" aria-live="polite">
-            {headline}. {progress}% complete
+            {headline}
             {stageStates.active ? `, ${STAGE_LABELS[stageStates.active]}` : ""}
           </p>
 
@@ -335,8 +503,9 @@ function RunView() {
               <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden />
               {stageStates.active ? (
                 <span>
-                  This stage is taking longer than usual. Free-tier models queue under load;
-                  nothing is lost while it waits.
+                  This stage is taking longer than usual. Free-tier models queue under load and a
+                  local model can hold a single call for several minutes; nothing is lost while it
+                  waits.
                 </span>
               ) : (
                 <span>
@@ -412,82 +581,112 @@ function RunView() {
         </section>
       ) : null}
 
-      <ol className="flex flex-col gap-2">
-        {STAGE_ORDER.map((stage, index) => {
-          const state = stageStates.states.get(stage) ?? "pending";
-          const active = state === "running" && !finished;
-          const stageEvents = events.filter((e) => e.stage === stage && e.message);
-          return (
-            <li key={stage}>
-              <div
-                className={cn(
-                  "flex items-start gap-3 rounded-lg border p-3 transition-colors",
-                  active
-                    ? "border-accent/40 bg-accent-subtle"
-                    : state === "failed"
-                      ? "border-danger/40 bg-danger-subtle"
-                      : "border-border bg-raised",
-                )}
-              >
-                <span className="mt-0.5 shrink-0" aria-hidden>
-                  {state === "done" ? (
-                    <Check className="size-5 text-success" />
-                  ) : state === "failed" ? (
-                    <X className="size-5 text-danger" />
-                  ) : state === "warned" ? (
-                    <AlertTriangle className="size-5 text-warning" />
-                  ) : active ? (
-                    <Loader2 className="size-5 animate-spin text-accent" />
-                  ) : (
-                    <CircleDashed className="size-5 text-fg-faint" />
-                  )}
-                </span>
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="font-mono text-xs text-fg-faint">{index + 1}</span>
-                    <span className="font-medium">{STAGE_LABELS[stage]}</span>
-                    {/* State is never colour alone: every non-default state
-                        carries a word as well as an icon. */}
-                    {state === "failed" ? (
-                      <Badge tone="danger">Stopped here</Badge>
-                    ) : state === "warned" ? (
-                      <Badge tone="warning">Warning</Badge>
-                    ) : state === "done" ? (
-                      <Badge tone="success">Done</Badge>
-                    ) : active ? (
-                      <Badge tone="accent">Running</Badge>
-                    ) : (
-                      <Badge>Not started</Badge>
-                    )}
-                  </div>
-                  <p className="mt-0.5 text-sm text-fg-muted">{STAGE_BLURBS[stage]}</p>
-                  <AnimatePresence initial={false}>
-                    {stageEvents.length ? (
-                      <motion.ul
-                        initial={{ opacity: 0, height: 0 }}
-                        animate={{ opacity: 1, height: "auto" }}
-                        className="mt-2 space-y-1 border-l-2 border-border pl-3"
-                      >
-                        {stageEvents.slice(-3).map((event) => (
-                          <li
-                            key={event.seq}
-                            className={cn(
-                              "text-xs [overflow-wrap:anywhere]",
-                              event.level === "info" ? "text-fg-faint" : "text-warning",
-                            )}
-                          >
-                            {event.message}
-                          </li>
-                        ))}
-                      </motion.ul>
-                    ) : null}
-                  </AnimatePresence>
-                </div>
+      {/* Only once there is something to show. An empty "Found so far" card
+          with dashes in it would be worse than the absence it is describing. */}
+      {findings.length ? (
+        <section aria-labelledby="findings" className="card p-4 sm:p-5">
+          <h2 id="findings" className="text-sm font-semibold">
+            Found so far
+          </h2>
+          <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-3">
+            {findings.map((finding) => (
+              <div key={finding.id} className="min-w-0">
+                <dt className="text-xs text-fg-muted">{finding.label}</dt>
+                <dd className="mt-0.5 text-sm font-medium [overflow-wrap:anywhere]">
+                  {finding.value}
+                </dd>
               </div>
-            </li>
-          );
-        })}
-      </ol>
+            ))}
+          </dl>
+        </section>
+      ) : null}
+
+      <ActivityLog events={events} originMs={logOrigin} live={!finished} />
+
+      <section aria-labelledby="stages">
+        <h2 id="stages" className="sr-only">
+          Pipeline stages
+        </h2>
+        <ol className="flex flex-col gap-2">
+          {STAGE_ORDER.map((stage, index) => {
+            const state = stageStates.states.get(stage) ?? "pending";
+            const active = state === "running" && !finished;
+            // Only the stage holding the baton, and any stage that stopped the
+            // run, get the full treatment. Everything else collapses to one
+            // line so the active stage has room — the detail they used to show
+            // now lives in the log above, in full and permanently.
+            const expanded = active || state === "failed";
+            const duration = stageDuration(stage);
+
+            return (
+              <li key={stage}>
+                <div
+                  className={cn(
+                    "flex items-start gap-3 rounded-lg border transition-colors",
+                    expanded ? "p-3" : "px-3 py-2",
+                    active
+                      ? "border-accent/40 bg-accent-subtle"
+                      : state === "failed"
+                        ? "border-danger/40 bg-danger-subtle"
+                        : "border-border bg-raised",
+                  )}
+                >
+                  <span className={cn("shrink-0", expanded ? "mt-0.5" : "")} aria-hidden>
+                    {state === "done" ? (
+                      <Check className="size-5 text-success" />
+                    ) : state === "failed" ? (
+                      <X className="size-5 text-danger" />
+                    ) : state === "warned" ? (
+                      <AlertTriangle className="size-5 text-warning" />
+                    ) : active ? (
+                      <Loader2 className="size-5 animate-spin text-accent" />
+                    ) : (
+                      <CircleDashed className="size-5 text-fg-faint" />
+                    )}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                      <span className="font-mono text-xs text-fg-faint">{index + 1}</span>
+                      <span className={cn("font-medium", expanded ? "" : "text-sm")}>
+                        {STAGE_LABELS[stage]}
+                      </span>
+                      {/* State is never colour alone: every non-default state
+                          carries a word as well as an icon. */}
+                      {state === "failed" ? (
+                        <Badge tone="danger">Stopped here</Badge>
+                      ) : state === "warned" ? (
+                        <Badge tone="warning">Warning</Badge>
+                      ) : state === "done" ? (
+                        <Badge tone="success">Done</Badge>
+                      ) : active ? (
+                        <Badge tone="accent">Running</Badge>
+                      ) : (
+                        <Badge>Not started</Badge>
+                      )}
+                      {/* Measured between this stage's first and last event.
+                          Omitted entirely when those timestamps are missing,
+                          rather than shown as a dash. */}
+                      {duration !== null ? (
+                        <span className="font-mono text-xs tabular-nums text-fg-faint">
+                          {formatDuration(duration)}
+                        </span>
+                      ) : null}
+                      {active ? (
+                        <span className="font-mono text-xs tabular-nums text-accent">
+                          {formatClock(activeStageElapsed)}
+                        </span>
+                      ) : null}
+                    </div>
+                    {expanded ? (
+                      <p className="mt-0.5 text-sm text-fg-muted">{STAGE_BLURBS[stage]}</p>
+                    ) : null}
+                  </div>
+                </div>
+              </li>
+            );
+          })}
+        </ol>
+      </section>
 
       {job?.warnings?.length ? (
         <Card>
@@ -502,35 +701,55 @@ function RunView() {
         </Card>
       ) : null}
 
-      {/* Written by the worker when the run ends, so it is shown then rather than
-          during — a running total that is structurally always zero would be a
-          worse claim than no claim. */}
-      {finished && usage ? (
+      {/* Shown throughout the run rather than only at the end, but driven by the
+          figure itself rather than by the run's status: the moment `usage.tokens`
+          is non-zero it renders, whenever that happens.
+
+          Today it happens once, at the end. `worker/runner.py` writes
+          `job.tokens_used` only on its terminal paths (lines 130 and 183), and
+          `ProgressEmitter._advance_job` — the one thing that updates the job
+          record mid-run — has no access to the LLM client to read a running
+          total from. So the running case below says that plainly instead of
+          animating a zero, which would read as "this run is free". */}
+      {usage ? (
         <Card>
           <CardContent className="pt-5">
-            <h2 className="text-sm font-semibold">What this run used</h2>
-            <dl className="mt-3 grid grid-cols-2 gap-4">
-              <div>
-                <dt className="text-sm text-fg-muted">Tokens</dt>
-                <dd className="mt-0.5 text-xl font-bold tabular-nums">
-                  {formatTokens(usage.tokens)}
-                </dd>
-              </div>
-              <div>
-                <dt className="flex items-center gap-1.5 text-sm text-fg-muted">
-                  <Coins className="size-4" aria-hidden /> Cost
-                </dt>
-                <dd className="mt-0.5 text-xl font-bold tabular-nums">
-                  {formatCost(usage.cost_usd)}
-                </dd>
-              </div>
-            </dl>
-            <p className="mt-3 text-xs text-fg-faint">
-              Every attempt is counted, including retries that spent tokens and returned nothing.
-              {usage.cost_usd === 0
-                ? " Free-tier models report no cost, so $0.00 here is the true figure rather than a missing one."
-                : ""}
-            </p>
+            <h2 className="text-sm font-semibold">
+              {finished ? "What this run used" : "What this run has used"}
+            </h2>
+            {usageCounted || finished ? (
+              <>
+                <dl className="mt-3 grid grid-cols-2 gap-4">
+                  <div>
+                    <dt className="text-sm text-fg-muted">Tokens</dt>
+                    <dd className="mt-0.5 text-xl font-bold tabular-nums">
+                      {formatTokens(usage.tokens)}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="flex items-center gap-1.5 text-sm text-fg-muted">
+                      <Coins className="size-4" aria-hidden /> Cost
+                    </dt>
+                    <dd className="mt-0.5 text-xl font-bold tabular-nums">
+                      {formatCost(usage.cost_usd)}
+                    </dd>
+                  </div>
+                </dl>
+                <p className="mt-3 text-xs text-fg-faint">
+                  Every attempt is counted, including retries that spent tokens and returned
+                  nothing.
+                  {usage.cost_usd === 0
+                    ? " Free-tier models report no cost, so $0.00 here is the true figure rather than a missing one."
+                    : ""}
+                </p>
+              </>
+            ) : (
+              <p className="mt-2 text-sm text-fg-muted">
+                Not counted yet. The worker totals tokens and cost when the run reaches a terminal
+                state, so this stays blank until then rather than showing a zero that would read as
+                a free run.
+              </p>
+            )}
           </CardContent>
         </Card>
       ) : null}

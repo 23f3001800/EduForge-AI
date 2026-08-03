@@ -16,7 +16,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
-LLMProfile = Literal["production", "local", "dev", "ci"]
+LLMProfile = Literal["production", "dev", "ci"]
 
 
 class Settings(BaseSettings):
@@ -29,11 +29,6 @@ class Settings(BaseSettings):
     open_router_api_key: str | None = None
     open_router_base_url: str = "https://openrouter.ai/api/v1"
     gemini_api_key: str | None = None
-    #: Where a local Ollama server listens. No key: it runs on this machine and
-    #: has nothing to authenticate against, which is the whole point of the
-    #: ``local`` profile — it has no quota and needs no network, so a demo can
-    #: never be blocked by someone else's daily limit resetting at midnight UTC.
-    ollama_base_url: str = "http://127.0.0.1:11434/v1"
 
     # Anthropic is implemented but off by default. A key being present in the
     # environment must not be enough to bill against it — enabling the provider
