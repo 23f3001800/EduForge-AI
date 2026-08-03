@@ -1,85 +1,81 @@
-# Sample packages
+# Samples
 
-Two Teacher Knowledge Packages, and the quality report for each. They exist to
-show the one claim that is hard to demonstrate any other way: **the same code
-path produces genuinely different teaching material for a STEM chapter and a
-humanities chapter, without anything in the system knowing what a "subject" is.**
+Two packages, both produced by running the real pipeline through the real API.
+Nothing here is hand-written or post-processed. `source.pdf` in each directory is
+the exact input, so any claim below can be re-derived:
 
-| | [`quantitative-physics/`](quantitative-physics/) | [`narrative-history/`](narrative-history/) |
+```bash
+make dev                                  # start the server
+python scripts/capture_sample.py samples/quantitative-physics/source.pdf \
+    --name quantitative-physics
+```
+
+An earlier version of this directory was assembled from test fixtures. One of
+those "samples" was the physics package with `subject` overwritten to `History`,
+so it presented a lesson plan about Newton's first law under the heading "The
+Partition of Bengal". Those files are gone, and so is `scripts/build_samples.py`,
+which produced them. A sample that cannot fail is not evidence.
+
+## What was run
+
+| | quantitative-physics | narrative-history |
 |---|---|---|
-| `pedagogy_profile` | `quantitative` | `narrative` |
-| Formulae | present | **none** |
-| Numerical questions | present | **none** |
-| Eval score | **0.917** | **0.874** |
-| Absences excused by design | 0 | **2** |
+| Source | NCERT Class 11 Physics, Ch. 1 | *French Revolution* article |
+| Pages / words | 44 / 20,603 | 39 / 19,166 |
+| Model | Azure OpenAI `gpt-5-mini` | Azure OpenAI `gpt-5-mini` |
 
-Each directory holds the package itself, the three teacher-facing PDFs, the
-Markdown bundle, and the eval report in both JSON and Markdown.
+NCERT chapters are the benchmark named in FAQ Q1 and Q2. The humanities
+counterpart is a substitute: `ncert.nic.in` was unreachable from the build
+network, so a comparable real document was used rather than a fabricated one.
 
-```
-quantitative-physics/
-  teacher_knowledge_package.json   the artifact — everything below is derived from it
-  lesson_plan.pdf                  per-period plan
-  teacher_guide.pdf                scripts, activities, gaps, remediation
-  assessment_book.pdf              questions, then the answer key behind a page break
-  markdown.md
-  eval-report.json / .md           scored on 9 dimensions, all deterministic
-```
+## The versatility result
 
-## What to look at
+Both documents take the identical code path. No stage branches on a subject
+name — a test greps for that and fails the build.
 
-**The absences.** Open `narrative-history/eval-report.md` and find
-`absent_by_design`. The harness records that this package has no formulae and no
-numerical items, and scores both as *correct* rather than missing. That is the
-whole versatility mechanism made visible: stage 2 classifies the content as
-`narrative`, that profile weights `numerical` at zero, so stage 7 never designs a
-numerical item and stage 9 never asks for one.
+| | Physics | History |
+|---|---|---|
+| Subject → profile | Physics → `quantitative` | History → `narrative` |
+| Formulae | 15 | **0** |
+| Concepts | 22 | 26 |
+| Periods (derived, not fixed) | 6 | 7 |
+| Assessment mix | 10 numerical, 7 mcq, 5 short, 2 long | **0 numerical**, 5 mcq, 7 short, 12 long |
+| Activities | experiment, problem_set, demonstration, simulation | debate, group_discussion, role_play, gallery_walk |
 
-**Coverage is identical — 1.00 in both.** This is the number that matters. It
-asks whether everything the package teaches is also practised and assessed, and
-it is the dimension that would punish absent content hardest. It does not move
-between the two profiles, which is the evidence that the grader is measuring
-teaching quality rather than subject shape.
+Zero numerical items and zero formulae in the humanities package, and no overlap
+at all in activity type. That absence is the designed output of the narrative
+profile rather than a gap: the profile weights `numerical` at zero, so no
+numerical item is ever requested.
 
-**The answer key is a separate section.** In `assessment_book.pdf` the questions
-come first, then a page break, then the key. A teacher hands out the first half.
-Correct answers, distractor rationales, worked solutions and rubrics appear only
-after the break — there is a test asserting exactly that.
+## Both packages fail validation, and that is the system working
 
-**Every factual claim carries a citation.** In the JSON, look at any concept,
-definition, or misconception: `evidence` is `min_length=1`, so an ungrounded
-claim is not constructible. Stage 3 verifies each quote appears verbatim in the
-chunk it cites before anything downstream sees it.
+Both report `status: succeeded_partial` — the package exists, and its own
+validator found problems it will not paper over.
 
-**The gaps are ranked structurally.** In `teacher_guide.pdf`, gap severity comes
-from transitive downstream load in the concept dependency graph — "three later
-concepts are built on this one" — not from asking a model how serious it thinks
-something is, which returns "medium" almost every time.
+Physics fails on one grounding claim: Gauss's law. **The claim and its citation
+are both correct.** PDF extraction flattened `ε₀` to `e` in the chunk text, so
+the grounding judge compared a correct claim against corrupted source and ruled
+it unsupported at confidence 1.0. The model had reconstructed the mathematics
+properly — `\dfrac{1}{4\pi\epsilon_0}` — and grounding penalised it for being
+more accurate than the text it was checked against.
 
-## Honest caveats
+That is a real defect, in extraction rather than in generation, and it is
+recorded here rather than tuned away. Loosening the judge to make this pass would
+also stop it catching genuine fabrication, which is the one thing it exists for.
 
-These two packages are built from the repository's reference fixtures, not from a
-fresh live run. That is deliberate and it is a real limitation:
+## Known rough edges in this output
 
-- Fixtures are **stable**, so the numbers above are reproducible by anyone who
-  checks out the repo and runs `make evals`. A live run's output moves with the
-  model.
-- The free-tier daily quota (50 requests) is consumed by roughly one and a half
-  full pipeline runs, so regenerating these from scratch is rate-limited rather
-  than free.
+- `duration_minutes` is `null` on every teacher-script segment, so a teacher
+  cannot pace a lesson from the script alone.
+- `time_allocation` labels are full sentences rather than segment names.
+- Equation-bearing chunks lose subscripts and Greek letters, which is the root
+  cause of the grounding false positive above.
 
-The pipeline *has* been verified end to end against live models — stages 1
-through 7 completed on `physics.pdf` before the daily quota was exhausted, with
-the period count derived (not fixed) and the quantitative profile correctly
-designing a numerical first item. To reproduce:
+## Files
 
-```bash
-./.venv/bin/python scripts/smoke_pipeline.py --doc physics
-./.venv/bin/python scripts/smoke_pipeline.py --doc history
-```
-
-To regenerate everything in this directory from the fixtures:
-
-```bash
-make samples
-```
+| File | What it is |
+|---|---|
+| `teacher_knowledge_package.json` | The package, schema-versioned |
+| `source.pdf` | The exact input, for reproduction |
+| `lesson_plan.pdf`, `teacher_guide.pdf`, `assessment_book.pdf` | Rendered artifacts |
+| `eval-report.json`, `eval-report.pdf` | Scored server-side, where the run's chunks are still reachable — so citation integrity actually runs instead of reporting itself unmeasurable |
