@@ -42,7 +42,7 @@ class JudgeStubAdapter:
     and raises from ``complete`` instead — see ``ForbiddenAdapter`` below.
     """
 
-    name = "gemini"
+    name = "openrouter"
 
     def __init__(self, verdict: str = "supported") -> None:
         self.verdict = verdict
@@ -66,8 +66,8 @@ class JudgeStubAdapter:
 
 
 def _client(adapter: Any) -> LLMClient:
-    spec = ModelSpec(provider="gemini", model="stub-model")
-    return LLMClient(routing=ProviderRouting(default=spec), adapters={"gemini": adapter})
+    spec = ModelSpec(provider="openrouter", model="stub-model")
+    return LLMClient(routing=ProviderRouting(default=spec), adapters={"openrouter": adapter})
 
 
 # ─────────────────────────────────────────────────────────────── fixtures

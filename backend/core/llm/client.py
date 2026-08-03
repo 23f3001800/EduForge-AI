@@ -17,7 +17,7 @@ the policy that must be identical everywhere:
   cost tokens and produced nothing is exactly what you want visible.
 
 Owning this in one place is what makes the provider port worth having: swap
-Anthropic for Gemini and none of the above changes.
+one provider for another and none of the above changes.
 """
 
 from __future__ import annotations
@@ -559,22 +559,27 @@ def build_adapters(
     *,
     openrouter_key: str | None = None,
     openrouter_base_url: str | None = None,
-    gemini_key: str | None = None,
-    anthropic_key: str | None = None,
-    allow_anthropic: bool = False,
+    azure_openai_endpoint: str | None = None,
+    azure_openai_key: str | None = None,
+    azure_openai_api_version: str = "2024-12-01-preview",
 ) -> dict[str, ProviderAdapter]:
     """Register only the providers that are both credentialled and permitted.
 
     A missing key means the adapter is absent, so naming that provider fails with
     a clear message at call time rather than a cryptic auth error later.
-
-    Anthropic is deliberately gated on allow_anthropic rather than on key
-    presence alone. A key sitting in the environment should not be sufficient to
-    bill against it — that has to be an explicit decision.
     """
     from core.llm.providers.replay_provider import ReplayAdapter
 
     adapters: dict[str, ProviderAdapter] = {"replay": ReplayAdapter()}
+
+    if azure_openai_key and azure_openai_endpoint:
+        from core.llm.providers.azure_openai_provider import AzureOpenAIAdapter
+
+        adapters["azure_openai"] = AzureOpenAIAdapter(
+            azure_openai_key,
+            azure_openai_endpoint,
+            api_version=azure_openai_api_version,
+        )
 
     if openrouter_key:
         from core.llm.providers.openrouter_provider import (
@@ -585,16 +590,6 @@ def build_adapters(
         adapters["openrouter"] = OpenRouterAdapter(
             openrouter_key, openrouter_base_url or DEFAULT_BASE_URL
         )
-
-    if gemini_key:
-        from core.llm.providers.gemini_provider import GeminiAdapter
-
-        adapters["gemini"] = GeminiAdapter(gemini_key)
-
-    if anthropic_key and allow_anthropic:
-        from core.llm.providers.anthropic_provider import AnthropicAdapter
-
-        adapters["anthropic"] = AnthropicAdapter(anthropic_key)
 
     return adapters
 

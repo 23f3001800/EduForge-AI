@@ -96,8 +96,6 @@ graph TB
 
     subgraph prov["Provider adapters"]
         OR["OpenRouter"]
-        GE["Gemini"]
-        AN["Anthropic — gated off"]
         RP["Replay — cassettes"]
     end
 
@@ -112,8 +110,6 @@ graph TB
     GR --> S1 --> SN --> S10
     SN --> LLM --> ROUT
     LLM --> OR
-    LLM --> GE
-    LLM --> AN
     LLM --> RP
     RUN --> STORE
     RT --> EV
@@ -460,16 +456,20 @@ only one of them is a defect.
 | Provider | Adapter | Status |
 |---|---|---|
 | OpenRouter | `openrouter_provider.py` | Default. Hosted, open-weight `:free` models. Needs `Open_Router_API_KEY` |
-| Gemini | `gemini_provider.py` | Needs `GEMINI_API_KEY` |
-| Anthropic | `anthropic_provider.py` | Implemented but **gated off** — a key alone is not enough, `ALLOW_ANTHROPIC=true` is also required, so billing is a decision rather than a config typo |
 | Replay | `replay_provider.py` | Serves recorded cassettes keyed by a hash of (stage, model, prompt). A cache miss is a hard failure, never a live call. Used by CI |
 
-Groq and Ollama are not supported providers; both adapters were removed. A
-local Ollama profile was built and then withdrawn after measurement: on the
-target hardware (8 CPU cores, 7.6 GB RAM, no GPU) it sustained 3.5 output
-tokens/second, which is roughly 14 minutes for a single knowledge-extraction
-call against ~40 calls per chapter. It is retained in git history rather than
-as a profile that cannot finish a run.
+Groq, Ollama, Gemini, and Anthropic are not supported providers; all four
+adapters were removed. Groq and Ollama: see the local-hardware note below.
+Gemini was never selectable — its `gemini_dev` profile was absent from the
+`LLMProfile` literal — and Anthropic was gated off by default with no credit
+behind it; both were flagged in a README audit as advertised but unreachable,
+so maintaining them was dead weight once the operator standardised on
+OpenRouter (hosted, open-weight free models) and Azure OpenAI. A local Ollama
+profile was built and then withdrawn after measurement: on the target hardware
+(8 CPU cores, 7.6 GB RAM, no GPU) it sustained 3.5 output tokens/second, which
+is roughly 14 minutes for a single knowledge-extraction call against ~40 calls
+per chapter. All four are retained in git history rather than as a profile
+that cannot finish a run.
 
 **Model routing** lives in `config/models.yaml`, never as a constant inside a
 stage. A stage asks for a stage name and receives a `ModelSpec`; it never learns
@@ -481,13 +481,10 @@ individual fields of its profile's `default`, and anything omitted is inherited.
 | `production` | openrouter | Yes |
 | `dev` | openrouter | Yes |
 | `ci` | replay | Yes |
-| `gemini_dev` | gemini | **No** — absent from the `LLMProfile` literal in `backend/core/config.py` |
-| `anthropic` | anthropic | **No** — same reason, and additionally gated by `ALLOW_ANTHROPIC` |
 
-`LLMProfile = Literal["production", "dev", "ci"]` in `config.py` is the
-authority. The last two profiles are defined in YAML but cannot currently be
-selected through settings; this is a known inconsistency between
-`config/models.yaml`, `.env.example`, and `backend/core/config.py`.
+`LLMProfile` in `backend/core/config.py` is the authority for which profile
+names `LLM_PROFILE` accepts — every profile defined in `config/models.yaml`
+is expected to appear there.
 
 ---
 
@@ -655,9 +652,6 @@ and read from `.env`.
 | `LLM_PROFILE` | `production` | One of `production`, `dev`, `ci` |
 | `Open_Router_API_KEY` | — | **Required** for `production` and `dev`; boot fails without it |
 | `OPEN_ROUTER_BASE_URL` | `https://openrouter.ai/api/v1` | |
-| `GEMINI_API_KEY` | — | Builds the Gemini adapter when present |
-| `ANTHROPIC_API_KEY` | — | Not sufficient on its own |
-| `ALLOW_ANTHROPIC` | `false` | Must be `true` before the Anthropic adapter is built |
 | `MODELS_CONFIG_PATH` | `config/models.yaml` | Routing table |
 | `MAX_UPLOAD_MB` | `25` | Enforced by a bounded read, not just the declared content length |
 | `MAX_PAGES` | `300` | |
@@ -959,13 +953,11 @@ the exact prompt and response for call 37 in run X", which is what a tracing
 platform provides.
 
 **Other honest gaps.** `EMBEDDINGS`, `BLOB_BACKEND`, `BLOB_LOCAL_PATH` and
-`RETENTION_DAYS` are inert. The `gemini_dev` and `anthropic` profiles exist in
-`config/models.yaml` but are not selectable through `LLM_PROFILE` because the
-`LLMProfile` literal in `config.py` does not include them. Prometheus metrics are
-in-process, so they reset with the app and would be per-instance if more than one
-instance ran — which is also why one instance is the only correct topology while
-the store is in-memory. `EVAL_HISTORY_PATH` defaults to `None`, so the evaluation
-trend line is also lost on restart unless it is pointed at a mounted volume.
+`RETENTION_DAYS` are inert. Prometheus metrics are in-process, so they reset
+with the app and would be per-instance if more than one instance ran — which
+is also why one instance is the only correct topology while the store is
+in-memory. `EVAL_HISTORY_PATH` defaults to `None`, so the evaluation trend line
+is also lost on restart unless it is pointed at a mounted volume.
 
 ---
 
@@ -979,12 +971,11 @@ Ordered by how much each would change the system's standing, not by effort.
 | 2 | Authentication and per-user package ownership | Nothing can be shared safely until this exists |
 | 3 | A labelled evaluation corpus | Several metrics currently report `NOT_MEASURABLE` for want of ground truth, notably subject-classification accuracy and OCR accuracy. A corpus converts them from stated gaps into measured numbers |
 | 4 | Systematic latency and cost benchmarking across document sizes and profiles | The run-time figure in Section 14 is observed, not measured. It should be a table |
-| 5 | Reconcile `LLMProfile` with `config/models.yaml` | Make `gemini_dev` and `anthropic` selectable, or delete them from the YAML. The current state is a documented inconsistency |
-| 6 | Populate `samples/` from real runs and rewrite `samples/README.md` | The subject-versatility claim is best demonstrated by two captured packages, and the stale README currently overstates what is present |
-| 7 | Human evaluation with practising teachers | The rubric measures properties of the artifact. Whether teachers actually use the output is not derivable from the artifact, and is honestly reported as unmeasurable |
-| 8 | Wire the declared `EMBEDDINGS` setting to a real hybrid (BM25 + dense) retrieval path | Currently inert; would improve grounding on longer documents |
-| 9 | Model-call tracing — LangSmith, or OpenTelemetry spans over `LLMClient` | Complements rather than replaces the claim-to-source traceability that exists |
-| 10 | Retention job honouring `RETENTION_DAYS` | Required once storage is durable |
+| 5 | Populate `samples/` from real runs and rewrite `samples/README.md` | The subject-versatility claim is best demonstrated by two captured packages, and the stale README currently overstates what is present |
+| 6 | Human evaluation with practising teachers | The rubric measures properties of the artifact. Whether teachers actually use the output is not derivable from the artifact, and is honestly reported as unmeasurable |
+| 7 | Wire the declared `EMBEDDINGS` setting to a real hybrid (BM25 + dense) retrieval path | Currently inert; would improve grounding on longer documents |
+| 8 | Model-call tracing — LangSmith, or OpenTelemetry spans over `LLMClient` | Complements rather than replaces the claim-to-source traceability that exists |
+| 9 | Retention job honouring `RETENTION_DAYS` | Required once storage is durable |
 
 ---
 

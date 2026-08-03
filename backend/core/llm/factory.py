@@ -26,9 +26,9 @@ def build_llm_client(settings: Settings) -> LLMClient:
         adapters=build_adapters(
             openrouter_key=settings.open_router_api_key,
             openrouter_base_url=settings.open_router_base_url,
-            gemini_key=settings.gemini_api_key,
-            anthropic_key=settings.anthropic_api_key,
-            allow_anthropic=settings.allow_anthropic,
+            azure_openai_endpoint=settings.azure_openai_endpoint,
+            azure_openai_key=settings.azure_openai_key,
+            azure_openai_api_version=settings.azure_openai_api_version,
         ),
         budget=TokenBudget(limit=settings.job_token_budget),
         concurrency=settings.llm_concurrency,

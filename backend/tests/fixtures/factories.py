@@ -664,8 +664,10 @@ def teacher_knowledge_package() -> TeacherKnowledgePackage:
             # Every stage that calls a model names the model that answered it.
             # Validation and publishing are absent because they make no call —
             # an empty entry there would suggest an attribution was lost.
-            models_by_stage=dict.fromkeys(_GENERATIVE_STAGES, "claude-opus-5"),
-            providers_by_stage=dict.fromkeys(_GENERATIVE_STAGES, "anthropic"),
+            models_by_stage=dict.fromkeys(
+                _GENERATIVE_STAGES, "nvidia/nemotron-3-super-120b-a12b:free"
+            ),
+            providers_by_stage=dict.fromkeys(_GENERATIVE_STAGES, "openrouter"),
         ),
         source=document_metadata(),
         classification=classification(),

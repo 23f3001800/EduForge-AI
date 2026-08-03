@@ -40,7 +40,7 @@ STAGES_DIR = REPO / "backend" / "stages"
 class StubAdapter:
     """Returns queued payloads. Records what it was asked, for prompt assertions."""
 
-    name = "gemini"
+    name = "openrouter"
 
     def __init__(self, *payloads: Any, fail_with: Exception | None = None) -> None:
         self._payloads = list(payloads)
@@ -69,10 +69,10 @@ class StubAdapter:
 
 
 def _client(adapter: Any, **kwargs: Any) -> LLMClient:
-    spec = ModelSpec(provider="gemini", model="stub-model")
+    spec = ModelSpec(provider="openrouter", model="stub-model")
     return LLMClient(
         routing=ProviderRouting(default=spec),
-        adapters={"gemini": adapter},
+        adapters={"openrouter": adapter},
         **kwargs,
     )
 
@@ -416,28 +416,6 @@ async def test_every_attempt_is_recorded_including_failures() -> None:
     assert client.usage.tokens_in == 200
 
 
-def test_gemini_schema_sanitiser_removes_rejected_keywords() -> None:
-    """Real incompatibility: the Developer API rejects additionalProperties,
-    which Pydantic emits for every model using extra='forbid' — ours all do."""
-    from core.llm.providers.gemini_provider import sanitise_schema
-
-    cleaned = sanitise_schema(Classification.model_json_schema())
-    serialised = json.dumps(cleaned)
-    assert "additionalProperties" not in serialised
-    assert "$ref" not in serialised
-    assert "$defs" not in serialised
-    assert cleaned["properties"]["subject"]["type"] == "string"
-
-
-def test_gemini_sanitiser_terminates_on_a_self_referential_schema() -> None:
-    """OutlineNode contains itself; naive inlining would never finish."""
-    from contracts.document import StructuredDocument
-    from core.llm.providers.gemini_provider import sanitise_schema
-
-    cleaned = sanitise_schema(StructuredDocument.model_json_schema())
-    assert "outline" in cleaned["properties"]
-
-
 # ───────────────────────────────────────────────────── classification stage
 
 
@@ -545,39 +523,7 @@ def test_each_profile_targets_its_intended_provider() -> None:
     assert load_routing(config, "ci").default.provider == "replay"
 
 
-def test_no_default_profile_routes_to_anthropic() -> None:
-    """Anthropic is opt-in only. It must not be reachable by picking a profile."""
-    config = REPO / "config" / "models.yaml"
-    from contracts.primitives import STAGE_NAMES
-
-    for profile in ("production", "dev", "ci"):
-        routing = load_routing(config, profile)
-        providers = {routing.for_stage(stage).provider for stage in STAGE_NAMES}
-        assert "anthropic" not in providers, f"{profile} routes to anthropic"
-
-
 # ─────────────────────────────────────────────────── provider permissioning
-
-
-def test_anthropic_is_not_callable_merely_because_a_key_exists() -> None:
-    """An explicit instruction encoded as a test.
-
-    A credential sitting in the environment must not be sufficient to bill
-    against it. Enabling that provider has to be a deliberate act, not a side
-    effect of a config typo or a copied .env.
-    """
-    from core.llm.client import build_adapters
-
-    adapters = build_adapters(anthropic_key="sk-ant-looks-real", openrouter_key="tok")
-    assert "anthropic" not in adapters
-    assert "openrouter" in adapters
-
-
-def test_anthropic_becomes_callable_only_on_explicit_opt_in() -> None:
-    from core.llm.client import build_adapters
-
-    adapters = build_adapters(anthropic_key="sk-ant-looks-real", allow_anthropic=True)
-    assert "anthropic" in adapters
 
 
 def test_a_provider_without_credentials_is_absent_rather_than_broken() -> None:
@@ -586,12 +532,6 @@ def test_a_provider_without_credentials_is_absent_rather_than_broken() -> None:
 
     adapters = build_adapters()
     assert sorted(adapters) == ["replay"]
-
-
-def test_production_profile_routes_to_openrouter_not_anthropic() -> None:
-    routing = load_routing(REPO / "config" / "models.yaml", "production")
-    providers = {routing.for_stage(s).provider for s in ("knowledge-extraction", "validation")}
-    assert providers == {"openrouter"}
 
 
 def test_openai_compatible_schema_rewrite_satisfies_strict_mode() -> None:

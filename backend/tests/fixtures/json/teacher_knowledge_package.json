@@ -370,24 +370,24 @@
   "generator": {
     "app_version": "0.1.0",
     "models_by_stage": {
-      "activity-generation": "claude-opus-5",
-      "assessment-generation": "claude-opus-5",
-      "document-intelligence": "claude-opus-5",
-      "educational-classification": "claude-opus-5",
-      "gap-analysis": "claude-opus-5",
-      "knowledge-extraction": "claude-opus-5",
-      "lesson-generation": "claude-opus-5",
-      "teaching-planner": "claude-opus-5"
+      "activity-generation": "nvidia/nemotron-3-super-120b-a12b:free",
+      "assessment-generation": "nvidia/nemotron-3-super-120b-a12b:free",
+      "document-intelligence": "nvidia/nemotron-3-super-120b-a12b:free",
+      "educational-classification": "nvidia/nemotron-3-super-120b-a12b:free",
+      "gap-analysis": "nvidia/nemotron-3-super-120b-a12b:free",
+      "knowledge-extraction": "nvidia/nemotron-3-super-120b-a12b:free",
+      "lesson-generation": "nvidia/nemotron-3-super-120b-a12b:free",
+      "teaching-planner": "nvidia/nemotron-3-super-120b-a12b:free"
     },
     "providers_by_stage": {
-      "activity-generation": "anthropic",
-      "assessment-generation": "anthropic",
-      "document-intelligence": "anthropic",
-      "educational-classification": "anthropic",
-      "gap-analysis": "anthropic",
-      "knowledge-extraction": "anthropic",
-      "lesson-generation": "anthropic",
-      "teaching-planner": "anthropic"
+      "activity-generation": "openrouter",
+      "assessment-generation": "openrouter",
+      "document-intelligence": "openrouter",
+      "educational-classification": "openrouter",
+      "gap-analysis": "openrouter",
+      "knowledge-extraction": "openrouter",
+      "lesson-generation": "openrouter",
+      "teaching-planner": "openrouter"
     }
   },
   "knowledge": {

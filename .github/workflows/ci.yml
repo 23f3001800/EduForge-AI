@@ -37,15 +37,12 @@ jobs:
           ./.venv/bin/pip install -q -U pip
           # `api,llm,parsing` cover everything backend/api, backend/core/llm and
           # stage 1 import; `dev` is the test/lint tooling `make check` runs.
-          # `openai` and `google-genai` are pinned explicitly because
-          # core/llm/client.py:build_adapters constructs OpenRouterAdapter /
-          # GeminiAdapter eagerly whenever the matching key is present — even
-          # under LLM_PROFILE=ci that constructor path is exercised by
-          # backend/tests/unit/test_knowledge_core.py — and neither package is
-          # declared in backend/pyproject.toml's `llm` extra. See
-          # docs/12-deployment.md "Must-fix before production".
+          # `openai` is pinned explicitly because core/llm/client.py:build_adapters
+          # constructs OpenRouterAdapter eagerly whenever the matching key is
+          # present — even under LLM_PROFILE=ci that constructor path is
+          # exercised by backend/tests/unit/test_knowledge_core.py.
           ./.venv/bin/pip install -q -e "backend[dev,api,llm,parsing]" \
-            "openai==2.51.0" "google-genai==2.16.0"
+            "openai==2.51.0"
 
       - name: make check
         run: make check

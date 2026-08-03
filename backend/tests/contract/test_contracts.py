@@ -411,14 +411,17 @@ def test_contracts_import_nothing_else_in_the_project() -> None:
 
 def test_provider_routing_falls_back_to_default() -> None:
     routing = c.ProviderRouting(
-        default=c.ModelSpec(provider="anthropic", model="claude-opus-5"),
+        default=c.ModelSpec(provider="openrouter", model="nvidia/nemotron-3-super-120b-a12b:free"),
         stages={
             "validation": c.ModelSpec(
-                provider="anthropic",
-                model="claude-opus-5",
+                provider="openrouter",
+                model="nvidia/nemotron-3-super-120b-a12b:free",
                 reasoning=c.ReasoningConfig(effort="low"),
             )
         },
     )
     assert routing.for_stage("validation").reasoning is not None
-    assert routing.for_stage("knowledge-extraction").model == "claude-opus-5"
+    assert (
+        routing.for_stage("knowledge-extraction").model
+        == "nvidia/nemotron-3-super-120b-a12b:free"
+    )
