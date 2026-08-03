@@ -585,7 +585,21 @@ def test_a_provider_without_credentials_is_absent_rather_than_broken() -> None:
     from core.llm.client import build_adapters
 
     adapters = build_adapters()
-    assert sorted(adapters) == ["replay"]
+    for gated in ("openrouter", "gemini", "anthropic"):
+        assert gated not in adapters
+
+
+def test_the_two_providers_needing_no_credential_are_always_available() -> None:
+    """`replay` reads cassettes off disk and `ollama` runs on this machine.
+
+    Neither has anything to authenticate against, so gating them on a key would
+    mean inventing one for them to be gated on. Ollama named in a profile it
+    cannot reach fails with a connection error at call time, which is the honest
+    failure — "adapter not registered" would blame the wrong thing.
+    """
+    from core.llm.client import build_adapters
+
+    assert sorted(build_adapters()) == ["ollama", "replay"]
 
 
 def test_production_profile_routes_to_openrouter_not_anthropic() -> None:
