@@ -9,6 +9,7 @@ import {
   Coins,
   Loader2,
   ShieldAlert,
+  Square,
   WifiOff,
   X,
 } from "lucide-react";
@@ -19,7 +20,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { EmptyState, ErrorState } from "@/components/ui/states";
-import { getJob, retryJob, type JobSnapshot } from "@/lib/api";
+import { cancelJob, getJob, retryJob, type JobSnapshot } from "@/lib/api";
 import { cn } from "@/lib/cn";
 import { describeError } from "@/lib/errors";
 import { formatClock, formatCost, formatDuration, formatTokens } from "@/lib/format";
@@ -137,6 +138,8 @@ function RunView() {
   const [now, setNow] = useState(() => Date.now());
   const [retrying, setRetrying] = useState(false);
   const [retryError, setRetryError] = useState<string | null>(null);
+  const [cancelling, setCancelling] = useState(false);
+  const [cancelError, setCancelError] = useState<string | null>(null);
 
   // Poll the snapshot as a backstop. SSE carries the detail, but a client that
   // arrives after the run finished — or whose stream never opened — must still
@@ -444,8 +447,38 @@ function RunView() {
                 {done ? "Complete" : failed || cancelled ? "Stopped" : "In progress"}
               </span>
               <span className="font-mono tabular-nums text-fg-muted">{progress}%</span>
+              {/* Only while there is something to stop. A run costs money for
+                  as long as it continues, so the way out belongs beside the
+                  clock that shows how long it has been going — not buried at
+                  the bottom of the page under the stage list. */}
+              {!finished && jobId ? (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  loading={cancelling}
+                  onClick={async () => {
+                    setCancelling(true);
+                    setCancelError(null);
+                    try {
+                      await cancelJob(jobId);
+                    } catch (error) {
+                      // In place, not toasted — the same reasoning the retry
+                      // path documents: this is the outcome of an action on
+                      // this screen and must persist until it is read.
+                      setCancelError(describeError(error).title);
+                    } finally {
+                      setCancelling(false);
+                    }
+                  }}
+                >
+                  <Square className="size-3.5" aria-hidden /> Stop run
+                </Button>
+              ) : null}
             </p>
           </div>
+          {cancelError ? (
+            <p className="mt-1 text-sm text-danger">{cancelError}</p>
+          ) : null}
 
           <div
             className="mt-3 h-2 overflow-hidden rounded-full bg-fg/10"

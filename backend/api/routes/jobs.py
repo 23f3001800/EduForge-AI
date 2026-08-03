@@ -34,6 +34,12 @@ router = APIRouter(tags=["jobs"])
 
 _background: set[asyncio.Task[Any]] = set()
 
+#: Running pipeline task per job, so ``cancel`` can stop the work rather than
+#: only relabel it. In-process only, which is the same scope the executor has
+#: today — a job running in a separate worker would need the store to carry the
+#: signal instead.
+_running: dict[UUID, asyncio.Task[Any]] = {}
+
 
 class _CreateJob(JobOptions):
     """Options plus the document to run them against."""
@@ -83,6 +89,10 @@ def _spawn(store: Store, job: JobRecord, settings: Settings, roster: RosterBuild
     # task mid-flight and the job silently disappears.
     _background.add(task)
     task.add_done_callback(_background.discard)
+    # Keyed by job as well, so cancel has something to cancel. Without this the
+    # UI could render a `cancelled` state it had no way to reach.
+    _running[job.id] = task
+    task.add_done_callback(lambda _t, job_id=job.id: _running.pop(job_id, None))
 
 
 @router.post("/jobs", status_code=202, dependencies=[Depends(require_access)])
@@ -182,12 +192,78 @@ async def retry_job(
     return {"job_id": str(job.id), "status": job.status}
 
 
+@router.post("/jobs/{job_id}/cancel", status_code=200, dependencies=[Depends(require_access)])
+async def cancel_job(job_id: UUID, store: Store = Depends(get_store)) -> dict[str, Any]:
+    """Stop a running job and mark it cancelled.
+
+    Gated with the spending endpoints, not the reading ones. Cancelling is not
+    itself a cost, but letting an anonymous caller kill another visitor's
+    half-finished run on a shared instance is worse than letting them start one.
+
+    A job already finished is left exactly as it is and reported back, rather
+    than 409'd: the caller's intent — "do not keep spending on this" — is
+    already satisfied, and an error would tell them to do something about a
+    state that needs nothing done.
+    """
+    job = await store.get_job(job_id)
+    if job is None:
+        raise HTTPException(404, detail={"code": "job_not_found"})
+
+    if job.status in {"succeeded", "succeeded_partial", "failed", "cancelled"}:
+        return {"job_id": str(job.id), "status": job.status, "already_finished": True}
+
+    task = _running.pop(job_id, None)
+    if task is not None and not task.done():
+        task.cancel()
+
+    # Terminal event before terminal status, the ordering `run_job` and
+    # `_fail_job` both follow: the SSE stream replays from the event log, so a
+    # client that polls the instant the status flips must never find a finished
+    # job with no event explaining it.
+    await ProgressEmitter(store, job_id)(
+        stage="cancelled", progress=job.progress, level="warning", message="cancelled by request"
+    )
+    job.status = "cancelled"
+    job.finished_at = datetime.now(UTC)
+    await store.update_job(job)
+
+    return {"job_id": str(job.id), "status": job.status, "already_finished": False}
+
+
 @router.get("/packages/{package_id}")
 async def get_package(package_id: UUID, store: Store = Depends(get_store)) -> dict[str, Any]:
     package = await store.get_package(package_id)
     if package is None:
         raise HTTPException(404, detail={"code": "package_not_found"})
     return package.tkp
+
+
+@router.delete("/packages/{package_id}", status_code=204)
+async def delete_package(package_id: UUID, store: Store = Depends(get_store)) -> Response:
+    """Delete a generated package.
+
+    Ungated deliberately, unlike cancel: deleting costs nothing and starts
+    nothing, and the store refuses to delete a sample, so the blast radius is
+    one package the caller generated. Requiring a key to tidy up would leave a
+    visitor unable to remove their own run from a shared instance.
+    """
+    package = await store.get_package(package_id)
+    if package is None:
+        raise HTTPException(404, detail={"code": "package_not_found"})
+    if package.is_sample:
+        raise HTTPException(
+            409,
+            detail={
+                "code": "sample_not_deletable",
+                "message": (
+                    "This is one of the instance's reference packages. Deleting it "
+                    "would remove it for everyone else using this instance."
+                ),
+            },
+        )
+
+    await store.delete_package(package_id)
+    return Response(status_code=204)
 
 
 @router.get("/packages/{package_id}/validation")

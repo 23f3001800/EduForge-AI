@@ -18,7 +18,7 @@ from uuid import uuid4
 import httpx
 import pytest
 
-from api.deps import set_roster_builder, set_store
+from api.deps import get_store, set_roster_builder, set_store
 from api.main import FRONTEND_DIST, create_app
 from api.samples import seed_samples
 from contracts import TeacherKnowledgePackage
@@ -277,7 +277,146 @@ async def test_job_for_unknown_document_is_404(client: httpx.AsyncClient) -> Non
     assert response.status_code == 404
 
 
-# -------------------------------------------------------------------- ops
+# ------------------------------------------------------------------- cancel
+
+
+class _HangingStage:
+    """A stage that never returns, so a job can be caught mid-run.
+
+    ``STUB_STAGES`` finishes before a test could ever call cancel on anything
+    but an already-done job — ``STEP_DELAY_S`` is 0 under pytest. Blocking on an
+    ``Event`` nothing ever sets is what lets a test observe a job sitting in
+    ``running`` for as long as it needs to.
+    """
+
+    name = "document-intelligence"
+
+    async def run(self, ctx: Any, state: dict[str, Any]) -> dict[str, Any]:
+        await asyncio.Event().wait()
+        return {}  # pragma: no cover - the event above is never set
+
+
+async def _hanging_roster(*_args: Any) -> Any:
+    return Roster(stages=[_HangingStage()], llm=None)
+
+
+class _OrderSpyStore(InMemoryStore):
+    """Records the order cancel's two writes land in, not just that both happened.
+
+    Reading the event log and the job status back afterwards would show both
+    present regardless of which one was written first — the only way to catch
+    them landing in the wrong order is to watch them happen.
+    """
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.writes: list[str] = []
+
+    async def append_event(self, event: Any) -> Any:
+        result = await super().append_event(event)
+        if event.stage == "cancelled":
+            self.writes.append("event")
+        return result
+
+    async def update_job(self, job: Any) -> Any:
+        result = await super().update_job(job)
+        if job.status == "cancelled":
+            self.writes.append("status")
+        return result
+
+
+async def _await_status(
+    client: httpx.AsyncClient, job_id: str, status: str, timeout: float = 5.0
+) -> dict:
+    deadline = asyncio.get_event_loop().time() + timeout
+    while asyncio.get_event_loop().time() < deadline:
+        body = (await client.get(f"/api/v1/jobs/{job_id}")).json()
+        if body["status"] == status:
+            return body
+        await asyncio.sleep(0.01)
+    raise AssertionError(f"job never reached {status!r}")
+
+
+async def test_cancel_of_an_unknown_job_is_404(client: httpx.AsyncClient) -> None:
+    response = await client.post(
+        "/api/v1/jobs/11111111-1111-4111-8111-111111111111/cancel"
+    )
+    assert response.status_code == 404
+    assert response.json()["error"]["code"] == "job_not_found"
+
+
+async def test_cancel_on_a_finished_job_reports_already_finished_and_changes_nothing(
+    client: httpx.AsyncClient,
+) -> None:
+    """Cancelling a job that already succeeded must not relabel a good result.
+
+    The caller's actual intent — stop spending on this — is already satisfied,
+    so this is reported back rather than 409'd, and the finished job is left
+    exactly as it was: same status, same ``finished_at``.
+    """
+    document_id = await _upload(client)
+    job_id = (
+        await client.post("/api/v1/jobs", json={"document_id": document_id})
+    ).json()["job_id"]
+    finished = await _await_job(client, job_id)
+    assert finished["status"] == "succeeded"
+
+    response = await client.post(f"/api/v1/jobs/{job_id}/cancel")
+    assert response.status_code == 200
+    assert response.json() == {
+        "job_id": job_id,
+        "status": "succeeded",
+        "already_finished": True,
+    }
+
+    after = (await client.get(f"/api/v1/jobs/{job_id}")).json()
+    assert after["status"] == "succeeded"
+    assert after["finished_at"] == finished["finished_at"]
+
+
+async def test_cancel_stops_a_running_job_with_the_event_before_the_status_flip() -> None:
+    """The invariant the SSE endpoint depends on (H-02's ordering, applied to
+    cancel): no reader may ever observe a terminal status with nothing in the
+    event log yet to explain it.
+
+    A spy store records the order cancel's two writes actually land in, so this
+    proves the ordering rather than assuming the docstring in ``jobs.py`` still
+    matches the code.
+    """
+    store = _OrderSpyStore()
+    set_store(store)
+    set_roster_builder(_hanging_roster)
+    app = create_app()
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=app), base_url="http://test"
+    ) as client:
+        document_id = await _upload(client)
+        job_id = (
+            await client.post("/api/v1/jobs", json={"document_id": document_id})
+        ).json()["job_id"]
+        await _await_status(client, job_id, "running")
+
+        response = await client.post(f"/api/v1/jobs/{job_id}/cancel")
+        assert response.status_code == 200
+        assert response.json() == {
+            "job_id": job_id,
+            "status": "cancelled",
+            "already_finished": False,
+        }
+
+        after = (await client.get(f"/api/v1/jobs/{job_id}")).json()
+        assert after["status"] == "cancelled"
+        assert after["finished_at"] is not None
+
+        assert store.writes == ["event", "status"], store.writes
+
+        frames = _parse_sse((await client.get(f"/api/v1/jobs/{job_id}/events")).text)
+        assert frames[-1]["data"]["stage"] == "cancelled"
+        assert frames[-1]["data"]["level"] == "warning"
+        assert frames[-1]["event"] == "warning"
+
+
+# ------------------------------------------------------------- ops
 
 
 async def test_health_and_readiness(client: httpx.AsyncClient) -> None:
@@ -377,6 +516,51 @@ async def test_rendered_artifacts_are_listed_and_downloadable() -> None:
 
         missing = await client.get(f"/api/v1/packages/{job['package_id']}/artifacts/nope")
         assert missing.status_code == 404
+
+
+# ------------------------------------------------------------ package delete
+
+
+async def test_deleting_an_unknown_package_is_404(client: httpx.AsyncClient) -> None:
+    response = await client.delete("/api/v1/packages/11111111-1111-4111-8111-111111111111")
+    assert response.status_code == 404
+    assert response.json()["error"]["code"] == "package_not_found"
+
+
+async def test_deleting_a_sample_is_refused(seeded_client: httpx.AsyncClient) -> None:
+    """Samples are the instance's shared reference set, not any one visitor's.
+
+    One visitor deleting the physics or history sample would empty the
+    comparison every later visitor relies on, on an instance nobody redeploys
+    between demos.
+    """
+    listed = (await seeded_client.get("/api/v1/samples")).json()["samples"]
+    package_id = listed[0]["package_id"]
+
+    response = await seeded_client.delete(f"/api/v1/packages/{package_id}")
+    assert response.status_code == 409
+    assert response.json()["error"]["code"] == "sample_not_deletable"
+
+    # Refused, not silently ignored: the package is still there afterwards.
+    still_there = await seeded_client.get(f"/api/v1/packages/{package_id}")
+    assert still_there.status_code == 200
+
+
+async def test_deleting_a_package_removes_it(client: httpx.AsyncClient) -> None:
+    """A generated package really goes: gone from the store, not just hidden."""
+    document_id = await _upload(client)
+    job_id = (
+        await client.post("/api/v1/jobs", json={"document_id": document_id})
+    ).json()["job_id"]
+    job = await _await_job(client, job_id)
+    package_id = job["package_id"]
+
+    response = await client.delete(f"/api/v1/packages/{package_id}")
+    assert response.status_code == 204
+    assert response.content == b""
+
+    gone = await client.get(f"/api/v1/packages/{package_id}")
+    assert gone.status_code == 404
 
 
 # ---------------------------------------------------------- error envelope
@@ -637,6 +821,18 @@ async def test_spending_endpoints_are_closed_without_the_key(
     assert job.status_code == 401
 
 
+async def test_cancel_is_gated_like_the_other_spending_endpoints(
+    gated_client: httpx.AsyncClient,
+) -> None:
+    """Grouped with uploads and job creation, not with the reading endpoints:
+    cancelling costs nothing itself, but letting an anonymous caller stop
+    another visitor's half-finished run on a shared instance is worse than
+    letting them start one."""
+    response = await gated_client.post(f"/api/v1/jobs/{uuid4()}/cancel")
+    assert response.status_code == 401
+    assert response.json()["error"]["code"] == "access_key_required"
+
+
 async def test_reading_stays_open_when_a_key_is_configured(
     gated_client: httpx.AsyncClient,
 ) -> None:
@@ -644,6 +840,33 @@ async def test_reading_stays_open_when_a_key_is_configured(
     publishing a demonstration at all."""
     for path in ("/api/v1/samples", "/api/v1/options", "/healthz"):
         assert (await gated_client.get(path)).status_code == 200, path
+
+
+async def test_deleting_a_package_needs_no_access_key(
+    gated_client: httpx.AsyncClient,
+) -> None:
+    """Deletion is ungated, unlike cancel: it costs nothing and starts nothing,
+    and the store refuses to delete a sample regardless, so requiring a key here
+    would only leave a visitor unable to remove their own run."""
+    from contracts.primitives import SCHEMA_VERSION
+    from core.storage.base import PackageRecord
+    from tests.fixtures import factories as fx
+
+    package_id = uuid4()
+    tkp = fx.teacher_knowledge_package().model_dump(mode="json")
+    await get_store().save_package(
+        PackageRecord(
+            id=package_id,
+            job_id=package_id,
+            document_id=package_id,
+            schema_version=str(tkp.get("schema_version") or SCHEMA_VERSION),
+            tkp=tkp,
+            status="pass",
+        )
+    )
+
+    response = await gated_client.delete(f"/api/v1/packages/{package_id}")
+    assert response.status_code == 204
 
 
 async def test_the_key_opens_the_gate(gated_client: httpx.AsyncClient) -> None:

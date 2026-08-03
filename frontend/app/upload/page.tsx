@@ -33,6 +33,7 @@ export default function UploadPage() {
   const [dragging, setDragging] = useState(false);
   const [fileError, setFileError] = useState<string | null>(null);
   const [showOptions, setShowOptions] = useState(false);
+  const [showKeyField, setShowKeyField] = useState(false);
 
   const [board, setBoard] = useState("generic");
   const [style, setStyle] = useState("balanced");
@@ -309,7 +310,25 @@ export default function UploadPage() {
             <Loader2 className="size-4 animate-spin" aria-hidden /> Uploading and queueing…
           </span>
         ) : null}
+
+        {/* Findable before the refusal, not only after it. Most instances need
+            no key, so this stays a quiet link rather than a field competing
+            with the button — but someone handed a key and a link should not
+            have to trigger a 401 to discover where the key goes. */}
+        {!submit.isPending && !showKeyField ? (
+          <button
+            type="button"
+            onClick={() => setShowKeyField(true)}
+            className="text-sm font-medium text-accent underline-offset-4 hover:underline"
+          >
+            Have an access key?
+          </button>
+        ) : null}
       </div>
+
+      {showKeyField && !isAccessKeyError(submit.error) ? (
+        <AccessKeyPrompt onSaved={() => setShowKeyField(false)} />
+      ) : null}
     </div>
   );
 }

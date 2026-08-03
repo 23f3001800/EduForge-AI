@@ -230,7 +230,10 @@ def test_control_characters_never_reach_the_page() -> None:
     """Measured: U+0002 and U+0012 travelled from a source PDF through parsing,
     chunking and generation into a rendered artifact. They are not content."""
     assert typeset("charge\x02 density\x12") == "charge density"
-    assert typeset("line one\nline two\tindented") == "line one\nline two\tindented"
+    # Newlines survive because the renderer's wrapping honours them. Tabs do not:
+    # no font here has a tab glyph, so fpdf2 dropped them and warned, silently
+    # closing up the gap the tab existed to make. Spaces keep it visible.
+    assert typeset("line one\nline two\tindented") == "line one\nline two  indented"
 
 
 # ────────────────────────────────────────────────────────────── answer key

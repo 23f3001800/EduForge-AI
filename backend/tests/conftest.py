@@ -18,6 +18,19 @@ import pytest
 # Set before anything imports core.config, whose Settings are constructed eagerly.
 os.environ.setdefault("LLM_PROFILE", "ci")
 
+# The suite runs against an *open* instance unless a test says otherwise.
+#
+# Settings read the developer's own .env, so a maintainer who sets ACCESS_KEY to
+# gate their deployment silently gated their test suite too: every upload in
+# every test began returning 401 and 29 tests failed for a reason that had
+# nothing to do with the code under test. A suite whose result depends on an
+# untracked local file is not measuring the repository.
+#
+# Forced rather than defaulted — `setdefault` would still lose to a value
+# already in the environment, which is exactly the case being defended against.
+# Tests that exercise the gate set the value on Settings directly.
+os.environ["ACCESS_KEY"] = ""
+
 
 @pytest.fixture(autouse=True)
 def _reset_settings_cache() -> None:

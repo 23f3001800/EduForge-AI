@@ -139,11 +139,18 @@ def typeset(text: str) -> str:
     Control characters are stripped rather than substituted. They arrive from
     PDF extraction — a source chapter carried U+0002 and U+0012 through parsing,
     chunking and generation into the rendered artifact — and they are not
-    content in any encoding. Tabs and newlines are kept: those are layout the
-    renderer's own wrapping understands.
+    content in any encoding.
+
+    Newlines are kept, because the renderer's wrapping honours them. Tabs are
+    not: no font here has a tab glyph, so fpdf2 dropped them and warned, and a
+    tab that survives as nothing silently closes up the gap it was there to
+    make. Two spaces keep the separation visible.
     """
     if not text:
         return text
+
+    if "\t" in text:
+        text = text.replace("\t", "  ")
 
     for symbol, replacement in _SUBSTITUTIONS.items():
         if symbol in text:

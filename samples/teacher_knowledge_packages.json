@@ -1,6 +1,6 @@
 {
   "schema_version": "1.0.0",
-  "bundled_at": "2026-08-03T19:01:19+00:00",
+  "bundled_at": "2026-08-03T19:38:14+00:00",
   "what_this_is": "Teacher Knowledge Packages produced by EduForge AI, bundled into one file for submission. Each entry's `package` is the artifact exactly as the pipeline published it. The per-directory copies under samples/ are canonical; this file is regenerated from them.",
   "reproduce": "make dev, then: python scripts/capture_sample.py samples/<name>/source.pdf --name <name>",
   "packages": [
