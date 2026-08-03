@@ -42,6 +42,7 @@ from contracts.document import (
     Block,
     DocumentMetadata,
     DocumentStats,
+    OcrProvenance,
     StructuredDocument,
 )
 from core.obs.logging import get_logger
@@ -93,6 +94,20 @@ class ParseLimits:
     in_subprocess: bool = True
     workers: int = 2
     memory_bytes: int = 2048 * 1024 * 1024
+
+
+def _settings_or_none() -> Any | None:
+    """Settings, or None when they cannot be constructed.
+
+    OCR is optional, so a configuration problem must degrade it rather than
+    fail the parse — the same rule _limits_from_settings follows.
+    """
+    try:
+        from core.config import get_settings
+
+        return get_settings()
+    except Exception:  # pragma: no cover - a missing key is not a parse failure
+        return None
 
 
 def _limits_from_settings() -> ParseLimits:
@@ -185,9 +200,7 @@ def _get_mp_context() -> Any | None:
             if method == "forkserver":
                 # Pre-importing the parsers keeps the per-parse cost at a fork
                 # rather than a full interpreter warm-up.
-                context.set_forkserver_preload(
-                    ["stages.s1_document_intelligence.parsers"]
-                )
+                context.set_forkserver_preload(["stages.s1_document_intelligence.parsers"])
             _mp_context = context
         except Exception:
             _subprocess_unavailable = True
@@ -282,8 +295,7 @@ async def _run_in_subprocess(
             except BrokenExecutor as exc:
                 _terminate(executor)
                 raise ParseFailure(
-                    "Parsing exhausted the memory or CPU allowed for one document "
-                    "and was stopped.",
+                    "Parsing exhausted the memory or CPU allowed for one document and was stopped.",
                     reason="child_resource_limit",
                 ) from exc
         finally:
@@ -338,6 +350,88 @@ def _stats(blocks: list[Block]) -> DocumentStats:
     )
 
 
+async def _recover_scanned_pages(
+    *,
+    payload: bytes,
+    mime: str,
+    blocks: list[Block],
+    limits: ParseLimits,
+) -> tuple[list[Block], OcrProvenance | None]:
+    """Read pages that carry no text layer, and record how it went.
+
+    Returns the blocks unchanged and ``None`` whenever OCR does not apply —
+    a non-PDF, a fully born-digital document, or no engine configured. That is
+    the overwhelmingly common path and it must cost nothing: detection is a
+    local measurement, and no engine is constructed until a page actually needs
+    one.
+
+    Recognised pages are appended rather than interleaved. Their true position
+    in reading order is unknowable without laying them back out against the
+    text blocks, and guessing wrong would scramble a document that OCR had just
+    successfully rescued. ``page`` is set on every block, so ordering is
+    recoverable downstream; :func:`assign_section_paths` runs afterwards and
+    gives them section paths like any other block.
+    """
+    if mime != "application/pdf":
+        return blocks, None
+
+    from stages.s1_document_intelligence import ocr as ocr_module
+
+    profiles = ocr_module.profile_pdf(payload)
+    pages = ocr_module.scanned_pages(profiles)
+    if not pages:
+        return blocks, None
+
+    settings = _settings_or_none()
+    max_pages = getattr(settings, "ocr_max_pages", 60) if settings else 60
+    if len(pages) > max_pages:
+        # A hosted engine is metered per page. Refusing loudly beats quietly
+        # billing for a 400-page scan the uploader thought was a chapter.
+        _log.warning("ocr_skipped_too_many_pages", extra={"pages": len(pages), "limit": max_pages})
+        return blocks, None
+
+    engine = ocr_module.build_engine(settings) if settings else None
+    if engine is None:
+        _log.warning("ocr_needed_but_unavailable", extra={"pages": len(pages)})
+        return blocks, None
+
+    try:
+        result = await asyncio.to_thread(ocr_module.recognise_scanned_pages, payload, pages, engine)
+    except Exception:
+        # OCR is a recovery path. If it fails, the document is no worse off
+        # than before it ran, so the parse continues with what the parser found.
+        _log.warning("ocr_failed", exc_info=True)
+        return blocks, None
+    finally:
+        engine.close()
+
+    # Built through the same choke point as every parser, so OCR output is
+    # bounded by the same block and character ceilings. A recogniser handed a
+    # noisy scan can emit a great deal of text.
+    builder = parsers._BlockBuilder(max_blocks=limits.max_blocks, max_chars=limits.max_chars)
+    for page in result.pages:
+        builder.add("paragraph", page.text, page=page.page)
+    recovered = list(builder.blocks)
+
+    threshold = getattr(settings, "ocr_min_confidence", None) if settings else None
+    provenance = OcrProvenance(
+        engine=result.engine,
+        pages=[p.page for p in result.pages if p.text.strip()],
+        failed_pages=list(result.failed_pages),
+        confidence=result.confidence,
+        min_confidence=threshold,
+    )
+    _log.info(
+        "ocr_recovered_pages",
+        extra={
+            "engine": result.engine,
+            "pages": len(recovered),
+            "confidence": result.confidence,
+        },
+    )
+    return blocks + recovered, provenance
+
+
 async def parse_document(
     *,
     document_id: UUID,
@@ -387,10 +481,19 @@ async def parse_document(
     )
     blocks: list[Block] = await _run_parser(call, timeout_s=timeout_s, limits=limits)
 
+    # Pages with no text layer are invisible to every parser above — the words
+    # are pixels. Recover them before deciding the document is empty, because
+    # "scanned" and "blank" produce identical output up to this point and only
+    # one of them is a failure. FAQ Q7 names scanned PDFs as an expected input.
+    blocks, ocr = await _recover_scanned_pages(
+        payload=payload, mime=mime, blocks=blocks, limits=limits
+    )
+
     if not blocks:
         raise EmptyDocument(
-            "No extractable text was found. A scanned document without a text "
-            "layer needs OCR, which this pipeline does not perform."
+            "No extractable text was found. If this is a scanned document, OCR "
+            "either found nothing or is not configured — set OCR_ENGINE and the "
+            "credentials for the engine you choose."
         )
 
     blocks = assign_section_paths(blocks)
@@ -407,6 +510,7 @@ async def parse_document(
             page_count=max(pages) if pages else None,
             word_count=word_count,
             title=next((b.text for b in blocks if b.type == "heading"), None),
+            ocr=ocr,
         ),
         blocks=blocks,
         outline=build_outline(blocks),
@@ -454,6 +558,36 @@ class DocumentIntelligenceStage:
             await span.progress(0.8, message=f"{len(document.blocks)} blocks, {len(chunks)} chunks")
             if document.stats.equations:
                 span.warn(f"{document.stats.equations} equations detected")
+
+            # A teacher has to be told which words came from a machine reading
+            # pixels rather than from the document itself. Everything downstream
+            # grounds its claims against this text, so if OCR misread it, every
+            # later check confirms the error instead of catching it — this
+            # warning is the only place that uncertainty is visible.
+            ocr = document.metadata.ocr
+            if ocr is not None:
+                span.decide(
+                    f"{len(ocr.pages)} page(s) read by OCR ({ocr.engine})",
+                    "those pages carried no text layer, so the words were "
+                    "recovered from the page image rather than extracted",
+                )
+                if ocr.below_threshold:
+                    span.warn(
+                        f"OCR confidence {ocr.confidence:.0%} is below the "
+                        f"{ocr.min_confidence:.0%} threshold on page(s) "
+                        f"{ocr.pages}; check this material against the source "
+                        "before teaching from it"
+                    )
+                elif ocr.confidence is None:
+                    span.warn(
+                        f"{ocr.engine} reported no confidence for the "
+                        f"{len(ocr.pages)} page(s) it read; their accuracy is unknown"
+                    )
+                if ocr.failed_pages:
+                    span.warn(
+                        f"page(s) {ocr.failed_pages} had no text layer and could "
+                        "not be read; that content is missing from this package"
+                    )
             return {
                 "structured_document": document.model_dump(mode="json"),
                 "chunks": [c.model_dump(mode="json") for c in chunks],

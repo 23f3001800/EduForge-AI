@@ -150,8 +150,7 @@ def inspect_ooxml_archive(
         )
         if ratio > max_ratio:
             raise DocumentTooLarge(
-                f"Archive member {info.filename!r} expands {ratio:.0f}:1; "
-                f"limit is {max_ratio}:1.",
+                f"Archive member {info.filename!r} expands {ratio:.0f}:1; limit is {max_ratio}:1.",
                 reason="archive_compression_ratio",
                 member=info.filename,
                 ratio=round(ratio, 1),
