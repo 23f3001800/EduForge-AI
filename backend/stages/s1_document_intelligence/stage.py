@@ -350,12 +350,57 @@ def _stats(blocks: list[Block]) -> DocumentStats:
     )
 
 
+#: How far the uploader's declared document kind may move the per-page character
+#: floor that decides whether a page is scanned.
+#:
+#: The floor is what actually decides. A page holding at least this many
+#: characters is never called scanned, and on any ordinary page size a page under
+#: the floor is already far below the density line — so the density test settles
+#: nothing and biasing it would be theatre. The default floor is 60.
+#:
+#: 30 characters is a deliberate half-step: it moves the boundary by half its own
+#: width, which is enough to change the answer for a page carrying a stray header
+#: and nothing else, and not enough to reach a page with real text on it.
+_KIND_FLOOR_NUDGE = 30
+
+#: FAQ Q7 lets an uploader declare what they are sending. The hint is advisory:
+#: someone uploading a born-digital chapter picks "Scanned PDF" to be safe, and
+#: someone uploading a photocopy picks "Mostly Text". So it adjusts where the
+#: line sits rather than deciding which side of it a page falls on.
+_KIND_BIAS: dict[str, int] = {
+    # Declared scanned: lean toward reading a marginal page rather than losing it.
+    "scanned_pdf": +_KIND_FLOOR_NUDGE,
+    # Declared text: lean against spending a metered OCR call on a page that
+    # probably parsed fine.
+    "mostly_text": -_KIND_FLOOR_NUDGE,
+    "text_with_tables": -_KIND_FLOOR_NUDGE,
+    # Diagrams and equations say nothing about whether a text layer exists - a
+    # figure-heavy born-digital page is still born-digital - so they do not move
+    # the line at all.
+    "text_with_diagrams": 0,
+    "text_with_equations": 0,
+    "unknown": 0,
+}
+
+
+def _char_floor_for(document_kind: str | None) -> int:
+    """The scanned-page character floor, adjusted by the uploader's declared kind."""
+    from stages.s1_document_intelligence.ocr.detect import MIN_CHARS_PER_PAGE
+
+    bias = _KIND_BIAS.get((document_kind or "unknown").strip().lower(), 0)
+    # Never let a hint drive the floor to zero: at zero no page clears it, every
+    # inked page becomes "scanned", and a wrong hint would send a whole readable
+    # document to a metered recogniser.
+    return max(10, MIN_CHARS_PER_PAGE + bias)
+
+
 async def _recover_scanned_pages(
     *,
     payload: bytes,
     mime: str,
     blocks: list[Block],
     limits: ParseLimits,
+    document_kind: str | None = None,
 ) -> tuple[list[Block], OcrProvenance | None]:
     """Read pages that carry no text layer, and record how it went.
 
@@ -378,7 +423,7 @@ async def _recover_scanned_pages(
     from stages.s1_document_intelligence import ocr as ocr_module
 
     profiles = ocr_module.profile_pdf(payload)
-    pages = ocr_module.scanned_pages(profiles)
+    pages = ocr_module.scanned_pages(profiles, char_floor=_char_floor_for(document_kind))
     if not pages:
         return blocks, None
 
@@ -442,6 +487,7 @@ async def parse_document(
     max_pages: int,
     timeout_s: float,
     limits: ParseLimits | None = None,
+    document_kind: str | None = None,
 ) -> tuple[StructuredDocument, list[Any]]:
     """Parse bytes into a structured document and its chunks."""
     if len(payload) > max_bytes:
@@ -486,7 +532,11 @@ async def parse_document(
     # "scanned" and "blank" produce identical output up to this point and only
     # one of them is a failure. FAQ Q7 names scanned PDFs as an expected input.
     blocks, ocr = await _recover_scanned_pages(
-        payload=payload, mime=mime, blocks=blocks, limits=limits
+        payload=payload,
+        mime=mime,
+        blocks=blocks,
+        limits=limits,
+        document_kind=document_kind,
     )
 
     if not blocks:
@@ -554,6 +604,7 @@ class DocumentIntelligenceStage:
                 max_pages=self._max_pages,
                 timeout_s=self._timeout_s,
                 limits=self._limits,
+                document_kind=ctx.options.get("document_kind"),
             )
             await span.progress(0.8, message=f"{len(document.blocks)} blocks, {len(chunks)} chunks")
             if document.stats.equations:

@@ -29,8 +29,12 @@ from stages.s1_document_intelligence.ocr.detect import (
     MIN_CHARS_PER_PAGE,
     PageTextProfile,
 )
+from stages.s1_document_intelligence.stage import _char_floor_for
 
 A4_SQIN = 8.27 * 11.69
+
+#: The declared kinds that must route differently, weakest signal to strongest.
+KINDS = ("mostly_text", "unknown", "scanned_pdf")
 
 
 def _page(chars: int, *, image_share: float = 1.0, page: int = 1) -> PageTextProfile:
@@ -57,6 +61,49 @@ def test_a_page_with_real_text_is_never_sent_to_ocr(chars: int, why: str) -> Non
     675- and 1003-character pages as scanned — both are perfectly readable.
     """
     assert _page(chars).is_scanned is False, why
+
+
+def test_the_declared_document_kind_changes_a_marginal_decision() -> None:
+    """FAQ Q7's hint has to actually route something, or it is decoration.
+
+    Guards a real defect. The hint was first wired to bias the chars-per-sq-in
+    density line, which reads like a control and is not one: the character floor
+    returns first, and a page under the floor is already far below every density
+    threshold on any ordinary page size. Every declared kind produced identical
+    routing. The assertion below — three kinds, three different answers for the
+    *same* page — is what failed then and what would fail again.
+    """
+    stray_header_only = _page(45)
+    answers = {kind: stray_header_only.is_scanned_at(_char_floor_for(kind)) for kind in KINDS}
+
+    assert answers == {"mostly_text": False, "unknown": True, "scanned_pdf": True}
+    assert len({_char_floor_for(k) for k in KINDS}) == len(KINDS), (
+        "each declared kind must map to a distinct floor, or the hint is inert"
+    )
+
+
+@pytest.mark.parametrize(
+    ("chars", "image_share", "why"),
+    [
+        (675, 1.0, "a sparse but genuinely readable page"),
+        (2804, 1.0, "a dense prose page"),
+        (0, 0.0, "a blank divider carrying no ink"),
+    ],
+)
+def test_a_declared_kind_cannot_overturn_a_clear_reading(
+    chars: int, image_share: float, why: str
+) -> None:
+    """The hint breaks ties. It does not get a vote on unambiguous pages.
+
+    An uploader who picks "Scanned PDF" for a born-digital chapter — the common
+    mistake, since it sounds like the safe answer — must not thereby send 44
+    readable pages to a metered recogniser that would replace exact text with a
+    guess.
+    """
+    page = _page(chars, image_share=image_share)
+    verdicts = {page.is_scanned_at(_char_floor_for(kind)) for kind in KINDS}
+    assert len(verdicts) == 1, f"declared kind changed the answer for {why}"
+    assert verdicts == {page.is_scanned}, "the tie-breaker moved an undisputed page"
 
 
 def test_image_coverage_alone_never_means_scanned() -> None:

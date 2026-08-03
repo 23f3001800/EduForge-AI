@@ -175,6 +175,11 @@ def main() -> int:
     parser.add_argument(
         "--document-kind", default=None, help="FAQ Q7 parse-routing hint."
     )
+    parser.add_argument(
+        "--language",
+        default=None,
+        help="BCP-47 output language, e.g. 'hi'. The source document stays as it is.",
+    )
     parser.add_argument("--timeout", type=float, default=1800.0)
     args = parser.parse_args()
 
@@ -189,6 +194,8 @@ def main() -> int:
         options["curriculum_board"] = args.board
     if args.document_kind:
         options["document_kind"] = args.document_kind
+    if args.language:
+        options["output_language"] = args.language
 
     with httpx.Client(base_url=args.base_url, timeout=args.timeout) as client:
         try:

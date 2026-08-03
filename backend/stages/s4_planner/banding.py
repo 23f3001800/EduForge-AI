@@ -268,6 +268,45 @@ def default_time_allocation(duration_minutes: int) -> list[dict[str, Any]]:
     return _apportion(raw, duration_minutes)
 
 
+#: A timetable label has to fit beside a clock reading, in a PDF cell and on a
+#: phone. Beyond this it is instruction, not a label.
+_MAX_LABEL_WORDS = 6
+
+
+def _as_label(raw: str) -> str:
+    """Reduce a model's slot description to something usable as a label.
+
+    ``TimeSlot.label`` documents itself as "Entry ticket", "Guided practice" —
+    a name. Models reliably answer with the *instruction* instead: a real run
+    produced "Activate prior knowledge with demonstrations of everyday static
+    electricity (sparks, charged plastic, hair standing); ask students to
+    describe observations". Correct content, wrong field: rendered in a
+    timetable cell it is a paragraph beside a number.
+
+    So the deterministic half takes the first clause and caps its length, which
+    is the same division of labour every generation stage uses — the model
+    decides the emphasis and the wording, structure is not its call. The full
+    sentence is not lost; the teacher script carries the instruction, at far
+    more length than a label could.
+    """
+    text = " ".join(raw.split())
+    if not text:
+        return ""
+
+    # The first clause is almost always the name: models write "Guided practice:
+    # students calculate..." or "Hook - quick demonstration; then ask...".
+    for separator in (":", ";", " - ", " — "):
+        head, found, _ = text.partition(separator)
+        if found and head.strip():
+            text = head.strip()
+            break
+
+    words = text.split()
+    if len(words) > _MAX_LABEL_WORDS:
+        text = " ".join(words[:_MAX_LABEL_WORDS])
+    return text.rstrip(" ,.;:-—").strip()
+
+
 def normalise_time_allocation(
     slots: Sequence[Mapping[str, Any]], duration_minutes: int
 ) -> list[dict[str, Any]]:
@@ -281,7 +320,7 @@ def normalise_time_allocation(
     """
     cleaned: list[tuple[str, float]] = []
     for slot in slots:
-        label = str(slot.get("label") or "").strip()
+        label = _as_label(str(slot.get("label") or ""))
         try:
             minutes = float(slot.get("minutes") or 0)
         except (TypeError, ValueError):
