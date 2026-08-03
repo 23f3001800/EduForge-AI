@@ -11,6 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ErrorState } from "@/components/ui/states";
 import { createJob, getOptions, uploadDocument, type JobOptions } from "@/lib/api";
 import { cn } from "@/lib/cn";
+import { AccessKeyPrompt, isAccessKeyError } from "@/components/access-key";
 import { describeError, traceIdOf } from "@/lib/errors";
 import { formatBytes, labelFor } from "@/lib/format";
 
@@ -90,6 +91,10 @@ export default function UploadPage() {
       router.push(`/run?job=${job.job_id}`);
     },
     onError: (error) => {
+      // A missing key already renders a panel explaining itself and offering
+      // the field that fixes it; a toast saying the same thing worse would only
+      // pull attention away from the input the visitor needs to reach.
+      if (isAccessKeyError(error)) return;
       const { title, body } = describeError(error);
       toast.error(title, { description: body });
     },
@@ -270,7 +275,11 @@ export default function UploadPage() {
         ) : null}
       </Card>
 
-      {submit.isError ? (
+      {/* A missing key is not an error to retry — retrying without one fails
+          identically. It gets the field that fixes it instead. */}
+      {submit.isError && isAccessKeyError(submit.error) ? (
+        <AccessKeyPrompt onSaved={() => submit.reset()} />
+      ) : submit.isError ? (
         <ErrorState
           title={describeError(submit.error).title}
           traceId={traceIdOf(submit.error)}

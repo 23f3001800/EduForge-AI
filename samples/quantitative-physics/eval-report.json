@@ -1,0 +1,2034 @@
+{
+  "benchmark": {
+    "overall": {
+      "max": 97.45,
+      "median": 96.2,
+      "min": 94.96,
+      "n": 2,
+      "p25": 94.96,
+      "p75": 97.45
+    },
+    "profile": "quantitative",
+    "runs": 2,
+    "stages": {
+      "activity-generation": {
+        "max": 100.0,
+        "median": 100.0,
+        "min": 100.0,
+        "n": 2,
+        "p25": 100.0,
+        "p75": 100.0
+      },
+      "assessment-generation": {
+        "max": 100.0,
+        "median": 100.0,
+        "min": 100.0,
+        "n": 2,
+        "p25": 100.0,
+        "p75": 100.0
+      },
+      "document-intelligence": {
+        "max": 92.86,
+        "median": 92.86,
+        "min": 92.86,
+        "n": 2,
+        "p25": 92.86,
+        "p75": 92.86
+      },
+      "educational-classification": {
+        "max": 98.22,
+        "median": 88.98,
+        "min": 79.74,
+        "n": 2,
+        "p25": 79.74,
+        "p75": 98.22
+      },
+      "gap-analysis": {
+        "max": 95.1,
+        "median": 94.61,
+        "min": 94.12,
+        "n": 2,
+        "p25": 94.12,
+        "p75": 95.1
+      },
+      "knowledge-extraction": {
+        "max": 100.0,
+        "median": 100.0,
+        "min": 100.0,
+        "n": 2,
+        "p25": 100.0,
+        "p75": 100.0
+      },
+      "lesson-generation": {
+        "max": 100.0,
+        "median": 100.0,
+        "min": 100.0,
+        "n": 2,
+        "p25": 100.0,
+        "p75": 100.0
+      },
+      "publishing": {
+        "max": 97.27,
+        "median": 97.27,
+        "min": 97.27,
+        "n": 2,
+        "p25": 97.27,
+        "p75": 97.27
+      },
+      "teaching-planner": {
+        "max": 100.0,
+        "median": 100.0,
+        "min": 100.0,
+        "n": 2,
+        "p25": 100.0,
+        "p75": 100.0
+      },
+      "validation": {
+        "max": 89.04,
+        "median": 85.96,
+        "min": 82.88,
+        "n": 2,
+        "p25": 82.88,
+        "p75": 89.04
+      }
+    },
+    "sufficient": false
+  },
+  "comparison": {
+    "detail": "2 comparable run(s) on record; a baseline needs at least 5 before a fall in score can be told apart from run-to-run variation.",
+    "improvements": [],
+    "needed": 5,
+    "regressions": [],
+    "runs": 2,
+    "skipped": [],
+    "status": "insufficient_history"
+  },
+  "evaluated_at": "2026-08-03T18:52:54+00:00",
+  "grade_band": "11-12",
+  "history": [
+    {
+      "confidence": 0.879,
+      "evaluated_at": "2026-08-03T18:37:34+00:00",
+      "overall": 94.96,
+      "profile": "quantitative",
+      "run_id": "ede51c32-b583-5884-b100-acd88edee73f",
+      "subject": "Physics"
+    },
+    {
+      "confidence": 0.879,
+      "evaluated_at": "2026-08-03T18:37:35+00:00",
+      "overall": 97.45,
+      "profile": "quantitative",
+      "run_id": "38d7259a-9121-5231-8644-b8db6ee27050",
+      "subject": "Physics"
+    }
+  ],
+  "not_measurable": [
+    {
+      "label": "OCR confidence",
+      "metric": "ocr_confidence",
+      "reason": "No page needed OCR: every page carried a text layer, so nothing was read from an image and there is no confidence to report. Measuring it would need: a document with at least one scanned page",
+      "stage": "document-intelligence"
+    },
+    {
+      "label": "OCR accuracy",
+      "metric": "ocr_accuracy",
+      "reason": "Accuracy is a comparison against what the page actually said, and no uploader supplies a transcript of their own scan. Confidence is reported instead, which is the recogniser's certainty, not its correctness — the two come apart exactly when it matters. Measuring it would need: reference transcriptions of the scanned pages to diff against",
+      "stage": "document-intelligence"
+    },
+    {
+      "label": "Extraction fidelity vs. original",
+      "metric": "extraction_fidelity",
+      "reason": "Fidelity is a comparison, and the original document's ground-truth text is not part of the package. Measuring it would need: a hand-checked transcript of the source PDF to diff the extraction against",
+      "stage": "document-intelligence"
+    },
+    {
+      "label": "Subject / grade classification accuracy",
+      "metric": "subject_accuracy",
+      "reason": "Accuracy needs labels. There is no corpus of documents with agreed subject and grade-band annotations to score this run against. Measuring it would need: a held-out set of documents labelled by teachers, ideally 100+ across subjects",
+      "stage": "educational-classification"
+    },
+    {
+      "label": "Item difficulty is calibrated",
+      "metric": "item_difficulty_calibration",
+      "reason": "Difficulty is a property of a population's responses. No student has answered these items, so there is no p-value or discrimination index to report. Measuring it would need: response data from a cohort — item-response theory needs roughly 100 students per item",
+      "stage": "assessment-generation"
+    },
+    {
+      "label": "Teacher satisfaction",
+      "metric": "teacher_satisfaction",
+      "reason": "Satisfaction is a rating teachers give. None have used this package. Measuring it would need: a pilot with teachers rating packages after classroom use — 20+ responses before a mean means anything",
+      "stage": "outcomes"
+    },
+    {
+      "label": "Student learning effectiveness",
+      "metric": "student_learning_effectiveness",
+      "reason": "Effectiveness is measured by what students learn, which requires students, a pre-test and a post-test. Measuring it would need: a controlled classroom trial with pre/post assessment against a conventionally-planned unit",
+      "stage": "outcomes"
+    },
+    {
+      "label": "Teacher preparation time saved",
+      "metric": "time_saved",
+      "reason": "Time saved is a difference against how long the same teacher would take unaided. That baseline has not been collected. Measuring it would need: timed preparation of the same unit by teachers with and without the package",
+      "stage": "outcomes"
+    },
+    {
+      "label": "Conformance to a published curriculum",
+      "metric": "curriculum_conformance",
+      "reason": "The package aligns to a board's structure, but no authority has certified the mapping. Reporting a conformance score would state agreement nobody granted. Measuring it would need: an official syllabus document parsed to statement level, and a reviewer's sign-off on the mapping",
+      "stage": "outcomes"
+    }
+  ],
+  "package_id": "5d18a35e-1b41-4670-ac75-5cb84fe2162b",
+  "profile": "quantitative",
+  "recommendations": [
+    {
+      "action": "Derive low_confidence_fields from the confidences map rather than letting the model populate both independently.",
+      "impact": "A field the classifier doubted reaches teachers unflagged.",
+      "metric": "low_confidence_declared",
+      "metric_label": "Low-confidence fields flagged for review",
+      "score": 0.0,
+      "severity": "high",
+      "stage": "educational-classification",
+      "stage_label": "Educational classification"
+    },
+    {
+      "action": "Route the blocking issues back to their owning stage for repair.",
+      "impact": "The package ships with defects its own validator found.",
+      "metric": "issue_resolution",
+      "metric_label": "No blocking issues remain",
+      "score": 44.44,
+      "severity": "high",
+      "stage": "validation",
+      "stage_label": "Validation"
+    },
+    {
+      "action": "Re-run extraction with the citation verifier rejecting spans whose quote is not substring-present in the cited chunk.",
+      "impact": "A citation that does not check out is worse than no citation — a teacher trusts it.",
+      "metric": "citation_integrity",
+      "metric_label": "Quotes appear in the chunks they cite",
+      "score": 66.67,
+      "severity": "high",
+      "stage": "knowledge-extraction",
+      "stage_label": "Knowledge extraction"
+    },
+    {
+      "action": "Emit a timing entry from every stage span, including cheap ones.",
+      "impact": "Per-stage cost cannot be attributed without it.",
+      "metric": "stage_timings",
+      "metric_label": "Every stage reported its cost",
+      "score": 90.0,
+      "severity": "medium",
+      "stage": "publishing",
+      "stage_label": "Publishing"
+    },
+    {
+      "action": "Record detected_language at parse time.",
+      "impact": "Provenance cannot be audited without it.",
+      "metric": "source_metadata",
+      "metric_label": "Source metadata captured",
+      "score": 85.71,
+      "severity": "low",
+      "stage": "document-intelligence",
+      "stage_label": "Document intelligence"
+    }
+  ],
+  "rubric": {
+    "absent_by_design": [
+      "learning_gaps: some gaps carry no evidence, which is correct for a predicted gap — the document rarely names the errors students make on its own hardest ideas"
+    ],
+    "band": "exemplary",
+    "dimensions": [
+      {
+        "applicable": true,
+        "findings": [],
+        "key": "content_fidelity",
+        "label": "Content fidelity",
+        "method": "deterministic",
+        "metrics": [
+          {
+            "key": "topic_alignment",
+            "note": "7 of 7 content word(s) in the declared topic \"Electrostatics (Electric charge, Coulomb's law, electric field, Gauss's law)\" appear in what the package teaches",
+            "value": 1.0,
+            "weight": 0.5
+          },
+          {
+            "key": "concept_reference_integrity",
+            "note": "22 of 22 referenced concept id(s) resolve to a concept extracted from this document",
+            "value": 1.0,
+            "weight": 0.35
+          },
+          {
+            "key": "teaching_content_present",
+            "note": "218 distinct content term(s) across concepts, keywords, definitions and objectives",
+            "value": 1.0,
+            "weight": 0.15
+          },
+          {
+            "key": "declared_subject",
+            "note": "subject 'Physics', grade band '11-12' (reported, never scored: a subject name is a catalogue label and rewarding its appearance in the prose would be a defect)",
+            "value": 0.0,
+            "weight": 0.0
+          }
+        ],
+        "reason": "",
+        "score": 1.0,
+        "weight": 0.11
+      },
+      {
+        "applicable": true,
+        "findings": [
+          {
+            "code": "OBJ_BLOOM_MISMATCH",
+            "detail": "tagged 'analyze' but 'derive' denotes 'apply' (1 level(s) apart); either the verb or the tag is wrong",
+            "path": "/knowledge/learning_objectives/1"
+          }
+        ],
+        "key": "objectives",
+        "label": "Objective quality",
+        "method": "deterministic",
+        "metrics": [
+          {
+            "key": "measurable_verb",
+            "note": "leading verb denotes an observable act",
+            "value": 1.0,
+            "weight": 0.3
+          },
+          {
+            "key": "bloom_honesty",
+            "note": "declared level matches the verb",
+            "value": 0.9333,
+            "weight": 0.25
+          },
+          {
+            "key": "concept_linkage",
+            "note": "resolves to a concept in this package",
+            "value": 1.0,
+            "weight": 0.15
+          },
+          {
+            "key": "behaviour_not_label",
+            "note": "not a topic with a verb attached",
+            "value": 1.0,
+            "weight": 0.2
+          },
+          {
+            "key": "specificity",
+            "note": "names a condition or context",
+            "value": 1.0,
+            "weight": 0.1
+          }
+        ],
+        "reason": "",
+        "score": 0.9833,
+        "weight": 0.08
+      },
+      {
+        "applicable": true,
+        "findings": [
+          {
+            "code": "BLOOM_LOW_HIGHER_ORDER",
+            "detail": "35% of marks sit at apply or above, against a 40% floor for this profile",
+            "path": "/assessments/items"
+          }
+        ],
+        "key": "bloom",
+        "label": "Bloom distribution",
+        "method": "deterministic",
+        "metrics": [
+          {
+            "key": "level_spread",
+            "note": "3 level(s) carry real marks",
+            "value": 1.0,
+            "weight": 0.25
+          },
+          {
+            "key": "recall_ceiling",
+            "note": "0% of marks are recall",
+            "value": 1.0,
+            "weight": 0.25
+          },
+          {
+            "key": "higher_order_floor",
+            "note": "35% of marks at apply+",
+            "value": 0.8784,
+            "weight": 0.25
+          },
+          {
+            "key": "credible_claims",
+            "note": "no MCQ claims a level it cannot test",
+            "value": 1.0,
+            "weight": 0.15
+          },
+          {
+            "key": "objective_ladder",
+            "note": "objectives span more than one level",
+            "value": 1.0,
+            "weight": 0.1
+          }
+        ],
+        "reason": "",
+        "score": 0.9696,
+        "weight": 0.05
+      },
+      {
+        "applicable": true,
+        "findings": [],
+        "key": "coverage",
+        "label": "Coverage",
+        "method": "deterministic",
+        "metrics": [
+          {
+            "key": "concepts_taught",
+            "note": "a period claims each concept",
+            "value": 1.0,
+            "weight": 0.16
+          },
+          {
+            "key": "concepts_practised",
+            "note": "an activity or checkpoint uses it",
+            "value": 1.0,
+            "weight": 0.14
+          },
+          {
+            "key": "concepts_assessed",
+            "note": "the bank carries marks for it",
+            "value": 1.0,
+            "weight": 0.16
+          },
+          {
+            "key": "objectives_planned",
+            "note": "a period is aimed at it",
+            "value": 1.0,
+            "weight": 0.12
+          },
+          {
+            "key": "objectives_assessed",
+            "note": "an item measures it",
+            "value": 1.0,
+            "weight": 0.18
+          },
+          {
+            "key": "profile_required_fields",
+            "note": "quantitative requires concepts, formulae, examples",
+            "value": 1.0,
+            "weight": 0.12
+          },
+          {
+            "key": "core_concepts_marked",
+            "note": "core concepts carry marks",
+            "value": 1.0,
+            "weight": 0.06
+          },
+          {
+            "key": "misconceptions_carried",
+            "note": "extracted errors reach a gap",
+            "value": 1.0,
+            "weight": 0.06
+          }
+        ],
+        "reason": "",
+        "score": 1.0,
+        "weight": 0.12
+      },
+      {
+        "applicable": true,
+        "findings": [
+          {
+            "code": "SEQ_PERIOD_OVERLOADED",
+            "detail": "period 5 carries 5 concepts; the workable range for this profile is 1-4",
+            "path": "/teaching_plan/periods/4"
+          }
+        ],
+        "key": "sequencing",
+        "label": "Sequencing and load",
+        "method": "deterministic",
+        "metrics": [
+          {
+            "key": "prerequisites_respected",
+            "note": "9 prerequisite edge(s) checked",
+            "value": 1.0,
+            "weight": 0.35
+          },
+          {
+            "key": "prerequisite_graph_present",
+            "note": "the package declares an ordering it can be held to",
+            "value": 1.0,
+            "weight": 0.35
+          },
+          {
+            "key": "load_balance",
+            "note": "concepts per period: [3, 3, 4, 3, 5, 4]",
+            "value": 0.7273,
+            "weight": 0.15
+          },
+          {
+            "key": "period_load",
+            "note": "no period over- or under-filled",
+            "value": 0.8333,
+            "weight": 0.15
+          },
+          {
+            "key": "period_arc",
+            "note": "introduce, practise, check, consolidate",
+            "value": 1.0,
+            "weight": 0.25
+          },
+          {
+            "key": "periods_per_concept",
+            "note": "6 period(s) for 22 concepts (reported, not scored: there is no correct ratio)",
+            "value": 0.0,
+            "weight": 0.0
+          }
+        ],
+        "reason": "",
+        "score": 0.9473,
+        "weight": 0.06
+      },
+      {
+        "applicable": true,
+        "findings": [
+          {
+            "code": "GND_QUOTE_NOT_IN_SOURCE",
+            "detail": "the quote 'like charges repel and unlike charges attract each other.' does not appear in chunk 'c_0001'; a citation that cannot be found is worse than none, because it reads as authority",
+            "path": "/knowledge/concepts/1/evidence/0"
+          },
+          {
+            "code": "GND_QUOTE_NOT_IN_SOURCE",
+            "detail": "the quote 'According to this, we say that the charge Q produces an elec' does not appear in chunk 'c_0013'; a citation that cannot be found is worse than none, because it reads as authority",
+            "path": "/knowledge/concepts/5/evidence/0"
+          },
+          {
+            "code": "GND_QUOTE_NOT_IN_SOURCE",
+            "detail": "the quote 'The number of field lines crossing the area element is propo' does not appear in chunk 'c_0020'; a citation that cannot be found is worse than none, because it reads as authority",
+            "path": "/knowledge/concepts/10/evidence/1"
+          },
+          {
+            "code": "GND_QUOTE_NOT_IN_SOURCE",
+            "detail": "the quote 'An electric dipole is a pair of equal and opposite point cha' does not appear in chunk 'c_0022'; a citation that cannot be found is worse than none, because it reads as authority",
+            "path": "/knowledge/concepts/11/evidence/0"
+          },
+          {
+            "code": "GND_QUOTE_NOT_IN_SOURCE",
+            "detail": "the quote 'For r >> a ... E p ( r >> a ) (1.15)' does not appear in chunk 'c_0022'; a citation that cannot be found is worse than none, because it reads as authority",
+            "path": "/knowledge/concepts/12/evidence/0"
+          },
+          {
+            "code": "GND_QUOTE_NOT_IN_SOURCE",
+            "detail": "the quote 'Notice the important point that the dipole field at large di' does not appear in chunk 'c_0022'; a citation that cannot be found is worse than none, because it reads as authority",
+            "path": "/knowledge/concepts/12/evidence/2"
+          },
+          {
+            "code": "GND_QUOTE_NOT_IN_SOURCE",
+            "detail": "the quote 'Gauss\\x0fs law\\nWe state without proof:\\nElectric flux through a ' does not appear in chunk 'c_0026'; a citation that cannot be found is worse than none, because it reads as authority",
+            "path": "/knowledge/concepts/13/evidence/0"
+          },
+          {
+            "code": "GND_QUOTE_NOT_IN_SOURCE",
+            "detail": "the quote 'Coulomb\\x0fs Law : The mutual electrostatic force between two p' does not appear in chunk 'c_0034'; a citation that cannot be found is worse than none, because it reads as authority",
+            "path": "/knowledge/concepts/14/evidence/0"
+          },
+          {
+            "code": "GND_QUOTE_NOT_IN_SOURCE",
+            "detail": "the quote 'The linear charge density l of a wire is defined by\\nD\\nQ\\nl =\\n' does not appear in chunk 'c_0025'; a citation that cannot be found is worse than none, because it reads as authority",
+            "path": "/knowledge/concepts/16/evidence/1"
+          },
+          {
+            "code": "GND_QUOTE_NOT_IN_SOURCE",
+            "detail": "the quote 'The volume charge density (sometimes simply called charge de' does not appear in chunk 'c_0025'; a citation that cannot be found is worse than none, because it reads as authority",
+            "path": "/knowledge/concepts/16/evidence/2"
+          },
+          {
+            "code": "GND_QUOTE_NOT_IN_SOURCE",
+            "detail": "the quote 'Flux through the Gaussian surface\\n= flux through the curved ' does not appear in chunk 'c_0029'; a citation that cannot be found is worse than none, because it reads as authority",
+            "path": "/knowledge/concepts/18/evidence/1"
+          },
+          {
+            "code": "GND_QUOTE_NOT_IN_SOURCE",
+            "detail": "the quote 'Or, E\\n2 2\\ne p e\\n4\\nr r\\n0 0\\n2\\nwhere q = 4 p R s is the total c' does not appear in chunk 'c_0030'; a citation that cannot be found is worse than none, because it reads as authority",
+            "path": "/knowledge/concepts/20/evidence/0"
+          },
+          {
+            "code": "GND_QUOTE_NOT_IN_SOURCE",
+            "detail": "the quote 'The charge in a volume element D V is r D V . Now, consider ' does not appear in chunk 'c_0026'; a citation that cannot be found is worse than none, because it reads as authority",
+            "path": "/knowledge/concepts/21/evidence/0"
+          },
+          {
+            "code": "GND_QUOTE_NOT_IN_SOURCE",
+            "detail": "the quote 'The linear charge density l of a wire is defined by\\nD\\nQ\\nl =\\n' does not appear in chunk 'c_0025'; a citation that cannot be found is worse than none, because it reads as authority",
+            "path": "/knowledge/definitions/4/evidence/0"
+          },
+          {
+            "code": "GND_QUOTE_NOT_IN_SOURCE",
+            "detail": "the quote 'The volume charge density (sometimes simply called charge de' does not appear in chunk 'c_0025'; a citation that cannot be found is worse than none, because it reads as authority",
+            "path": "/knowledge/definitions/5/evidence/0"
+          },
+          {
+            "code": "GND_QUOTE_NOT_IN_SOURCE",
+            "detail": "the quote 'An electric dipole is a pair of equal and opposite charges a' does not appear in chunk 'c_0039'; a citation that cannot be found is worse than none, because it reads as authority",
+            "path": "/knowledge/definitions/7/evidence/0"
+          },
+          {
+            "code": "GND_QUOTE_NOT_IN_SOURCE",
+            "detail": "the quote 'k = 1/4 pe for later convenience, so that Coulomb’s law is w' does not appear in chunk 'c_0008'; a citation that cannot be found is worse than none, because it reads as authority",
+            "path": "/knowledge/formulae/1/evidence/0"
+          },
+          {
+            "code": "GND_QUOTE_NOT_IN_SOURCE",
+            "detail": "the quote 'Gauss\\x0fs law\\nWe state without proof:\\nElectric flux through a ' does not appear in chunk 'c_0026'; a citation that cannot be found is worse than none, because it reads as authority",
+            "path": "/knowledge/formulae/7/evidence/0"
+          },
+          {
+            "code": "GND_QUOTE_NOT_IN_SOURCE",
+            "detail": "the quote 'Flux through the Gaussian surface\\n= flux through the curved ' does not appear in chunk 'c_0029'; a citation that cannot be found is worse than none, because it reads as authority",
+            "path": "/knowledge/formulae/9/evidence/0"
+          },
+          {
+            "code": "GND_QUOTE_NOT_IN_SOURCE",
+            "detail": "the quote 'Vectorially,\\nq\\n=\\nˆ\\nE r\\n(1.34)\\n2\\np e\\n4 r\\n0' does not appear in chunk 'c_0030'; a citation that cannot be found is worse than none, because it reads as authority",
+            "path": "/knowledge/formulae/11/evidence/0"
+          },
+          {
+            "code": "GND_QUOTE_NOT_IN_SOURCE",
+            "detail": "the quote 'Flux through the Gaussian surface = E × 2 p rl. The surface ' does not appear in chunk 'c_0029'; a citation that cannot be found is worse than none, because it reads as authority",
+            "path": "/knowledge/examples/0/evidence/0"
+          },
+          {
+            "code": "GND_QUOTE_NOT_IN_SOURCE",
+            "detail": "the quote 'Taking the clue from the preceding discussion, the charged c' does not appear in chunk 'c_0024'; a citation that cannot be found is worse than none, because it reads as authority",
+            "path": "/knowledge/applications/0/evidence/0"
+          },
+          {
+            "code": "GND_QUOTE_NOT_IN_SOURCE",
+            "detail": "the quote 'Another person may draw more lines. But the number of lines ' does not appear in chunk 'c_0018'; a citation that cannot be found is worse than none, because it reads as authority",
+            "path": "/knowledge/misconceptions/1/evidence/0"
+          },
+          {
+            "code": "GND_QUOTE_NOT_IN_SOURCE",
+            "detail": "the quote 'The field lines crowd where the field is strong and are spac' does not appear in chunk 'c_0018'; a citation that cannot be found is worse than none, because it reads as authority",
+            "path": "/knowledge/misconceptions/1/evidence/1"
+          },
+          {
+            "code": "GND_QUOTE_NOT_IN_SOURCE",
+            "detail": "the quote 'Taking the clue from the preceding discussion, the charged c' does not appear in chunk 'c_0024'; a citation that cannot be found is worse than none, because it reads as authority",
+            "path": "/knowledge/misconceptions/2/evidence/0"
+          },
+          {
+            "code": "GND_QUOTE_NOT_IN_SOURCE",
+            "detail": "the quote 'Another person may draw more lines. But the number of lines ' does not appear in chunk 'c_0018'; a citation that cannot be found is worse than none, because it reads as authority",
+            "path": "/learning_gaps/3/evidence/0"
+          },
+          {
+            "code": "GND_QUOTE_NOT_IN_SOURCE",
+            "detail": "the quote 'The field lines crowd where the field is strong and are spac' does not appear in chunk 'c_0018'; a citation that cannot be found is worse than none, because it reads as authority",
+            "path": "/learning_gaps/3/evidence/1"
+          },
+          {
+            "code": "GND_QUOTE_NOT_IN_SOURCE",
+            "detail": "the quote 'Taking the clue from the preceding discussion, the charged c' does not appear in chunk 'c_0024'; a citation that cannot be found is worse than none, because it reads as authority",
+            "path": "/learning_gaps/4/evidence/0"
+          }
+        ],
+        "key": "grounding",
+        "label": "Grounding",
+        "method": "deterministic",
+        "metrics": [
+          {
+            "key": "claims_cited",
+            "note": "52 of 52 claim(s) cite the source at all",
+            "value": 1.0,
+            "weight": 0.2
+          },
+          {
+            "key": "citation_integrity",
+            "note": "76 evidence span(s) checked verbatim against the source",
+            "value": 0.6316,
+            "weight": 0.5
+          },
+          {
+            "key": "claim_support",
+            "note": "52 claim(s) checked; 3 in the ambiguous band (0.25-0.6), scored 0.5 and left for the judge",
+            "value": 0.9712,
+            "weight": 0.3
+          }
+        ],
+        "reason": "",
+        "score": 0.8071,
+        "weight": 0.12
+      },
+      {
+        "applicable": true,
+        "findings": [],
+        "key": "activities",
+        "label": "Activity variety and runnability",
+        "method": "deterministic",
+        "metrics": [
+          {
+            "key": "type_variety",
+            "note": "5 distinct type(s) across 6",
+            "value": 1.0,
+            "weight": 0.25
+          },
+          {
+            "key": "profile_fit",
+            "note": "types the quantitative profile weights",
+            "value": 1.0,
+            "weight": 0.05
+          },
+          {
+            "key": "observable_criteria",
+            "note": "visible during the lesson",
+            "value": 0.8889,
+            "weight": 0.3
+          },
+          {
+            "key": "instruction_specificity",
+            "note": "runnable without edits",
+            "value": 1.0,
+            "weight": 0.2
+          },
+          {
+            "key": "materials_realism",
+            "note": "6 activity(ies) list materials; listing none is a pass",
+            "value": 1.0,
+            "weight": 0.1
+          },
+          {
+            "key": "distinct_activities",
+            "note": "not the same activity repeated",
+            "value": 1.0,
+            "weight": 0.1
+          }
+        ],
+        "reason": "",
+        "score": 0.9667,
+        "weight": 0.07
+      },
+      {
+        "applicable": true,
+        "findings": [],
+        "key": "differentiation",
+        "label": "Differentiation",
+        "method": "deterministic",
+        "metrics": [
+          {
+            "key": "present",
+            "note": "both sides filled in",
+            "value": 1.0,
+            "weight": 0.15
+          },
+          {
+            "key": "specific",
+            "note": "names something this package teaches",
+            "value": 1.0,
+            "weight": 0.4
+          },
+          {
+            "key": "support_differs_from_extension",
+            "note": "two routes, not one",
+            "value": 1.0,
+            "weight": 0.15
+          },
+          {
+            "key": "extension_deepens",
+            "note": "different demand, not more volume",
+            "value": 1.0,
+            "weight": 0.15
+          },
+          {
+            "key": "distinct_across_activities",
+            "note": "not copy-pasted between activities",
+            "value": 1.0,
+            "weight": 0.15
+          }
+        ],
+        "reason": "",
+        "score": 1.0,
+        "weight": 0.04
+      },
+      {
+        "applicable": true,
+        "findings": [
+          {
+            "code": "ASM_MCQ_MALFORMED",
+            "detail": "missing answer key matching the correct option; this item cannot be marked as written",
+            "path": "/assessments/items/1"
+          },
+          {
+            "code": "ASM_MCQ_MALFORMED",
+            "detail": "missing answer key matching the correct option; this item cannot be marked as written",
+            "path": "/assessments/items/5"
+          },
+          {
+            "code": "ASM_DUPLICATE_OPTIONS",
+            "detail": "two options say the same thing, so the item really has three",
+            "path": "/assessments/items/5/options"
+          },
+          {
+            "code": "ASM_MCQ_MALFORMED",
+            "detail": "missing answer key matching the correct option; this item cannot be marked as written",
+            "path": "/assessments/items/9"
+          },
+          {
+            "code": "ASM_MCQ_MALFORMED",
+            "detail": "missing answer key matching the correct option; this item cannot be marked as written",
+            "path": "/assessments/items/12"
+          },
+          {
+            "code": "ASM_MCQ_MALFORMED",
+            "detail": "missing answer key matching the correct option; this item cannot be marked as written",
+            "path": "/assessments/items/15"
+          },
+          {
+            "code": "ASM_MCQ_MALFORMED",
+            "detail": "missing answer key matching the correct option; this item cannot be marked as written",
+            "path": "/assessments/items/18"
+          },
+          {
+            "code": "ASM_MCQ_MALFORMED",
+            "detail": "missing answer key matching the correct option; this item cannot be marked as written",
+            "path": "/assessments/items/20"
+          },
+          {
+            "code": "ASM_RUBRIC_INDISCRIMINATE",
+            "detail": "adjacent levels score 1.00 on naming different work and hedge rather than describe it. Two markers would land on different levels for the same borderline script, which makes the marks it awards arbitrary",
+            "path": "/assessments/items/3/rubric"
+          },
+          {
+            "code": "ASM_RUBRIC_INDISCRIMINATE",
+            "detail": "adjacent levels score 1.00 on naming different work and hedge rather than describe it. Two markers would land on different levels for the same borderline script, which makes the marks it awards arbitrary",
+            "path": "/assessments/items/4/rubric"
+          },
+          {
+            "code": "ASM_RUBRIC_INDISCRIMINATE",
+            "detail": "adjacent levels score 1.00 on naming different work and hedge rather than describe it. Two markers would land on different levels for the same borderline script, which makes the marks it awards arbitrary",
+            "path": "/assessments/items/7/rubric"
+          },
+          {
+            "code": "ASM_RUBRIC_INDISCRIMINATE",
+            "detail": "adjacent levels score 1.00 on naming different work and hedge rather than describe it. Two markers would land on different levels for the same borderline script, which makes the marks it awards arbitrary",
+            "path": "/assessments/items/10/rubric"
+          },
+          {
+            "code": "ASM_RUBRIC_INDISCRIMINATE",
+            "detail": "adjacent levels score 1.00 on naming different work and hedge rather than describe it. Two markers would land on different levels for the same borderline script, which makes the marks it awards arbitrary",
+            "path": "/assessments/items/11/rubric"
+          },
+          {
+            "code": "ASM_RUBRIC_INDISCRIMINATE",
+            "detail": "adjacent levels score 1.00 on naming different work and hedge rather than describe it. Two markers would land on different levels for the same borderline script, which makes the marks it awards arbitrary",
+            "path": "/assessments/items/22/rubric"
+          },
+          {
+            "code": "ASM_UNLINKED_DISTRACTORS",
+            "detail": "43% of MCQs cite the misconception they probe, though the package extracted 3; the bank scores students without telling the teacher what to reteach",
+            "path": "/assessments/items"
+          }
+        ],
+        "key": "assessment_integrity",
+        "label": "Assessment integrity",
+        "method": "deterministic",
+        "metrics": [
+          {
+            "key": "mcq_structure",
+            "note": "7 MCQ(s) checked",
+            "value": 0.75,
+            "weight": 0.15
+          },
+          {
+            "key": "distractor_quality",
+            "note": "plausible, explained, not filler",
+            "value": 0.9643,
+            "weight": 0.2
+          },
+          {
+            "key": "rubric_structure",
+            "note": "17 rubric(s): levels, distinct marks, enough of them",
+            "value": 1.0,
+            "weight": 0.08
+          },
+          {
+            "key": "rubric_discrimination",
+            "note": "17 rubric(s): do adjacent levels name different work, and does any level name this package's content?",
+            "value": 0.6471,
+            "weight": 0.35
+          },
+          {
+            "key": "marks_and_blueprint",
+            "note": "74 marks in the bank",
+            "value": 1.0,
+            "weight": 0.12
+          },
+          {
+            "key": "kind_mix",
+            "note": "against the quantitative assessment mix",
+            "value": 0.975,
+            "weight": 0.05
+          },
+          {
+            "key": "misconception_linkage",
+            "note": "items trace to a diagnosed error",
+            "value": 0.8571,
+            "weight": 0.05
+          }
+        ],
+        "reason": "",
+        "score": 0.8234,
+        "weight": 0.15
+      },
+      {
+        "applicable": true,
+        "findings": [
+          {
+            "code": "CLS_BOARD_NOTES_ARE_PROSE",
+            "detail": "1 bullet(s) run past 20 words; nobody writes a paragraph on a blackboard",
+            "path": "/classroom_content/0/blackboard_notes"
+          },
+          {
+            "code": "CLS_BOARD_NOTES_ARE_PROSE",
+            "detail": "2 bullet(s) run past 20 words; nobody writes a paragraph on a blackboard",
+            "path": "/classroom_content/2/blackboard_notes"
+          },
+          {
+            "code": "CLS_BOARD_NOTES_ARE_PROSE",
+            "detail": "1 bullet(s) run past 20 words; nobody writes a paragraph on a blackboard",
+            "path": "/classroom_content/3/blackboard_notes"
+          },
+          {
+            "code": "CLS_BOARD_NOTES_ARE_PROSE",
+            "detail": "5 bullet(s) run past 20 words; nobody writes a paragraph on a blackboard",
+            "path": "/classroom_content/4/blackboard_notes"
+          }
+        ],
+        "key": "classroom",
+        "label": "Classroom readiness",
+        "method": "deterministic",
+        "metrics": [
+          {
+            "key": "script_actionability",
+            "note": "35 segment(s): does the note instruct, name this package's content, and say what goes on the board?",
+            "value": 1.0,
+            "weight": 0.28
+          },
+          {
+            "key": "distinct_speaker_notes",
+            "note": "35 script segment(s); one sentence repeated is one note",
+            "value": 1.0,
+            "weight": 0.14
+          },
+          {
+            "key": "script_completeness",
+            "note": "enough segments, board actions across them, a question anticipated",
+            "value": 1.0,
+            "weight": 0.05
+          },
+          {
+            "key": "ticket_diagnostics",
+            "note": "entry and exit tickets that diagnose",
+            "value": 1.0,
+            "weight": 0.16
+          },
+          {
+            "key": "board_notes",
+            "note": "headings and bullets, not prose",
+            "value": 0.7778,
+            "weight": 0.1
+          },
+          {
+            "key": "checkpoints",
+            "note": "answerable mid-lesson checks",
+            "value": 1.0,
+            "weight": 0.12
+          },
+          {
+            "key": "homework",
+            "note": "names an output that can be handed in",
+            "value": 1.0,
+            "weight": 0.05
+          },
+          {
+            "key": "distinct_periods",
+            "note": "periods differ from each other",
+            "value": 1.0,
+            "weight": 0.1
+          },
+          {
+            "key": "grade_readability",
+            "note": "17.0 words/sentence (band allows 26), 13% long words (allows 24%)",
+            "value": 0.0,
+            "weight": 0.0
+          }
+        ],
+        "reason": "",
+        "score": 0.9778,
+        "weight": 0.15
+      },
+      {
+        "applicable": true,
+        "findings": [
+          {
+            "code": "PER_CHECKPOINT_OFF_PERIOD",
+            "detail": "period 1 checks a concept this period does not teach; the check reports on a lesson the class has not just had",
+            "path": "/classroom_content/0/checkpoint_questions/0"
+          },
+          {
+            "code": "PER_CHECKPOINT_OFF_PERIOD",
+            "detail": "period 1 checks a concept this period does not teach; the check reports on a lesson the class has not just had",
+            "path": "/classroom_content/0/checkpoint_questions/1"
+          },
+          {
+            "code": "PER_CHECKPOINT_OFF_PERIOD",
+            "detail": "period 1 checks a concept this period does not teach; the check reports on a lesson the class has not just had",
+            "path": "/classroom_content/0/checkpoint_questions/2"
+          },
+          {
+            "code": "PER_CHECKPOINT_OFF_PERIOD",
+            "detail": "period 2 checks a concept this period does not teach; the check reports on a lesson the class has not just had",
+            "path": "/classroom_content/1/checkpoint_questions/1"
+          },
+          {
+            "code": "PER_CHECKPOINT_OFF_PERIOD",
+            "detail": "period 2 checks a concept this period does not teach; the check reports on a lesson the class has not just had",
+            "path": "/classroom_content/1/checkpoint_questions/2"
+          },
+          {
+            "code": "PER_ARTEFACT_OFF_PERIOD",
+            "detail": "period 2's exit ticket names none of the concepts that period teaches (Conductors and insulators, Electric field, Principle of superposition); what the class copies down is not what the period was for",
+            "path": "/classroom_content/1/exit_ticket"
+          },
+          {
+            "code": "PER_CHECKPOINT_OFF_PERIOD",
+            "detail": "period 3 checks a concept this period does not teach; the check reports on a lesson the class has not just had",
+            "path": "/classroom_content/2/checkpoint_questions/0"
+          },
+          {
+            "code": "PER_ARTEFACT_OFF_PERIOD",
+            "detail": "period 3's exit ticket names none of the concepts that period teaches (Electric dipole, Electric flux through a surface, Source charge and test charge, Superposition principle for electric fields); what the class copies down is not what the period was for",
+            "path": "/classroom_content/2/exit_ticket"
+          },
+          {
+            "code": "PER_CHECKPOINT_OFF_PERIOD",
+            "detail": "period 4 checks a concept this period does not teach; the check reports on a lesson the class has not just had",
+            "path": "/classroom_content/3/checkpoint_questions/0"
+          },
+          {
+            "code": "PER_ARTEFACT_OFF_PERIOD",
+            "detail": "period 4's exit ticket names none of the concepts that period teaches (Coulomb's law, Dipole field falls off faster than monopole, Gauss's law); what the class copies down is not what the period was for",
+            "path": "/classroom_content/3/exit_ticket"
+          },
+          {
+            "code": "PER_CHECKPOINT_OFF_PERIOD",
+            "detail": "period 5 checks a concept this period does not teach; the check reports on a lesson the class has not just had",
+            "path": "/classroom_content/4/checkpoint_questions/0"
+          },
+          {
+            "code": "PER_CHECKPOINT_OFF_PERIOD",
+            "detail": "period 5 checks a concept this period does not teach; the check reports on a lesson the class has not just had",
+            "path": "/classroom_content/4/checkpoint_questions/1"
+          }
+        ],
+        "key": "period_integrity",
+        "label": "Period integrity",
+        "method": "deterministic",
+        "metrics": [
+          {
+            "key": "checkpoints_on_period",
+            "note": "6 period(s) with checkpoints",
+            "value": 0.5,
+            "weight": 0.3
+          },
+          {
+            "key": "artefacts_on_period",
+            "note": "12 exit ticket(s) and board note block(s) checked against their own period's concepts",
+            "value": 0.75,
+            "weight": 0.3
+          },
+          {
+            "key": "activities_on_period",
+            "note": "6 referenced activity(ies) practise their period's concepts",
+            "value": 1.0,
+            "weight": 0.15
+          },
+          {
+            "key": "periods_are_not_copies",
+            "note": "0 duplicated pair(s) across 6 period(s)",
+            "value": 1.0,
+            "weight": 0.25
+          }
+        ],
+        "reason": "",
+        "score": 0.775,
+        "weight": 0.05
+      }
+    ],
+    "grade_band": "11-12",
+    "judged": false,
+    "llm_profile": "azure",
+    "overall": 0.9274,
+    "package_id": "5d18a35e-1b41-4670-ac75-5cb84fe2162b",
+    "profile": "quantitative",
+    "subject": "Physics",
+    "transferable": true
+  },
+  "run_id": "54887eb7-68e6-4a9e-be00-567b9bf20d40",
+  "stages": [
+    {
+      "confidence": 0.5,
+      "judged": 0,
+      "label": "Document intelligence",
+      "measured": 3,
+      "metrics": [
+        {
+          "confidence": 1.0,
+          "evidence": [
+            {
+              "observation": "recorded: filename, mime, sha256, size_bytes, page_count, word_count",
+              "path": "/source"
+            }
+          ],
+          "key": "source_metadata",
+          "label": "Source metadata captured",
+          "measurability": "measured",
+          "reasoning": "6 of 7 source fields recorded; missing detected_language.",
+          "recommendations": [
+            {
+              "action": "Record detected_language at parse time.",
+              "impact": "Provenance cannot be audited without it.",
+              "severity": "low"
+            }
+          ],
+          "score": 85.71,
+          "weight": 1.0
+        },
+        {
+          "confidence": 1.0,
+          "evidence": [
+            {
+              "observation": "20,603 words over 44 pages",
+              "path": "/source/word_count"
+            }
+          ],
+          "key": "text_yield",
+          "label": "Text extracted per page",
+          "measurability": "measured",
+          "reasoning": "468 words per page across 44 pages. Consistent with a born-digital document.",
+          "recommendations": [],
+          "score": 100.0,
+          "weight": 1.0
+        },
+        {
+          "confidence": 1.0,
+          "evidence": [
+            {
+              "observation": "63 chunks retained",
+              "path": "/chunks"
+            }
+          ],
+          "key": "chunk_integrity",
+          "label": "Chunks carry text",
+          "measurability": "measured",
+          "reasoning": "63 of 63 chunks hold text. Empty chunks break every citation that lands on them.",
+          "recommendations": [],
+          "score": 100.0,
+          "weight": 1.0
+        },
+        {
+          "confidence": 0.0,
+          "evidence": [],
+          "key": "ocr_confidence",
+          "label": "OCR confidence",
+          "measurability": "not_measurable",
+          "reasoning": "No page needed OCR: every page carried a text layer, so nothing was read from an image and there is no confidence to report. Measuring it would need: a document with at least one scanned page",
+          "recommendations": [],
+          "score": null,
+          "weight": 0.0
+        },
+        {
+          "confidence": 0.0,
+          "evidence": [],
+          "key": "ocr_accuracy",
+          "label": "OCR accuracy",
+          "measurability": "not_measurable",
+          "reasoning": "Accuracy is a comparison against what the page actually said, and no uploader supplies a transcript of their own scan. Confidence is reported instead, which is the recogniser's certainty, not its correctness — the two come apart exactly when it matters. Measuring it would need: reference transcriptions of the scanned pages to diff against",
+          "recommendations": [],
+          "score": null,
+          "weight": 0.0
+        },
+        {
+          "confidence": 0.0,
+          "evidence": [],
+          "key": "extraction_fidelity",
+          "label": "Extraction fidelity vs. original",
+          "measurability": "not_measurable",
+          "reasoning": "Fidelity is a comparison, and the original document's ground-truth text is not part of the package. Measuring it would need: a hand-checked transcript of the source PDF to diff the extraction against",
+          "recommendations": [],
+          "score": null,
+          "weight": 0.0
+        }
+      ],
+      "missing": [],
+      "not_measurable": 3,
+      "score": 95.24,
+      "stage": "document-intelligence"
+    },
+    {
+      "confidence": 0.8,
+      "judged": 0,
+      "label": "Educational classification",
+      "measured": 4,
+      "metrics": [
+        {
+          "confidence": 1.0,
+          "evidence": [
+            {
+              "observation": "subject='Physics', profile='quantitative'",
+              "path": "/classification"
+            }
+          ],
+          "key": "classification_completeness",
+          "label": "Classification fields populated",
+          "measurability": "measured",
+          "reasoning": "7 of 7 fields classified.",
+          "recommendations": [],
+          "score": 100.0,
+          "weight": 1.5
+        },
+        {
+          "confidence": 1.0,
+          "evidence": [
+            {
+              "observation": "quantitative",
+              "path": "/classification/pedagogy_profile"
+            }
+          ],
+          "key": "profile_validity",
+          "label": "Pedagogy profile is one the pipeline routes on",
+          "measurability": "measured",
+          "reasoning": "Profile 'quantitative' is a routable profile; every downstream stage branches on it.",
+          "recommendations": [],
+          "score": 100.0,
+          "weight": 2.0
+        },
+        {
+          "confidence": 1.0,
+          "evidence": [
+            {
+              "observation": "{'subject': 0.95, 'grade_band': 0.8, 'difficulty': 0.8, 'topic': 0.95, 'chapter': 0.7, 'category': 0.9, 'language': 0.99, 'pedagogy_profile': 0.98, 'curriculum_alignment': 0.6}",
+              "path": "/classification/confidences"
+            }
+          ],
+          "key": "self_reported_confidence",
+          "label": "Classifier's own confidence",
+          "measurability": "measured",
+          "reasoning": "Mean self-reported confidence 0.85 across category, chapter, curriculum_alignment, difficulty, grade_band, language, pedagogy_profile, subject, topic. This is the classifier's own estimate, not an accuracy measurement.",
+          "recommendations": [],
+          "score": 85.22,
+          "weight": 0.5
+        },
+        {
+          "confidence": 1.0,
+          "evidence": [
+            {
+              "observation": "[]",
+              "path": "/classification/low_confidence_fields"
+            }
+          ],
+          "key": "low_confidence_declared",
+          "label": "Low-confidence fields flagged for review",
+          "measurability": "measured",
+          "reasoning": "1 field(s) scored below 0.7 without being flagged: curriculum_alignment.",
+          "recommendations": [
+            {
+              "action": "Derive low_confidence_fields from the confidences map rather than letting the model populate both independently.",
+              "impact": "A field the classifier doubted reaches teachers unflagged.",
+              "severity": "high"
+            }
+          ],
+          "score": 0.0,
+          "weight": 1.5
+        },
+        {
+          "confidence": 0.0,
+          "evidence": [],
+          "key": "subject_accuracy",
+          "label": "Subject / grade classification accuracy",
+          "measurability": "not_measurable",
+          "reasoning": "Accuracy needs labels. There is no corpus of documents with agreed subject and grade-band annotations to score this run against. Measuring it would need: a held-out set of documents labelled by teachers, ideally 100+ across subjects",
+          "recommendations": [],
+          "score": null,
+          "weight": 0.0
+        }
+      ],
+      "missing": [],
+      "not_measurable": 1,
+      "score": 71.38,
+      "stage": "educational-classification"
+    },
+    {
+      "confidence": 1.0,
+      "judged": 0,
+      "label": "Knowledge extraction",
+      "measured": 5,
+      "metrics": [
+        {
+          "confidence": 1.0,
+          "evidence": [],
+          "key": "concept_evidence",
+          "label": "Concepts carry evidence",
+          "measurability": "measured",
+          "reasoning": "22 of 22 concepts carry evidence.",
+          "recommendations": [],
+          "score": 100.0,
+          "weight": 2.0
+        },
+        {
+          "confidence": 1.0,
+          "evidence": [],
+          "key": "concept_summary",
+          "label": "Concepts carry a summary",
+          "measurability": "measured",
+          "reasoning": "22 of 22 concepts carry summary.",
+          "recommendations": [],
+          "score": 100.0,
+          "weight": 1.0
+        },
+        {
+          "confidence": 1.0,
+          "evidence": [
+            {
+              "observation": "quote not found in c_0001: 'like charges repel and unlike charges attract each other.'",
+              "path": "/knowledge/concepts/1/evidence"
+            },
+            {
+              "observation": "quote not found in c_0013: 'According to this, we say that the charge Q produces an elec'",
+              "path": "/knowledge/concepts/5/evidence"
+            },
+            {
+              "observation": "quote not found in c_0020: 'The number of field lines crossing the area element is propo'",
+              "path": "/knowledge/concepts/10/evidence"
+            },
+            {
+              "observation": "quote not found in c_0022: 'An electric dipole is a pair of equal and opposite point cha'",
+              "path": "/knowledge/concepts/11/evidence"
+            },
+            {
+              "observation": "quote not found in c_0022: 'For r >> a ... E p ( r >> a ) (1.15)'",
+              "path": "/knowledge/concepts/12/evidence"
+            }
+          ],
+          "key": "citation_integrity",
+          "label": "Quotes appear in the chunks they cite",
+          "measurability": "measured",
+          "reasoning": "26 of 39 evidence spans quote text that is present verbatim in the chunk they cite. 13 do not.",
+          "recommendations": [
+            {
+              "action": "Re-run extraction with the citation verifier rejecting spans whose quote is not substring-present in the cited chunk.",
+              "impact": "A citation that does not check out is worse than no citation — a teacher trusts it.",
+              "severity": "high"
+            }
+          ],
+          "score": 66.67,
+          "weight": 3.0
+        },
+        {
+          "confidence": 1.0,
+          "evidence": [
+            {
+              "observation": "levels: ['analyze', 'apply', 'understand']",
+              "path": "/knowledge/learning_objectives"
+            }
+          ],
+          "key": "objective_bloom",
+          "label": "Objectives carry a Bloom level",
+          "measurability": "measured",
+          "reasoning": "6 of 6 objectives are tagged with a Bloom level; 3 distinct level(s) used.",
+          "recommendations": [],
+          "score": 100.0,
+          "weight": 1.5
+        },
+        {
+          "confidence": 1.0,
+          "evidence": [],
+          "key": "graph_integrity",
+          "label": "Concept graph resolves to real concepts",
+          "measurability": "measured",
+          "reasoning": "9 edges over 22 nodes. Every endpoint resolves to an extracted concept.",
+          "recommendations": [],
+          "score": 100.0,
+          "weight": 1.5
+        }
+      ],
+      "missing": [],
+      "not_measurable": 0,
+      "score": 88.89,
+      "stage": "knowledge-extraction"
+    },
+    {
+      "confidence": 1.0,
+      "judged": 0,
+      "label": "Teaching planner",
+      "measured": 3,
+      "metrics": [
+        {
+          "confidence": 1.0,
+          "evidence": [
+            {
+              "observation": "6 periods scheduled",
+              "path": "/teaching_plan/periods"
+            }
+          ],
+          "key": "concept_scheduling",
+          "label": "Every concept is scheduled into a period",
+          "measurability": "measured",
+          "reasoning": "22 of 22 concepts are taught in some period.",
+          "recommendations": [],
+          "score": 100.0,
+          "weight": 2.0
+        },
+        {
+          "confidence": 1.0,
+          "evidence": [],
+          "key": "prerequisite_order",
+          "label": "Prerequisites are taught before what needs them",
+          "measurability": "measured",
+          "reasoning": "9 of 9 prerequisite edges are respected by the period order.",
+          "recommendations": [],
+          "score": 100.0,
+          "weight": 2.5
+        },
+        {
+          "confidence": 1.0,
+          "evidence": [],
+          "key": "time_budget",
+          "label": "Period plans fit the period",
+          "measurability": "measured",
+          "reasoning": "6 of 6 periods allocate no more than the 40-minute period.",
+          "recommendations": [],
+          "score": 100.0,
+          "weight": 1.5
+        }
+      ],
+      "missing": [],
+      "not_measurable": 0,
+      "score": 100.0,
+      "stage": "teaching-planner"
+    },
+    {
+      "confidence": 1.0,
+      "judged": 0,
+      "label": "Lesson generation",
+      "measured": 4,
+      "metrics": [
+        {
+          "confidence": 1.0,
+          "evidence": [
+            {
+              "observation": "6 content blocks for 6 periods",
+              "path": "/classroom_content"
+            }
+          ],
+          "key": "period_coverage",
+          "label": "Every planned period has classroom content",
+          "measurability": "measured",
+          "reasoning": "6 of 6 planned periods have generated content.",
+          "recommendations": [],
+          "score": 100.0,
+          "weight": 2.0
+        },
+        {
+          "confidence": 1.0,
+          "evidence": [],
+          "key": "lesson_block_completeness",
+          "label": "Each period carries the full set of lesson blocks",
+          "measurability": "measured",
+          "reasoning": "36 of 36 lesson blocks are populated across 6 periods.",
+          "recommendations": [],
+          "score": 100.0,
+          "weight": 1.5
+        },
+        {
+          "confidence": 1.0,
+          "evidence": [
+            {
+              "observation": "1163 words",
+              "path": "/classroom_content/0/teacher_script"
+            }
+          ],
+          "key": "script_substance",
+          "label": "Teacher scripts have enough to work from",
+          "measurability": "measured",
+          "reasoning": "Teacher scripts average 1341 words per period against a 250-word working floor. This measures volume, not teaching quality.",
+          "recommendations": [],
+          "score": 100.0,
+          "weight": 0.5
+        },
+        {
+          "confidence": 1.0,
+          "evidence": [],
+          "key": "activity_ref_integrity",
+          "label": "Activity references resolve",
+          "measurability": "measured",
+          "reasoning": "6 of 6 activity references point at an activity that exists.",
+          "recommendations": [],
+          "score": 100.0,
+          "weight": 2.0
+        }
+      ],
+      "missing": [],
+      "not_measurable": 0,
+      "score": 100.0,
+      "stage": "lesson-generation"
+    },
+    {
+      "confidence": 1.0,
+      "judged": 0,
+      "label": "Activity generation",
+      "measured": 6,
+      "metrics": [
+        {
+          "confidence": 1.0,
+          "evidence": [
+            {
+              "observation": "types: ['demonstration', 'experiment', 'problem_set', 'simulation', 'think_pair_share']",
+              "path": "/activities"
+            }
+          ],
+          "key": "type_variety",
+          "label": "Activities vary in kind",
+          "measurability": "measured",
+          "reasoning": "5 distinct activity type(s) across 6 activities (demonstration, experiment, problem_set, simulation, think_pair_share), against a target of 4.",
+          "recommendations": [],
+          "score": 100.0,
+          "weight": 1.5
+        },
+        {
+          "confidence": 1.0,
+          "evidence": [],
+          "key": "concept_linkage",
+          "label": "Activities target extracted concepts",
+          "measurability": "measured",
+          "reasoning": "6 of 6 activities reference at least one concept that stage 3 actually extracted.",
+          "recommendations": [],
+          "score": 100.0,
+          "weight": 2.0
+        },
+        {
+          "confidence": 1.0,
+          "evidence": [],
+          "key": "teacher_instructions",
+          "label": "Activities carry teacher instructions",
+          "measurability": "measured",
+          "reasoning": "6 of 6 activities carry teacher_instructions.",
+          "recommendations": [],
+          "score": 100.0,
+          "weight": 1.5
+        },
+        {
+          "confidence": 1.0,
+          "evidence": [],
+          "key": "success_criteria",
+          "label": "Activities state success criteria",
+          "measurability": "measured",
+          "reasoning": "6 of 6 activities carry success_criteria.",
+          "recommendations": [],
+          "score": 100.0,
+          "weight": 1.0
+        },
+        {
+          "confidence": 1.0,
+          "evidence": [],
+          "key": "differentiation",
+          "label": "Activities carry differentiation",
+          "measurability": "measured",
+          "reasoning": "6 of 6 activities carry differentiation.",
+          "recommendations": [],
+          "score": 100.0,
+          "weight": 1.0
+        },
+        {
+          "confidence": 1.0,
+          "evidence": [],
+          "key": "timing_fit",
+          "label": "Activities fit inside a period",
+          "measurability": "measured",
+          "reasoning": "6 of 6 activities run within the 40-minute period.",
+          "recommendations": [],
+          "score": 100.0,
+          "weight": 1.0
+        }
+      ],
+      "missing": [],
+      "not_measurable": 0,
+      "score": 100.0,
+      "stage": "activity-generation"
+    },
+    {
+      "confidence": 0.8571,
+      "judged": 0,
+      "label": "Assessment generation",
+      "measured": 6,
+      "metrics": [
+        {
+          "confidence": 1.0,
+          "evidence": [],
+          "key": "answer_key",
+          "label": "Every item can be marked",
+          "measurability": "measured",
+          "reasoning": "24 of 24 items carry an answer or a rubric.",
+          "recommendations": [],
+          "score": 100.0,
+          "weight": 3.0
+        },
+        {
+          "confidence": 1.0,
+          "evidence": [],
+          "key": "mcq_integrity",
+          "label": "MCQs have one right answer and real distractors",
+          "measurability": "measured",
+          "reasoning": "7 of 7 multiple-choice items have three or more options with exactly one marked correct.",
+          "recommendations": [],
+          "score": 100.0,
+          "weight": 2.0
+        },
+        {
+          "confidence": 1.0,
+          "evidence": [],
+          "key": "objective_coverage",
+          "label": "Objectives are assessed",
+          "measurability": "measured",
+          "reasoning": "6 of 6 learning objectives are reachable from at least one assessment item.",
+          "recommendations": [],
+          "score": 100.0,
+          "weight": 2.5
+        },
+        {
+          "confidence": 1.0,
+          "evidence": [
+            {
+              "observation": "bloom levels: ['analyze', 'apply', 'understand']",
+              "path": "/assessments/items"
+            }
+          ],
+          "key": "bloom_spread",
+          "label": "Items span more than recall",
+          "measurability": "measured",
+          "reasoning": "3 distinct Bloom level(s) in the bank (analyze, apply, understand). Three or more is the point at which a paper distinguishes recall from reasoning.",
+          "recommendations": [],
+          "score": 100.0,
+          "weight": 1.5
+        },
+        {
+          "confidence": 1.0,
+          "evidence": [
+            {
+              "observation": "{'numerical': 10, 'mcq': 7, 'short_answer': 5, 'long_answer': 2}",
+              "path": "/assessments/blueprint/items_by_kind"
+            }
+          ],
+          "key": "blueprint_consistency",
+          "label": "Blueprint matches the items actually present",
+          "measurability": "measured",
+          "reasoning": "The published blueprint agrees with a recount of the bank.",
+          "recommendations": [],
+          "score": 100.0,
+          "weight": 2.0
+        },
+        {
+          "confidence": 1.0,
+          "evidence": [
+            {
+              "observation": "74 vs 74 summed",
+              "path": "/assessments/total_marks"
+            }
+          ],
+          "key": "marks_consistency",
+          "label": "Total marks equal the sum of the items",
+          "measurability": "measured",
+          "reasoning": "Published total is 74; the items sum to 74. They agree.",
+          "recommendations": [],
+          "score": 100.0,
+          "weight": 1.0
+        },
+        {
+          "confidence": 0.0,
+          "evidence": [],
+          "key": "item_difficulty_calibration",
+          "label": "Item difficulty is calibrated",
+          "measurability": "not_measurable",
+          "reasoning": "Difficulty is a property of a population's responses. No student has answered these items, so there is no p-value or discrimination index to report. Measuring it would need: response data from a cohort — item-response theory needs roughly 100 students per item",
+          "recommendations": [],
+          "score": null,
+          "weight": 0.0
+        }
+      ],
+      "missing": [],
+      "not_measurable": 1,
+      "score": 100.0,
+      "stage": "assessment-generation"
+    },
+    {
+      "confidence": 1.0,
+      "judged": 0,
+      "label": "Gap analysis",
+      "measured": 5,
+      "metrics": [
+        {
+          "confidence": 1.0,
+          "evidence": [],
+          "key": "gap_concept_linkage",
+          "label": "Gaps attach to real concepts",
+          "measurability": "measured",
+          "reasoning": "7 of 7 predicted gaps name a concept that stage 3 extracted.",
+          "recommendations": [],
+          "score": 100.0,
+          "weight": 2.0
+        },
+        {
+          "confidence": 1.0,
+          "evidence": [],
+          "key": "remediation",
+          "label": "Gaps carry a remediation",
+          "measurability": "measured",
+          "reasoning": "7 of 7 gaps carry remediation.",
+          "recommendations": [],
+          "score": 100.0,
+          "weight": 2.5
+        },
+        {
+          "confidence": 1.0,
+          "evidence": [],
+          "key": "diagnostics",
+          "label": "Gaps carry a diagnostic question",
+          "measurability": "measured",
+          "reasoning": "7 of 7 gaps carry diagnostic_questions.",
+          "recommendations": [],
+          "score": 100.0,
+          "weight": 2.0
+        },
+        {
+          "confidence": 1.0,
+          "evidence": [
+            {
+              "observation": "14 diagnostic questions",
+              "path": "/learning_gaps"
+            }
+          ],
+          "key": "diagnostic_discrimination",
+          "label": "Diagnostics predict the wrong answer",
+          "measurability": "measured",
+          "reasoning": "14 of 14 diagnostic questions state the wrong answer the misconception produces, which is what makes them diagnostic rather than merely difficult.",
+          "recommendations": [],
+          "score": 100.0,
+          "weight": 1.5
+        },
+        {
+          "confidence": 1.0,
+          "evidence": [
+            {
+              "observation": "3 extracted misconceptions",
+              "path": "/knowledge/misconceptions"
+            }
+          ],
+          "key": "misconception_alignment",
+          "label": "Gaps trace to extracted misconceptions",
+          "measurability": "measured",
+          "reasoning": "0 of 7 gaps restate a misconception stage 3 found in the source. The remainder are predicted rather than sourced, which is a legitimate output of this stage.",
+          "recommendations": [],
+          "score": 0.0,
+          "weight": 0.5
+        }
+      ],
+      "missing": [],
+      "not_measurable": 0,
+      "score": 94.12,
+      "stage": "gap-analysis"
+    },
+    {
+      "confidence": 1.0,
+      "judged": 0,
+      "label": "Validation",
+      "measured": 4,
+      "metrics": [
+        {
+          "confidence": 1.0,
+          "evidence": [
+            {
+              "observation": "GROUNDING_UNSUPPORTED_CLAIM: claim at /knowledge/concepts/8 is not supported by its cited source (judge rated this unsupported)",
+              "path": "/validation/issues"
+            },
+            {
+              "observation": "GROUNDING_UNSUPPORTED_CLAIM: claim at /knowledge/concepts/13 is not supported by its cited source (judge rated this unsupported)",
+              "path": "/validation/issues"
+            },
+            {
+              "observation": "GROUNDING_UNSUPPORTED_CLAIM: claim at /knowledge/definitions/4 is not supported by its cited source (judge rated this unsupported)",
+              "path": "/validation/issues"
+            },
+            {
+              "observation": "GROUNDING_UNSUPPORTED_CLAIM: claim at /knowledge/formulae/7 is not supported by its cited source (judge rated this unsupported)",
+              "path": "/validation/issues"
+            },
+            {
+              "observation": "GROUNDING_UNSUPPORTED_CLAIM: claim at /knowledge/applications/0 is not supported by its cited source (judge rated this unsupported)",
+              "path": "/validation/issues"
+            }
+          ],
+          "key": "issue_resolution",
+          "label": "No blocking issues remain",
+          "measurability": "measured",
+          "reasoning": "Status 'fail' with 9 issue(s), 5 of them blocking.",
+          "recommendations": [
+            {
+              "action": "Route the blocking issues back to their owning stage for repair.",
+              "impact": "The package ships with defects its own validator found.",
+              "severity": "high"
+            }
+          ],
+          "score": 44.44,
+          "weight": 2.5
+        },
+        {
+          "confidence": 1.0,
+          "evidence": [
+            {
+              "observation": "22/22 concepts taught, confirmed",
+              "path": "/validation/coverage"
+            }
+          ],
+          "key": "coverage_report_accuracy",
+          "label": "Coverage report survives a recount",
+          "measurability": "measured",
+          "reasoning": "The published coverage numbers match an independent recount of the package.",
+          "recommendations": [],
+          "score": 100.0,
+          "weight": 3.0
+        },
+        {
+          "confidence": 1.0,
+          "evidence": [],
+          "key": "structural_consistency",
+          "label": "Structural checks pass",
+          "measurability": "measured",
+          "reasoning": "3 of 3 structural checks are clean.",
+          "recommendations": [],
+          "score": 100.0,
+          "weight": 2.0
+        },
+        {
+          "confidence": 1.0,
+          "evidence": [
+            {
+              "observation": "Electric field: Electric field is a vector field in space that characterises the electrical environment of a system of c",
+              "path": "/validation/unsupported_claims"
+            },
+            {
+              "observation": "Superposition principle for electric fields: The net electric field due to a system of point charges at a point is the v",
+              "path": "/validation/unsupported_claims"
+            },
+            {
+              "observation": "Electric field lines: Field lines are curves whose tangent at any point gives the direction of the electric field there;",
+              "path": "/validation/unsupported_claims"
+            },
+            {
+              "observation": "Gauss's law: Electric flux through a closed surface equals the total enclosed charge divided by epsilon_0.",
+              "path": "/validation/unsupported_claims"
+            },
+            {
+              "observation": "Torque on a dipole in a uniform electric field: A permanent electric dipole with dipole moment p in uniform field E expe",
+              "path": "/validation/unsupported_claims"
+            }
+          ],
+          "key": "grounding_score",
+          "label": "Claims are supported by the source",
+          "measurability": "measured",
+          "reasoning": "Stage 9 scored grounding at 0.87. 9 claim(s) were recorded as unsupported.",
+          "recommendations": [],
+          "score": 86.54,
+          "weight": 2.5
+        }
+      ],
+      "missing": [],
+      "not_measurable": 0,
+      "score": 82.75,
+      "stage": "validation"
+    },
+    {
+      "confidence": 1.0,
+      "judged": 0,
+      "label": "Publishing",
+      "measured": 5,
+      "metrics": [
+        {
+          "confidence": 1.0,
+          "evidence": [
+            {
+              "observation": "9 entries totalling 481424 ms",
+              "path": "/provenance/stage_timings"
+            }
+          ],
+          "key": "stage_timings",
+          "label": "Every stage reported its cost",
+          "measurability": "measured",
+          "reasoning": "9 of 10 stages recorded a timing entry; missing publishing.",
+          "recommendations": [
+            {
+              "action": "Emit a timing entry from every stage span, including cheap ones.",
+              "impact": "Per-stage cost cannot be attributed without it.",
+              "severity": "medium"
+            }
+          ],
+          "score": 90.0,
+          "weight": 1.5
+        },
+        {
+          "confidence": 1.0,
+          "evidence": [
+            {
+              "observation": "{'educational-classification': 'gpt-5-mini-2025-08-07', 'knowledge-extraction': 'gpt-5-mini-2025-08-07', 'teaching-planner': 'gpt-5-mini-2025-08-07', 'lesson-generation': 'gpt-5-mini-2025-08-07', 'act",
+              "path": "/generator/models_by_stage"
+            }
+          ],
+          "key": "model_attribution",
+          "label": "Each model-calling stage names the model that ran it",
+          "measurability": "measured",
+          "reasoning": "8 of 8 model-calling stages record which model produced their output. document-intelligence, publishing are excluded because they make no model call, so an absent entry for them is correct rather than missing.",
+          "recommendations": [],
+          "score": 100.0,
+          "weight": 1.0
+        },
+        {
+          "confidence": 1.0,
+          "evidence": [
+            {
+              "observation": "knowledge-extraction: extraction split into 3 passes — 28,244 tokens exceeds the 12,000-token window this route leaves for document text after the schema, system prompt, and the reservation for the answer; sections are packed to that window rather than one call each, so cost follows content volume",
+              "path": "/provenance/decisions"
+            },
+            {
+              "observation": "knowledge-extraction: pedagogy pass reads 17 of 63 chunks — objectives and edges are document-level judgements, but the document is 28,244 tokens against a 12,000-token window; scope comes from the full 25-concept inventory, which is sent whole, and the text is narrowed to the passages those concepts cite plus a stride across the rest, so every claim still has a quotable source",
+              "path": "/provenance/decisions"
+            },
+            {
+              "observation": "knowledge-extraction: 8 claims dropped — their quotes did not appear in the chunk they cited; an unverifiable citation is removed here rather than propagating into six later stages",
+              "path": "/provenance/decisions"
+            },
+            {
+              "observation": "teaching-planner: 6 periods of 40 minutes — derived from 22 concepts weighted by importance against a 40-minute period",
+              "path": "/provenance/decisions"
+            }
+          ],
+          "key": "decision_record",
+          "label": "Stages explain their choices",
+          "measurability": "measured",
+          "reasoning": "7 stage decision(s) recorded with a reason. Four is the point at which the main routing choices — period count, item mix, gap severity, profile — are all accounted for.",
+          "recommendations": [],
+          "score": 100.0,
+          "weight": 1.0
+        },
+        {
+          "confidence": 1.0,
+          "evidence": [
+            {
+              "observation": "1.0.0",
+              "path": "/schema_version"
+            }
+          ],
+          "key": "package_identity",
+          "label": "Package is identified and versioned",
+          "measurability": "measured",
+          "reasoning": "3 of 3 identity fields present (schema 1.0.0).",
+          "recommendations": [],
+          "score": 100.0,
+          "weight": 1.5
+        },
+        {
+          "confidence": 1.0,
+          "evidence": [
+            {
+              "observation": "$0.0000",
+              "path": "/provenance/total_cost_usd"
+            }
+          ],
+          "key": "cost_accounting",
+          "label": "Cost and token usage are accounted for",
+          "measurability": "measured",
+          "reasoning": "$0.0000 across 136,483 input and 96,255 output tokens.",
+          "recommendations": [],
+          "score": 100.0,
+          "weight": 0.5
+        }
+      ],
+      "missing": [],
+      "not_measurable": 0,
+      "score": 97.27,
+      "stage": "publishing"
+    },
+    {
+      "confidence": 0.0,
+      "judged": 0,
+      "label": "Learning outcomes",
+      "measured": 0,
+      "metrics": [
+        {
+          "confidence": 0.0,
+          "evidence": [],
+          "key": "teacher_satisfaction",
+          "label": "Teacher satisfaction",
+          "measurability": "not_measurable",
+          "reasoning": "Satisfaction is a rating teachers give. None have used this package. Measuring it would need: a pilot with teachers rating packages after classroom use — 20+ responses before a mean means anything",
+          "recommendations": [],
+          "score": null,
+          "weight": 0.0
+        },
+        {
+          "confidence": 0.0,
+          "evidence": [],
+          "key": "student_learning_effectiveness",
+          "label": "Student learning effectiveness",
+          "measurability": "not_measurable",
+          "reasoning": "Effectiveness is measured by what students learn, which requires students, a pre-test and a post-test. Measuring it would need: a controlled classroom trial with pre/post assessment against a conventionally-planned unit",
+          "recommendations": [],
+          "score": null,
+          "weight": 0.0
+        },
+        {
+          "confidence": 0.0,
+          "evidence": [],
+          "key": "time_saved",
+          "label": "Teacher preparation time saved",
+          "measurability": "not_measurable",
+          "reasoning": "Time saved is a difference against how long the same teacher would take unaided. That baseline has not been collected. Measuring it would need: timed preparation of the same unit by teachers with and without the package",
+          "recommendations": [],
+          "score": null,
+          "weight": 0.0
+        },
+        {
+          "confidence": 0.0,
+          "evidence": [],
+          "key": "curriculum_conformance",
+          "label": "Conformance to a published curriculum",
+          "measurability": "not_measurable",
+          "reasoning": "The package aligns to a board's structure, but no authority has certified the mapping. Reporting a conformance score would state agreement nobody granted. Measuring it would need: an official syllabus document parsed to statement level, and a reviewer's sign-off on the mapping",
+          "recommendations": [],
+          "score": null,
+          "weight": 0.0
+        }
+      ],
+      "missing": [],
+      "not_measurable": 4,
+      "score": null,
+      "stage": "outcomes"
+    }
+  ],
+  "subject": "Physics",
+  "summary": {
+    "band": "exemplary",
+    "judged": false,
+    "rubric_band": "exemplary",
+    "rubric_score": 92.74,
+    "stage_confidence": 0.9157,
+    "stage_score": 93.2,
+    "stages_scored": 10,
+    "stages_total": 11,
+    "transferable": true
+  }
+}
