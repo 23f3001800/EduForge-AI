@@ -21,7 +21,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from api.middleware import ObservabilityMiddleware
 from api.routes import documents, evaluations, events, jobs, options, stats
-from api.samples import seed_samples
+from api.samples import score_samples, seed_samples
 from contracts.primitives import SCHEMA_VERSION
 from core.config import REPO_ROOT, get_settings
 from core.obs import metrics
@@ -58,6 +58,9 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     configure_logging(get_settings().log_level, json_output=get_settings().log_json)
     await seed_samples(get_store())
+    # Scored right after seeding so the cross-run dashboard has a series to draw
+    # on a cold start instead of an empty state explaining what it would show.
+    await score_samples(get_store())
     yield
 
 

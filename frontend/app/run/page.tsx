@@ -566,16 +566,23 @@ function RunView() {
           <div className="flex items-start gap-3">
             <ShieldAlert className="mt-0.5 size-5 shrink-0 text-warning" aria-hidden />
             <div className="min-w-0 flex-1">
+              {/* `fail` and `pass_with_warnings` are different verdicts and must
+                  not share a headline. A package carrying two loosely-filed
+                  learning gaps is usable as it stands; one the validator
+                  rejected is not. Wording them identically taught the reader to
+                  discount the message, which costs the real rejection its
+                  weight. */}
               <h2 id="partial" className="font-medium">
-                Validation did not fully pass
+                {validationStatus === "fail"
+                  ? "Validation did not pass"
+                  : "Usable, with points to check"}
               </h2>
               <p className="mt-1 text-sm text-fg-muted">
-                The package was built and you can open it, but the validator
                 {validationStatus === "fail"
-                  ? " rejected it"
-                  : " raised problems it could not clear"}
-                . Read the Validation tab before teaching from it. Retrying re-runs the stages after
-                the last checkpoint rather than the whole pipeline.
+                  ? "The package was built and you can open it, but the validator rejected it. Read the Validation tab before teaching from it."
+                  : "The package passed. The validator flagged some points worth a glance — mostly claims it judged only loosely tied to the passage cited for them — but none block using it. The Validation tab lists them."}{" "}
+                Retrying re-runs the stages after the last checkpoint rather than the whole
+                pipeline.
               </p>
               <div className="mt-3 flex flex-wrap gap-2">
                 {packageId ? (

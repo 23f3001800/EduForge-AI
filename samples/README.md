@@ -116,3 +116,15 @@ read a wall clock instead of adding up.
 | `source.pdf` | The exact input, for reproduction |
 | `lesson_plan.pdf`, `teacher_guide.pdf`, `assessment_book.pdf` | Rendered artifacts |
 | `eval-report.json`, `eval-report.pdf` | Scored server-side, where the run's chunks are still reachable — so citation integrity actually runs instead of reporting itself unmeasurable |
+
+## The single-file bundle
+
+`teacher_knowledge_packages.json` holds `quantitative-physics` and
+`narrative-history` in one file, for a submission portal that takes one upload.
+Regenerate it with `python scripts/bundle_samples.py`; the per-directory copies
+above are canonical and the bundle is a view over them.
+
+`multilingual-hindi` is deliberately **not** in the bundle. It is a real run and
+stays here as the evidence for the multilingual claim, but it is the same NCERT
+chapter as `quantitative-physics` — so including it would make two of three
+entries the same source document, which reads as padding rather than range.

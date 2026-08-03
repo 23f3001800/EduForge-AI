@@ -35,7 +35,11 @@ def _render_questions(doc: TkpDocument, items: list[AssessmentItem]) -> None:
     doc.key_value("Total marks", str(sum(item.marks for item in items)))
     doc.spacer()
     for index, item in enumerate(items, start=1):
-        doc.h3(f"Q{index}. ({item.marks} mark{'s' if item.marks != 1 else ''}) {item.stem}")
+        # Bold carries the question number and its mark value — the two things a
+        # student scans for — while the stem stays regular weight and readable.
+        doc.labelled(
+            f"Q{index}. ({item.marks} mark{'s' if item.marks != 1 else ''})", item.stem
+        )
         if item.kind == "mcq" and item.options:
             for label, option in zip(_OPTION_LABELS, item.options, strict=False):
                 doc.bullet(f"{label}. {option.text}")

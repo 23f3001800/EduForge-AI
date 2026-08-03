@@ -140,6 +140,19 @@ async def evaluate_one(
     )
 
 
+async def evaluate_sample(record: PackageRecord, history: EvaluationStore) -> dict[str, Any]:
+    """Score a seeded sample into the history at startup.
+
+    Shares the worker-thread and lock discipline of the route above rather than
+    reimplementing it — the point of exposing this is that startup scoring and
+    on-demand scoring cannot drift apart. No chunks: a sample has no stage-1
+    checkpoint to resolve them from.
+    """
+    return await asyncio.to_thread(
+        _evaluate_locked, record.tkp, [], str(record.id), history, True
+    )
+
+
 @router.get("/evaluations")
 async def list_evaluations(
     profile: str | None = Query(None),
