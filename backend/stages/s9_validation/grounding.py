@@ -64,7 +64,7 @@ from __future__ import annotations
 import re
 import unicodedata
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Literal
 
 from contracts.primitives import StageName
 from core.llm.client import LLMClient
@@ -275,6 +275,28 @@ def contradiction_risk(claim: str, span: str) -> str | None:
     return None
 
 
+#: What kind of statement a claim is, which decides *which question* grounding
+#: asks of it. The distinction is not a softening — it is the difference between
+#: two genuinely different failure modes.
+#:
+#: An *extracted* claim asserts something the document says. If the cited passage
+#: does not establish it, the model invented it, and that is the fabrication this
+#: whole module exists to catch.
+#:
+#: A *predicted* claim — a misconception, a learning gap — asserts something
+#: about **students**, not about the document. No textbook records which errors
+#: learners make on its own hardest ideas; that is precisely why a teacher needs
+#: the prediction. Demanding that the source entail it is demanding the
+#: impossible, and it was measured doing exactly that: on a 935-word calculus
+#: chapter, all nine extracted claims grounded cleanly and all four predicted
+#: ones were flagged, dragging a genuinely good package to 0.73 and `fail`.
+#:
+#: So a predicted claim's evidence is a *pointer to the material the difficulty
+#: concerns*, and the honest question is whether it points at the right passage,
+#: not whether the passage proves the prediction.
+ClaimKind = Literal["extracted", "predicted"]
+
+
 @dataclass(slots=True, frozen=True)
 class GroundableClaim:
     """One generated statement that must trace back to the source document."""
@@ -283,6 +305,7 @@ class GroundableClaim:
     text: str
     chunk_id: str | None
     stage: StageName
+    kind: ClaimKind = "extracted"
 
 
 @dataclass(slots=True, frozen=True)
@@ -303,6 +326,11 @@ _KNOWLEDGE_CLAIM_TEXT: dict[str, Any] = {
     "applications": lambda item: f"{item.get('context', '')}: {item.get('description', '')}",
     "misconceptions": lambda item: f"{item.get('statement', '')} {item.get('correction', '')}",
 }
+
+#: Knowledge fields that describe students rather than the document. See
+#: ``ClaimKind``. Only misconceptions qualify — every other field in
+#: ``_KNOWLEDGE_CLAIM_TEXT`` asserts something the chapter itself says.
+_PREDICTED_FIELDS: dict[str, ClaimKind] = {"misconceptions": "predicted"}
 
 
 def collect_claims(
@@ -330,6 +358,7 @@ def collect_claims(
                     text=build_text(item).strip(" :"),
                     chunk_id=evidence[0].get("chunk_id"),
                     stage="knowledge-extraction",
+                    kind=_PREDICTED_FIELDS.get(field, "extracted"),
                 )
             )
 
@@ -343,6 +372,7 @@ def collect_claims(
                 text=str(gap.get("misconception", "")),
                 chunk_id=evidence[0].get("chunk_id"),
                 stage="gap-analysis",
+                kind="predicted",
             )
         )
 
@@ -363,7 +393,15 @@ def prefilter(
             continue
 
         overlap = lexical_overlap(claim.text, span)
-        if overlap >= TAU_HIGH and contradiction_risk(claim.text, span) is None:
+        # Contradiction detection is meaningless on a predicted claim and worse
+        # than meaningless on a misconception: a misconception *states the wrong
+        # thing on purpose*, so conflicting with the source's polarity is the
+        # shape of a correct one. Flagging that conflict penalises the field for
+        # doing its job. Predicted claims go to the judge, which is asked a
+        # question the conflict does not corrupt.
+        if claim.kind == "predicted":
+            ambiguous.append(claim)
+        elif overlap >= TAU_HIGH and contradiction_risk(claim.text, span) is None:
             decided.append(Verdicted(claim, "supported", f"lexical overlap {overlap:.2f}"))
         else:
             # Everything else needs a real read. Low overlap is a paraphrase
@@ -384,6 +422,40 @@ For every numbered claim, return exactly one verdict:
 - supported: the passage states or directly entails the claim.
 - partially_supported: the passage is related but does not fully establish it.
 - unsupported: the passage does not support the claim.
+
+Return one verdict per index. Cover every index given."""
+
+#: The predicted-claim judge. Deliberately not a softer version of the extracted
+#: one — it asks a different question, because entailment is unanswerable here.
+#:
+#: A misconception or learning gap describes an error *students* make. The
+#: passage is cited to say which material the error concerns, so the only
+#: honest test is whether it points at the right material. The rubric below
+#: still fails a prediction that wanders off the passage's topic entirely,
+#: which is the real failure mode: a gap about integration filed against a
+#: passage on set notation is a routing error worth catching.
+#:
+#: The instruction not to penalise a claim for contradicting the passage is
+#: load-bearing. A misconception states something false on purpose; a judge left
+#: to its own instincts marks that "unsupported" every time, which is what made
+#: this check unpassable for the field.
+_PREDICTED_JUDGE_SYSTEM = """You check whether a predicted student difficulty is \
+filed against the right source passage.
+
+Each claim describes a mistake, misconception or gap that STUDENTS are expected \
+to have. The passage is not evidence that students make this mistake — no \
+textbook records that. The passage identifies the material the difficulty is \
+about.
+
+So judge topical fit, not proof:
+- supported: the difficulty plainly concerns what this passage teaches.
+- partially_supported: loosely related — it touches the passage's topic but \
+centres on something else.
+- unsupported: the difficulty is about different material than this passage.
+
+Do NOT mark a claim unsupported for stating something incorrect, or for \
+contradicting the passage. A misconception is *meant* to state the wrong thing; \
+that is the error being described, not a fault in the claim.
 
 Return one verdict per index. Cover every index given."""
 
@@ -411,27 +483,39 @@ async def judge_claims(
     results: list[Verdicted] = []
     any_degraded = False
 
-    for start in range(0, len(claims), JUDGE_BATCH_SIZE):
-        batch = claims[start : start + JUDGE_BATCH_SIZE]
-        outcome = await llm.parse(
-            stage=stage,
-            output_model=GroundingJudgement,
-            system=_JUDGE_SYSTEM,
-            user_content=_judge_prompt(batch, chunks_by_id),
-        )
-        if outcome.degraded:
-            any_degraded = True
+    # Batched by kind, never mixed: the two kinds are graded against different
+    # rubrics, and one prompt cannot carry both without inviting the judge to
+    # apply the wrong one to half its batch.
+    batches = [
+        (kind, [claim for claim in claims if claim.kind == kind])
+        for kind in ("extracted", "predicted")
+    ]
 
-        verdict_by_index = {v.index: v.verdict for v in outcome.value.verdicts}
-        for index, claim in enumerate(batch):
-            verdict = verdict_by_index.get(index)
-            if verdict is None:
-                # A missing verdict is the judge's failure, not evidence the claim
-                # is bad — defaulting to "unsupported" would manufacture a false
-                # hallucination finding out of a degraded call.
-                results.append(Verdicted(claim, "partially_supported", "judge returned no verdict"))
-            else:
-                results.append(Verdicted(claim, verdict, f"judge rated this {verdict}"))
+    for kind, of_kind in batches:
+        system = _JUDGE_SYSTEM if kind == "extracted" else _PREDICTED_JUDGE_SYSTEM
+        for start in range(0, len(of_kind), JUDGE_BATCH_SIZE):
+            batch = of_kind[start : start + JUDGE_BATCH_SIZE]
+            outcome = await llm.parse(
+                stage=stage,
+                output_model=GroundingJudgement,
+                system=system,
+                user_content=_judge_prompt(batch, chunks_by_id),
+            )
+            if outcome.degraded:
+                any_degraded = True
+
+            verdict_by_index = {v.index: v.verdict for v in outcome.value.verdicts}
+            for index, claim in enumerate(batch):
+                verdict = verdict_by_index.get(index)
+                if verdict is None:
+                    # A missing verdict is the judge's failure, not evidence the
+                    # claim is bad — defaulting to "unsupported" would manufacture
+                    # a false hallucination finding out of a degraded call.
+                    results.append(
+                        Verdicted(claim, "partially_supported", "judge returned no verdict")
+                    )
+                else:
+                    results.append(Verdicted(claim, verdict, f"judge rated this {verdict}"))
 
     return results, any_degraded
 
@@ -478,12 +562,28 @@ async def check_grounding(
                     "reason": verdict.reason,
                 }
             )
+            # Named for what actually went wrong. A mis-filed prediction is a
+            # routing error — the difficulty is real, the passage is the wrong
+            # one — and reporting it as an unsupported claim tells a teacher the
+            # system invented something, which it did not.
+            predicted = verdict.claim.kind == "predicted"
             issues.append(
                 make_issue(
-                    code="GROUNDING_UNSUPPORTED_CLAIM",
+                    code=(
+                        "GROUNDING_MISFILED_PREDICTION"
+                        if predicted
+                        else "GROUNDING_UNSUPPORTED_CLAIM"
+                    ),
                     message=(
-                        f"claim at {verdict.claim.path} is not supported by its "
-                        f"cited source ({verdict.reason})"
+                        (
+                            f"predicted difficulty at {verdict.claim.path} concerns "
+                            f"different material than the passage it cites ({verdict.reason})"
+                        )
+                        if predicted
+                        else (
+                            f"claim at {verdict.claim.path} is not supported by its "
+                            f"cited source ({verdict.reason})"
+                        )
                     ),
                     path=verdict.claim.path,
                     stage=verdict.claim.stage,

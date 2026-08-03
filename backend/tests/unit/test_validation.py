@@ -175,6 +175,59 @@ async def test_the_grounding_judge_is_only_asked_about_the_ambiguous_middle() ->
         assert prompt.count("CLAIM ") <= 20  # JUDGE_BATCH_SIZE
 
 
+def test_a_prediction_about_students_is_not_judged_as_an_extracted_claim() -> None:
+    """Misconceptions and gaps describe learners, so they get the other rubric.
+
+    Measured defect, not a hypothetical. On a 935-word calculus chapter every
+    one of the nine extracted claims grounded cleanly and every one of the four
+    predicted ones was flagged, giving 9.5/13 = 0.731 and a `fail` verdict on a
+    package whose extraction was perfect. No textbook states which errors
+    students will make, so demanding the source entail a predicted difficulty
+    demands the impossible and the score punishes the gap analysis for existing.
+    """
+    knowledge = fx.knowledge_base().model_dump(mode="json")
+    gaps = [
+        {
+            "misconception": "students think the derivative of a product "
+            "is the product of the derivatives",
+            "evidence": [{"chunk_id": fx.chunks()[0].chunk_id, "quote": "x"}],
+        }
+    ]
+    by_path = {c.path: c for c in collect_claims(knowledge, gaps)}
+
+    assert by_path["/learning_gaps/0"].kind == "predicted"
+    assert all(
+        claim.kind == "predicted"
+        for path, claim in by_path.items()
+        if path.startswith("/knowledge/misconceptions/")
+    )
+    assert all(
+        claim.kind == "extracted"
+        for path, claim in by_path.items()
+        if path.startswith("/knowledge/concepts/")
+        or path.startswith("/knowledge/formulae/")
+    ), "an extracted claim was reclassified, which would weaken the fabrication check"
+
+
+def test_a_misconception_is_never_failed_for_stating_the_wrong_thing() -> None:
+    """A misconception contradicts its source *by construction*; that is the point.
+
+    ``contradiction_risk`` looks for exactly that polarity conflict, so running
+    it over a misconception marks the well-formed ones as fabrications. Predicted
+    claims must therefore reach the judge rather than be decided lexically.
+    """
+    knowledge = fx.knowledge_base().model_dump(mode="json")
+    chunks = {c.chunk_id: c.text for c in fx.chunks()}
+    claims = collect_claims(knowledge, [])
+    decided, ambiguous = prefilter(claims, chunks)
+
+    settled = {v.claim.path for v in decided}
+    assert not any(path.startswith("/knowledge/misconceptions/") for path in settled), (
+        "a misconception was decided by lexical rules that penalise it for being a misconception"
+    )
+    assert any(claim.kind == "predicted" for claim in ambiguous)
+
+
 # ──────────────────────────────────────────────────────────── schema class
 
 

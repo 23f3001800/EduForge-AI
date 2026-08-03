@@ -651,17 +651,28 @@ function ViewerBody() {
             {(validation.issues ?? []).length ? (
               <Card>
                 <CardContent className="pt-5">
-                  <h3 className="text-sm font-semibold">Issues</h3>
-                  <ul className="mt-2 space-y-2">
+                  <h3 className="text-sm font-semibold">
+                    Issues ({(validation.issues as Any[]).length})
+                  </h3>
+                  {/* A grid, because these are scanned as a set rather than read
+                      in order: a package failing on eleven claims is a pattern,
+                      and eleven full-width rows hide the pattern by making the
+                      reader scroll through it one line at a time. */}
+                  <ul className="mt-2 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
                     {(validation.issues as Any[]).map((issue, index) => (
-                      <li key={index} className="rounded-md border border-border p-3 text-sm">
-                        <div className="flex flex-wrap items-center gap-2">
+                      <li
+                        key={index}
+                        className="rounded-md border border-border px-2.5 py-2 text-xs"
+                      >
+                        <div className="flex flex-wrap items-center gap-1.5">
                           <Badge tone={issue.severity === "error" ? "danger" : "warning"}>
                             {labelFor(issue.severity ?? "")}
                           </Badge>
-                          <span className="font-mono text-xs text-fg-faint">{issue.code}</span>
+                          <span className="font-mono text-[11px] text-fg-faint">{issue.code}</span>
                         </div>
-                        <p className="mt-1 text-fg-muted">{issue.message ?? issue.detail}</p>
+                        <p className="mt-1 leading-relaxed text-fg-muted">
+                          {issue.message ?? issue.detail}
+                        </p>
                       </li>
                     ))}
                   </ul>
