@@ -26,6 +26,7 @@ from stages.s1_document_intelligence.ocr.base import (
 )
 from stages.s1_document_intelligence.ocr.detect import (
     PageTextProfile,
+    extract_pages,
     profile_pdf,
     rasterise,
 )
@@ -43,6 +44,7 @@ __all__ = [
     "PageImage",
     "PageTextProfile",
     "build_engine",
+    "extract_pages",
     "profile_pdf",
     "rasterise",
     "recognise_scanned_pages",
@@ -120,7 +122,13 @@ def recognise_scanned_pages(
         return OcrResult(engine=engine.name)
 
     if engine.name in _PDF_NATIVE:
-        images = [PageImage(page=number, pdf=payload) for number in pages]
+        # Only the pages that need reading. See extract_pages: hosted readers
+        # bill per page and cap request size, and re-sending pages that already
+        # parsed cleanly would let a guess overwrite exact text.
+        trimmed = extract_pages(payload, pages)
+        if not trimmed:
+            return OcrResult(engine=engine.name, failed_pages=tuple(pages))
+        images = [PageImage(page=number, pdf=trimmed) for number in pages]
     else:
         images = rasterise(payload, pages)
         if not images:

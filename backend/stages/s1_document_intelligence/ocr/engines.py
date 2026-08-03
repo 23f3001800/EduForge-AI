@@ -37,7 +37,20 @@ __all__ = ["AzureDocumentIntelligenceEngine", "EasyOcrEngine", "TesseractEngine"
 
 
 class AzureDocumentIntelligenceEngine(OcrEngine):
-    """Azure Document Intelligence — reads the PDF, returns text and confidence."""
+    """Azure Document Intelligence — reads the PDF, returns text and confidence.
+
+    **Two free-tier limits, both measured rather than read off a page.** F0
+    rejects a request above 4 MB, and it analyses only the *first two pages* of
+    whatever it is sent. Neither is an error the SDK surfaces as one: the
+    oversize case raises ``InvalidContentLength``, and the page cap simply
+    returns fewer pages than were asked for.
+
+    The first is handled by sending only the pages that need reading rather than
+    the whole document (see ``extract_pages``). The second cannot be worked
+    around on F0 — pages beyond the cap come back in ``failed_pages``, so the
+    package records honestly which pages were never read instead of implying
+    the whole document was recovered. Upgrading to S0 removes both limits.
+    """
 
     name = "azure-document-intelligence"
 

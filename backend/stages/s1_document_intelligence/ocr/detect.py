@@ -130,6 +130,37 @@ def profile_pdf(payload: bytes) -> list[PageTextProfile]:
     return profiles
 
 
+def extract_pages(payload: bytes, pages: list[int]) -> bytes:
+    """A new PDF holding only ``pages``, for engines that read PDFs directly.
+
+    Sending the whole document would be wrong on every axis: hosted readers bill
+    per page, they cap request size (the Azure free tier at 4 MB, which a 44-page
+    chapter exceeds), and the pages with a text layer have already been parsed —
+    re-reading them would let a recogniser's guess overwrite text that was
+    extracted exactly.
+    """
+    try:
+        import pymupdf
+    except ImportError:  # pragma: no cover - dependency is declared
+        return payload
+
+    wanted = sorted({n for n in pages if n >= 1})
+    if not wanted:
+        return b""
+
+    with pymupdf.open(stream=payload, filetype="pdf") as source:
+        keep = [n for n in wanted if n <= source.page_count]
+        if not keep:
+            return b""
+        out = pymupdf.open()
+        try:
+            for number in keep:
+                out.insert_pdf(source, from_page=number - 1, to_page=number - 1)
+            return out.tobytes(garbage=4, deflate=True)
+        finally:
+            out.close()
+
+
 def rasterise(payload: bytes, pages: list[int], *, dpi: int = RENDER_DPI) -> list:
     """Render the named 1-based pages to PNG for an engine that needs images.
 
