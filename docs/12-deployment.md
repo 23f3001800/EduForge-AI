@@ -133,7 +133,7 @@ under `backend/`, which is out of scope for this change — other agents own it.
 whoever owns `backend/pyproject.toml` next has a reproducible bug report, not a vague warning.
 
 1. **`backend/pyproject.toml`'s `llm` extra is missing `openai` and `google-genai`.**
-   `core/llm/providers/openai_compat.py` (which backs the OpenRouter and Groq adapters) does
+   `core/llm/providers/openai_compat.py` (which backs the OpenRouter adapter) does
    `import openai` inside `OpenRouterAdapter.__init__`; `gemini_provider.py` does
    `from google import genai`. Neither package is declared anywhere in `pyproject.toml`.
    **This is not merely a deploy-time issue** — `core/llm/client.py:build_adapters` constructs

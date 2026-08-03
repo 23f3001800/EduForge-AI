@@ -513,7 +513,7 @@ def test_packing_preserves_document_order() -> None:
 def _routing(**overrides: object):
     from contracts.llm import ModelSpec, ProviderRouting
 
-    spec = ModelSpec(provider="groq", model="m", max_tokens=3000, **overrides)  # type: ignore[arg-type]
+    spec = ModelSpec(provider="openrouter", model="m", max_tokens=3000, **overrides)  # type: ignore[arg-type]
     return ProviderRouting(default=spec)
 
 

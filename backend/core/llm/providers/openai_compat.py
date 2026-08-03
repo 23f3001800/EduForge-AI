@@ -1,9 +1,9 @@
 """Shared base for OpenAI-compatible providers.
 
-AI Pipe and Groq speak the same wire protocol, so they differ only in base URL,
-model naming, and price table. Everything else — strict-schema negotiation, the
-schema rewrite, refusal detection, usage extraction — is identical and lives here
-once.
+Every OpenAI-compatible provider speaks the same wire protocol, so they differ
+only in base URL, model naming, and price table. Everything else — strict-schema
+negotiation, the schema rewrite, refusal detection, usage extraction — is
+identical and lives here once.
 
 The one genuinely tricky behaviour is structured-output negotiation. "OpenAI
 compatible" is a spectrum: some models honour ``response_format: json_schema``
@@ -41,7 +41,8 @@ _RETRYABLE_STATUS = {408, 409, 429, 500, 502, 503, 504, 529}
 #: Providers with a tokens-per-minute cap count `max_tokens` as *reserved*
 #: budget, not as measured usage — so an oversized reservation is rejected before
 #: the model runs. The error states the numbers needed to compute a reservation
-#: that fits, but not in a fixed shape: Groq's real message is
+#: that fits, but not in a fixed shape: a real rate-limited provider's message
+#: was seen as
 #:
 #:     Limit 8000, Used 0, Requested 38566
 #:
@@ -52,8 +53,8 @@ _RETRYABLE_STATUS = {408, 409, 429, 500, 502, 503, 504, 529}
 _TPM_FIELD = re.compile(r"\b(limit|used|requested)\b\s*[:=]?\s*(\d+)", re.IGNORECASE)
 
 #: Status codes and phrases that mean "your token reservation did not fit".
-#: Groq answers a per-minute token overrun with 429 and prose about tokens per
-#: minute, not with the 413 the previous gate looked for alone.
+#: A per-minute token overrun can arrive as a 429 with prose about tokens per
+#: minute, not only as the 413 the previous gate looked for alone.
 _TPM_MARKERS = (
     "tokens per minute",
     "tokens-per-minute",
@@ -371,16 +372,17 @@ class OpenAICompatibleAdapter:
         worse than one that is silent.
 
         Empty in the base class because "OpenAI compatible" does not agree on the
-        field — Groq takes ``reasoning_effort``, OpenRouter takes a ``reasoning``
-        object — and a guess that a given endpoint rejects turns an advisory knob
-        into a 400 on every call. Subclasses that know their own wire format
-        override; one that does not, honestly sends nothing.
+        field — OpenRouter takes a ``reasoning`` object, other wire-compatible
+        providers have used a flat ``reasoning_effort`` string — and a guess that
+        a given endpoint rejects turns an advisory knob into a 400 on every call.
+        Subclasses that know their own wire format override; one that does not,
+        honestly sends nothing.
 
         ``cache_prefix`` is deliberately not translated anywhere in this file.
-        This protocol has no request-level cache control at all: Groq and
-        OpenRouter cache prefixes automatically or not at all, so there is nothing
-        to send. Its contract already says adapters that cannot honour it must
-        ignore it rather than fail, and Anthropic and Gemini do act on it.
+        This protocol has no request-level cache control at all: providers on it
+        cache prefixes automatically or not at all, so there is nothing to send.
+        Its contract already says adapters that cannot honour it must ignore it
+        rather than fail, and Anthropic and Gemini do act on it.
         """
         return {}
 

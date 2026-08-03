@@ -51,65 +51,6 @@ profiles:
       validation:            { model: openai/gpt-oss-20b:free, max_tokens: 4000,
                                reasoning: { effort: low } }
 
-  groq:
-    # Groq. Fast, and the free tier is generous enough to run all ten stages
-    # repeatedly — which matters more than it sounds: a pipeline you cannot
-    # afford to run end to end is one whose integration bugs surface during the
-    # demo rather than during development.
-    #
-    # TWO HARD FREE-TIER CONSTRAINTS, both measured rather than assumed:
-    #
-    # 1. TPM is 8000 and `max_tokens` counts against it as *reserved* budget, not
-    #    as measured usage. The real ceiling is `prompt + max_tokens <= 8000`, so
-    #    a 16k max_tokens fails with a 413 before the model ever runs.
-    #
-    #    That constraint is `tpm_ceiling` below rather than only this comment. It
-    #    used to be prose, which meant nothing enforced it and nothing could size
-    #    a prompt against it: a live run sent a 38,566-token stage-3 request into
-    #    an 8000-token window and was rejected outright. As config, the adapter
-    #    clamps the reservation before sending and a stage can ask
-    #    `LLMClient.prompt_budget()` how much document it may actually include.
-    #
-    # 2. That same 8000 is a per-minute throughput budget. gpt-oss-120b needed
-    #    ~7.7k tokens per extraction call, which is barely one call per minute and
-    #    made a full run mostly waiting. 20b at ~4.6k roughly doubles throughput
-    #    for a modest quality cost, which is the right trade for a profile whose
-    #    job is proving the pipeline runs end to end.
-    #
-    # On a paid tier, raise `tpm_ceiling` to the tier's real limit (or drop it),
-    # promote extraction / planning / lesson-generation to gpt-oss-120b, and
-    # roughly quadruple every max_tokens below.
-    default:
-      provider: groq
-      model: openai/gpt-oss-20b
-      max_tokens: 3500
-      tpm_ceiling: 8000
-      reasoning: { effort: high }
-      cache_prefix: true
-    stages:
-      # Cheap: a short judgement over a sample of the document.
-      educational-classification: { max_tokens: 2500, reasoning: { effort: medium } }
-      # Everything downstream teaches what extraction produces, so it gets the
-      # largest budget that still fits the ceiling. Map-reduce keeps long
-      # documents inside it, so the limit constrains breadth per call rather than
-      # total coverage.
-      #
-      # 3000, not 4000: every token reserved for the answer is a token the prompt
-      # cannot use, and against an 8000 ceiling that trade is direct. The two
-      # stage-3 calls are narrow by construction — one section's factual backbone,
-      # or the teaching layer over an already-extracted concept inventory — so
-      # 3000 is comfortably above what either returns, and the 1000 tokens moved
-      # to the prompt is roughly a 40% larger document window per pass.
-      knowledge-extraction:  { max_tokens: 3000 }
-      teaching-planner:      { max_tokens: 3500 }
-      lesson-generation:     { max_tokens: 4000 }
-      activity-generation:   { max_tokens: 3000, reasoning: { effort: medium } }
-      assessment-generation: { max_tokens: 3500 }
-      gap-analysis:          { max_tokens: 3000, reasoning: { effort: medium } }
-      # Validation is a judge, not an author, and it only sees the ambiguous
-      # middle band of claims the lexical pre-filter could not settle.
-      validation:            { max_tokens: 2500, reasoning: { effort: low } }
-
   # Anthropic profile is defined but NOT selected anywhere. Running it also
   # requires ALLOW_ANTHROPIC=true; a key in the environment is not sufficient.
   anthropic:

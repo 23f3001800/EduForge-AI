@@ -40,6 +40,11 @@ SECRET_PATTERNS = {
     "OpenRouter": re.compile(r"sk-or-v1-[A-Za-z0-9]{32,}"),
     "OpenAI": re.compile(r"sk-proj-[A-Za-z0-9_-]{32,}"),
     "Anthropic": re.compile(r"sk-ant-api\d{2}-[A-Za-z0-9_-]{32,}"),
+    # Kept even though the Groq provider itself was removed: this scans committed
+    # *files*, not the configured provider list, and a leaked `gsk_...` key is a
+    # leaked key regardless of whether this codebase still calls Groq. An operator
+    # env can still hold one (e.g. from before the provider was dropped), and a
+    # secret scanner's job is to catch shapes that leak, not the ones we endorse.
     "Groq": re.compile(r"gsk_[A-Za-z0-9]{40,}"),
     "Google": re.compile(r"AIza[A-Za-z0-9_-]{35}"),
     "AWS": re.compile(r"AKIA[A-Z0-9]{16}"),

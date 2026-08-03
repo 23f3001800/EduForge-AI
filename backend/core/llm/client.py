@@ -559,8 +559,6 @@ def build_adapters(
     *,
     openrouter_key: str | None = None,
     openrouter_base_url: str | None = None,
-    groq_key: str | None = None,
-    groq_base_url: str | None = None,
     gemini_key: str | None = None,
     anthropic_key: str | None = None,
     allow_anthropic: bool = False,
@@ -587,11 +585,6 @@ def build_adapters(
         adapters["openrouter"] = OpenRouterAdapter(
             openrouter_key, openrouter_base_url or DEFAULT_BASE_URL
         )
-
-    if groq_key:
-        from core.llm.providers.groq_provider import DEFAULT_BASE_URL, GroqAdapter
-
-        adapters["groq"] = GroqAdapter(groq_key, groq_base_url or DEFAULT_BASE_URL)
 
     if gemini_key:
         from core.llm.providers.gemini_provider import GeminiAdapter
