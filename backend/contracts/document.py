@@ -24,6 +24,7 @@ __all__ = [
     "Chunk",
     "DocumentMetadata",
     "DocumentStats",
+    "OcrProvenance",
     "OutlineNode",
     "StructuredDocument",
     "TableData",
@@ -135,6 +136,43 @@ class DocumentMetadata(StrictModel):
     detected_language: str | None = Field(
         default=None, description="BCP-47 tag detected from content, e.g. 'en', 'hi'."
     )
+    ocr: OcrProvenance | None = Field(
+        default=None,
+        description="Present only when some page had no text layer and was read by OCR.",
+    )
+
+
+class OcrProvenance(StrictModel):
+    """Which pages a machine read, with what, and how sure it was.
+
+    Recorded because OCR is the one step whose output can be *confidently*
+    wrong. Every later stage grounds its claims in evidence spans checked
+    against the source text — but if OCR misread the source, those checks
+    validate the error rather than catching it. Grounding cannot see below
+    itself, so the uncertainty has to be carried forward explicitly and shown
+    to the teacher.
+
+    ``confidence`` is ``None`` when the engine does not report one, which is
+    not the same as zero and must not be rendered as a score. See
+    ``evals.framework`` for the same distinction applied to metrics.
+    """
+
+    engine: str = Field(min_length=1, description="Engine identifier, e.g. 'tesseract'.")
+    pages: list[int] = Field(default_factory=list, description="1-based pages read by OCR.")
+    failed_pages: list[int] = Field(
+        default_factory=list,
+        description="Pages that had no text layer and could not be recognised either.",
+    )
+    confidence: float | None = Field(default=None, ge=0.0, le=1.0)
+    #: The threshold in force for this run, so a reader can tell whether the
+    #: confidence above was considered acceptable without knowing the config.
+    min_confidence: float | None = Field(default=None, ge=0.0, le=1.0)
+
+    @property
+    def below_threshold(self) -> bool:
+        if self.confidence is None or self.min_confidence is None:
+            return False
+        return self.confidence < self.min_confidence
 
 
 class StructuredDocument(StrictModel):

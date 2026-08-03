@@ -962,6 +962,18 @@
           "title": "Mime",
           "type": "string"
         },
+        "ocr": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/OcrProvenance"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Present only when some page had no text layer and was read by OCR."
+        },
         "page_count": {
           "anyOf": [
             {
@@ -1434,6 +1446,19 @@
           ],
           "title": "Severity",
           "type": "string"
+        },
+        "why_it_happens": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The cause behind the misconception — what about the material, the prior teaching, or everyday experience produces it. A remediation that does not address the cause treats the symptom: telling a student that uniform motion needs no force does not help while their whole experience of motion involves friction. The stage 8 prompt asks for this at length; the field exists so the answer is not discarded.",
+          "title": "Why It Happens"
         }
       },
       "required": [
@@ -1622,6 +1647,67 @@
         "correction"
       ],
       "title": "Misconception",
+      "type": "object"
+    },
+    "OcrProvenance": {
+      "additionalProperties": false,
+      "description": "Which pages a machine read, with what, and how sure it was.\n\nRecorded because OCR is the one step whose output can be *confidently*\nwrong. Every later stage grounds its claims in evidence spans checked\nagainst the source text — but if OCR misread the source, those checks\nvalidate the error rather than catching it. Grounding cannot see below\nitself, so the uncertainty has to be carried forward explicitly and shown\nto the teacher.\n\n``confidence`` is ``None`` when the engine does not report one, which is\nnot the same as zero and must not be rendered as a score. See\n``evals.framework`` for the same distinction applied to metrics.",
+      "properties": {
+        "confidence": {
+          "anyOf": [
+            {
+              "maximum": 1.0,
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Confidence"
+        },
+        "engine": {
+          "description": "Engine identifier, e.g. 'tesseract'.",
+          "minLength": 1,
+          "title": "Engine",
+          "type": "string"
+        },
+        "failed_pages": {
+          "description": "Pages that had no text layer and could not be recognised either.",
+          "items": {
+            "type": "integer"
+          },
+          "title": "Failed Pages",
+          "type": "array"
+        },
+        "min_confidence": {
+          "anyOf": [
+            {
+              "maximum": 1.0,
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Min Confidence"
+        },
+        "pages": {
+          "description": "1-based pages read by OCR.",
+          "items": {
+            "type": "integer"
+          },
+          "title": "Pages",
+          "type": "array"
+        }
+      },
+      "required": [
+        "engine"
+      ],
+      "title": "OcrProvenance",
       "type": "object"
     },
     "Period": {

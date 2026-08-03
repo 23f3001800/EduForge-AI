@@ -27,6 +27,12 @@ unsupported claim would penalise the package for doing the right thing.
 With no source chunks supplied the dimension is **not applicable**, and drops out
 of the weighted mean rather than scoring zero. Scoring an absent input as a
 failure is how a harness starts punishing packages for how they were exported.
+
+That is different from a package that supplies chunks and cites *nothing*. Citation
+integrity averaged an empty list to 1.0, so stripping every quote from every claim
+scored perfect integrity — the cheapest citation is no citation. Absent chunks are
+the evaluator's missing input; absent citations are the package's missing work.
+The first is inapplicable, the second is measured by ``claims_cited``.
 """
 
 from __future__ import annotations
@@ -42,7 +48,7 @@ __all__ = ["KEY", "LABEL", "METHOD", "TAU_HIGH", "TAU_LOW", "WEIGHT", "score"]
 
 KEY = "grounding"
 LABEL = "Grounding"
-WEIGHT = 0.15
+WEIGHT = 0.12
 METHOD = "deterministic"
 
 #: At or above this share of claim tokens present in the cited chunk, the claim is
@@ -159,17 +165,41 @@ def score(ctx: EvalContext) -> DimensionScore:
             ambiguous += 1
             support.append(0.5)
 
+    # A claim carrying no evidence is uncheckable, not verified. Counting it as
+    # neither would let a package earn full grounding by citing nothing at all,
+    # which is why this is measured before integrity is averaged.
+    cited = sum(1 for _, _, evidence in claims if evidence)
+    cited_share = cited / len(claims)
+    if cited_share < 1.0:
+        findings.append(
+            Finding(
+                "GND_CLAIM_UNCITED",
+                "/knowledge",
+                f"{len(claims) - cited} of {len(claims)} claims carry no evidence span at "
+                "all; an uncited claim is not a verified one, and a bank of them would "
+                "otherwise score perfect citation integrity for having nothing to check",
+            )
+        )
+
     metrics = (
+        Metric(
+            "claims_cited",
+            cited_share,
+            0.20,
+            f"{cited} of {len(claims)} claim(s) cite the source at all",
+        ),
         Metric(
             "citation_integrity",
             mean(integrity),
-            0.55,
-            f"{len(integrity)} evidence span(s) checked verbatim against the source",
+            0.50 if integrity else 0.0,
+            f"{len(integrity)} evidence span(s) checked verbatim against the source"
+            if integrity
+            else "no evidence spans to check; reported, not scored — see claims_cited",
         ),
         Metric(
             "claim_support",
             mean(support),
-            0.45,
+            0.30,
             f"{len(claims)} claim(s) checked; {ambiguous} in the ambiguous band "
             f"({TAU_LOW}-{TAU_HIGH}), scored 0.5 and left for the judge",
         ),

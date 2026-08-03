@@ -22,7 +22,37 @@ from evals.expectations import Expectations, resolve
 from evals.text import build_vocabulary
 from evals.types import Judgements
 
-__all__ = ["EvalContext", "build_context"]
+__all__ = ["EvalContext", "build_context", "coerce_int"]
+
+
+def coerce_int(value: Any, default: int = 0) -> int:
+    """An integer from whatever the package actually contains.
+
+    The harness promises to score a published ``package.json`` off disk — *including
+    one that no longer satisfies the contract*, because that is the package a
+    reviewer most wants a number for. A bare ``int(...)`` breaks that promise on the
+    first string page count, ``null`` mark or ``"one"`` period number, and takes the
+    whole evaluation down with a ``ValueError`` instead of reporting the malformed
+    field it found.
+
+    Anything uninterpretable answers ``default``: a metric reading zero marks off a
+    broken item is a finding a reviewer can act on, and a traceback is not.
+
+    Defined here rather than in each consumer because a second copy would drift on
+    the first edge case, and the edge cases are the entire point.
+    """
+    if isinstance(value, bool):
+        return default
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float):
+        return int(value)
+    if isinstance(value, str):
+        try:
+            return int(float(value.strip()))
+        except (TypeError, ValueError):
+            return default
+    return default
 
 
 def _as_mapping(value: Any) -> Mapping[str, Any]:
@@ -89,7 +119,7 @@ class EvalContext:
 
     @property
     def period_minutes(self) -> int:
-        return int(self.plan.get("period_duration_minutes") or 0)
+        return coerce_int(self.plan.get("period_duration_minutes"))
 
     @property
     def classroom_content(self) -> list[Mapping[str, Any]]:
@@ -129,7 +159,7 @@ class EvalContext:
         """concept_id -> the period that teaches it. Empty for untaught concepts."""
         mapping: dict[str, int] = {}
         for period in self.periods:
-            number = int(period.get("period_no") or 0)
+            number = coerce_int(period.get("period_no"))
             for cid in period.get("concept_ids") or []:
                 mapping.setdefault(str(cid), number)
         return mapping

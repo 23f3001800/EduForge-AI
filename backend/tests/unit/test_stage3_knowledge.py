@@ -346,6 +346,16 @@ def _chunk(section: str, tokens: int, index: int) -> dict:
     }
 
 
+def _rootless(tokens: int, index: int) -> dict:
+    """A chunk structure detection could not place under any heading."""
+    return {
+        "chunk_id": f"r_{index:04d}",
+        "text": "x" * tokens,
+        "token_count": tokens,
+        "section_path": [],
+    }
+
+
 def test_calls_scale_with_content_not_with_section_count() -> None:
     """A finely-sectioned document must not cost a call per heading.
 
@@ -386,15 +396,105 @@ def test_a_section_is_never_split_across_calls() -> None:
     assert len(a_groups) == 1, "section 'a' was split across calls"
 
 
-def test_a_section_larger_than_the_budget_still_gets_a_call() -> None:
-    """Splitting it would break the narrowed context; an oversized prompt is the
-    lesser problem, and the client already fits prompts to the token ceiling."""
+def test_a_section_larger_than_a_soft_budget_still_gets_one_call() -> None:
+    """Splitting it would break the narrowed context, and where the budget is a
+    recall preference rather than a provider limit, an oversized prompt is the
+    lesser problem."""
     from stages.s3_knowledge.stage import _pack_sections
 
     chunks = [_chunk("huge", 40_000, 0)]
     packed = _pack_sections(chunks, budget=12_000)
     assert len(packed) == 1
     assert packed[0][0]["chunk_id"] == "c_0000"
+
+
+def test_an_oversized_section_is_reported_rather_than_passing_silently() -> None:
+    """It produces the single largest prompt of the run; that has to be visible."""
+    from stages.s3_knowledge.stage import _pack_sections
+
+    warnings: list[str] = []
+    _pack_sections([_chunk("huge", 40_000, 0)], budget=12_000, warn=warnings.append)
+    assert any("huge" in w and "kept whole" in w for w in warnings)
+
+
+def test_a_hard_ceiling_splits_even_a_named_section() -> None:
+    """The exemption's premise is that an oversized prompt is the lesser problem.
+    Against a provider limit it is not a problem at all — it is a request that
+    cannot be sent, so keeping the section whole buys context for a call that
+    never happens."""
+    from stages.s3_knowledge.stage import _pack_sections
+
+    warnings: list[str] = []
+    section = [_chunk("huge", 2_000, i) for i in range(20)]  # 40k in one section
+    packed = _pack_sections(section, budget=12_000, warn=warnings.append, hard_ceiling=True)
+
+    assert all(sum(c["token_count"] for c in group) <= 12_000 for group in packed)
+    assert sum(len(group) for group in packed) == len(section)
+    assert any("rejects" in w for w in warnings)
+
+
+# ─────────────────────────────────────────────── the __root__ catch-all bucket
+
+
+def test_the_root_bucket_is_packed_to_budget_not_kept_whole() -> None:
+    """`__root__` is not a section and must not inherit the never-split rule.
+
+    It is where chunks land when structure detection finds no heading above them,
+    so "keep it together" protects nothing: there is no narrowed context to
+    preserve, only an accident of parsing. Measured on a real NCERT chapter, 198
+    of 262 chunks landed there and produced one pass at 336% of budget — exactly
+    the shape of request the provider rejects.
+    """
+    from stages.s3_knowledge.stage import _pack_sections
+
+    chunks = [_rootless(3_000, i) for i in range(13)]  # 39k tokens, no sections
+    packed = _pack_sections(chunks, budget=12_000)
+
+    assert len(packed) > 1, "the catch-all bucket was kept whole"
+    assert all(sum(c["token_count"] for c in group) <= 12_000 for group in packed)
+    assert sum(len(group) for group in packed) == len(chunks)
+
+
+def test_splitting_the_root_bucket_preserves_document_order() -> None:
+    from stages.s3_knowledge.stage import _pack_sections
+
+    chunks = [_rootless(3_000, i) for i in range(13)]
+    ids = [c["chunk_id"] for group in _pack_sections(chunks, budget=12_000) for c in group]
+    assert ids == sorted(ids)
+
+
+def test_a_large_unsectioned_bucket_is_reported() -> None:
+    """It usually means structure detection found no headings, which is worth
+    knowing — the split is a correct response to a possible upstream problem."""
+    from stages.s3_knowledge.stage import _pack_sections
+
+    warnings: list[str] = []
+    _pack_sections([_rootless(3_000, i) for i in range(13)], budget=12_000, warn=warnings.append)
+    assert any("no section path" in w for w in warnings)
+
+
+def test_the_root_fix_is_correct_however_large_the_bucket_ends_up() -> None:
+    """Structure detection is being fixed concurrently, so the bucket may shrink
+    to nothing or grow again. Neither may produce an over-budget pass."""
+    from stages.s3_knowledge.stage import _pack_sections
+
+    for root_count in (0, 1, 5, 40):
+        chunks = [_rootless(1_000, i) for i in range(root_count)]
+        chunks += [_chunk(f"s{i}", 1_000, 100 + i) for i in range(10)]
+        packed = _pack_sections(chunks, budget=4_000, hard_ceiling=True)
+        assert sum(len(group) for group in packed) == len(chunks)
+        for group in packed:
+            assert sum(c["token_count"] for c in group) <= 4_000
+
+
+def test_a_root_chunk_is_recognised_whether_the_key_is_absent_or_empty() -> None:
+    """Chunkers disagree about which they emit; both mean 'no section'."""
+    from stages.s3_knowledge.stage import _pack_sections
+
+    missing = {"chunk_id": "m", "text": "x", "token_count": 9_000}
+    empty = {**_rootless(9_000, 1)}
+    packed = _pack_sections([missing, empty], budget=4_000)
+    assert len(packed) == 2
 
 
 def test_packing_preserves_document_order() -> None:
@@ -405,3 +505,149 @@ def test_packing_preserves_document_order() -> None:
     packed = _pack_sections(chunks, budget=12_000)
     ids = [c["chunk_id"] for group in packed for c in group]
     assert ids == sorted(ids)
+
+
+# ────────────────────────────────────── the window is derived, not assumed
+
+
+def _routing(**overrides: object):
+    from contracts.llm import ModelSpec, ProviderRouting
+
+    spec = ModelSpec(provider="groq", model="m", max_tokens=3000, **overrides)  # type: ignore[arg-type]
+    return ProviderRouting(default=spec)
+
+
+def _budget_for(**overrides: object) -> tuple[int, bool]:
+    from core.llm.client import LLMClient
+    from stages.s3_knowledge.schemas import CoreKnowledge
+    from stages.s3_knowledge.stage import _document_budget
+
+    llm = LLMClient(routing=_routing(**overrides), adapters={})
+    return _document_budget(
+        llm,
+        "knowledge-extraction",
+        output_model=CoreKnowledge,
+        fixed="system prompt goes here",
+        chunks=[_chunk("s", 500, i) for i in range(20)],
+    )
+
+
+def test_a_declared_ceiling_produces_a_window_that_leaves_room_for_the_answer() -> None:
+    """The failure this replaces: a pass packed to a constant 12,000 tokens was
+    sent to a route whose entire per-minute ceiling — prompt, schema, and the
+    reservation for the answer together — is 8,000."""
+    window, hard = _budget_for(tpm_ceiling=8000)
+
+    assert hard is True
+    assert window < 8000 - 3000, "the reservation for the answer was not subtracted"
+    assert window > 0
+
+
+def test_the_schema_and_system_prompt_are_charged_against_the_window() -> None:
+    """They are most of what is left on a small ceiling; a window that ignores
+    them is not a window."""
+    from core.llm.base import TPM_SAFETY_MARGIN
+
+    window, _ = _budget_for(tpm_ceiling=8000)
+    assert window < 8000 - 3000 - TPM_SAFETY_MARGIN
+
+
+def test_no_declared_ceiling_falls_back_to_the_recall_driven_limit() -> None:
+    """Large-context production models have no ceiling worth planning around, and
+    splitting long documents is still right for recall."""
+    from stages.s3_knowledge.stage import SINGLE_CALL_TOKEN_BUDGET
+
+    window, hard = _budget_for()
+    assert (window, hard) == (SINGLE_CALL_TOKEN_BUDGET, False)
+
+
+def test_a_tiny_ceiling_never_yields_a_useless_window() -> None:
+    """Hundreds of calls each carrying two sentences says nothing about the
+    material; the adapter's pre-flight check reports the real problem instead."""
+    from stages.s3_knowledge.stage import MIN_DOCUMENT_WINDOW
+
+    window, hard = _budget_for(tpm_ceiling=3200)
+    assert (window, hard) == (MIN_DOCUMENT_WINDOW, True)
+
+
+# ──────────────────────────── the pedagogy pass is bounded (the 38k request)
+
+
+def _core_with_citations(*chunk_ids: str):
+    from stages.s3_knowledge.schemas import CoreKnowledge
+
+    return CoreKnowledge.model_validate(
+        {
+            "concepts": [
+                {
+                    "concept_id": f"c{i}",
+                    "name": f"Concept {i}",
+                    "summary": "A summary long enough to pass.",
+                    "importance": "core",
+                    "evidence": [{"chunk_id": chunk_id, "quote": "a quote long enough"}],
+                }
+                for i, chunk_id in enumerate(chunk_ids)
+            ]
+        }
+    )
+
+
+def test_the_pedagogy_pass_no_longer_sends_the_whole_document() -> None:
+    """The 38,566-token request that killed a live run.
+
+    The core pass is map-reduced into budget-sized passes and then this one pass
+    re-sent all of it, throwing the bound away.
+    """
+    from stages.s3_knowledge.stage import _pedagogy_context, _tokens_of
+
+    chunks = [_chunk(f"s{i}", 1_000, i) for i in range(40)]  # 40k tokens
+    context = _pedagogy_context(chunks, _core_with_citations("c_0003"), budget=6_000)
+
+    assert _tokens_of(context) <= 6_000
+    assert len(context) < len(chunks)
+
+
+def test_the_passages_the_concepts_cited_are_the_ones_kept() -> None:
+    """What the document text has to supply is quotable evidence, and the
+    passages worth quoting are the ones extraction already cited."""
+    from stages.s3_knowledge.stage import _pedagogy_context
+
+    chunks = [_chunk(f"s{i}", 1_000, i) for i in range(40)]
+    cited = ("c_0007", "c_0019", "c_0031")
+    context = _pedagogy_context(chunks, _core_with_citations(*cited), budget=6_000)
+
+    kept = {c["chunk_id"] for c in context}
+    assert set(cited) <= kept, "a cited passage was dropped in favour of an uncited one"
+
+
+def test_the_rest_of_the_document_is_still_sampled_across_its_whole_span() -> None:
+    """Objectives and edges are document-level judgements. Spending the remaining
+    budget on a contiguous run of the opening would answer them from the head of
+    the chapter, which is exactly what the concept inventory already covers."""
+    from stages.s3_knowledge.stage import _pedagogy_context
+
+    chunks = [_chunk(f"s{i}", 200, i) for i in range(60)]
+    context = _pedagogy_context(chunks, _core_with_citations("c_0000"), budget=3_000)
+
+    positions = [int(c["chunk_id"].split("_")[1]) for c in context]
+    assert max(positions) > 40, "the sample never reached the end of the document"
+
+
+def test_the_pedagogy_context_is_emitted_in_reading_order() -> None:
+    """Selection is by citation weight; presentation must not be — reading order
+    is information, and out-of-order excerpts read as a different document."""
+    from stages.s3_knowledge.stage import _pedagogy_context
+
+    chunks = [_chunk(f"s{i}", 500, i) for i in range(20)]
+    context = _pedagogy_context(chunks, _core_with_citations("c_0015", "c_0002"), budget=4_000)
+    ids = [c["chunk_id"] for c in context]
+    assert ids == sorted(ids)
+
+
+def test_a_document_that_already_fits_is_passed_through_whole() -> None:
+    """The bound must not narrow anything it does not have to."""
+    from stages.s3_knowledge.stage import _pedagogy_context
+
+    chunks = [_chunk(f"s{i}", 100, i) for i in range(5)]
+    context = _pedagogy_context(chunks, _core_with_citations("c_0001"), budget=50_000)
+    assert [c["chunk_id"] for c in context] == [c["chunk_id"] for c in chunks]

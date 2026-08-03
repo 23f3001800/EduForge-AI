@@ -8,6 +8,15 @@ teaching artifact.
 ``evidence`` is optional here, unlike the stage 3 knowledge types: a genuine
 misconception is often *predicted* from how students fail at this topic rather
 than stated in the source document. Where the document does name it, cite it.
+
+``why_it_happens`` is optional for the same reason it exists: the stage 8 prompt
+devotes its longest paragraph to demanding the *cause* of a misconception, the
+model answers, and until this field existed the answer was dropped on the way
+into the contract. Optional rather than required so that packages published
+against the previous schema still load — but a gap without it has lost the one
+part of the analysis that tells a teacher why their reteaching keeps failing.
+:class:`Misconception` in ``contracts.knowledge`` carries the same field, and the
+two should say the same kind of thing.
 """
 
 from __future__ import annotations
@@ -43,6 +52,17 @@ class RemediationStep(StrictModel):
 class LearningGap(StrictModel):
     gap_id: Identifier
     misconception: str = Field(min_length=1)
+    why_it_happens: str | None = Field(
+        default=None,
+        description=(
+            "The cause behind the misconception — what about the material, the "
+            "prior teaching, or everyday experience produces it. A remediation "
+            "that does not address the cause treats the symptom: telling a student "
+            "that uniform motion needs no force does not help while their whole "
+            "experience of motion involves friction. The stage 8 prompt asks for "
+            "this at length; the field exists so the answer is not discarded."
+        ),
+    )
     concept_ids: list[Identifier] = Field(default_factory=list)
     severity: Severity = Field(
         description="Drives remediation priority. `high` means downstream concepts "

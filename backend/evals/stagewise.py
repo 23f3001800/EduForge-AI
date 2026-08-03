@@ -33,6 +33,7 @@ from collections.abc import Mapping, Sequence
 from typing import Any
 
 from evals.context import EvalContext
+from evals.context import coerce_int as _int
 from evals.framework import (
     Evidence,
     MetricResult,
@@ -47,11 +48,33 @@ from evals.text import contains_verbatim, word_count
 __all__ = ["STAGE_EVALUATORS", "evaluate_stage", "evaluate_stages"]
 
 
+#: Stages that make no model call, and so can never appear in
+#: ``generator.models_by_stage``. Read against the two places that decide it:
+#: ``orchestration.pipeline.build_stages`` constructs ``DocumentIntelligenceStage``
+#: with no ``llm`` argument, and ``PublishingStage()`` with none either;
+#: ``stages.s10_publishing.assemble._generator_fields`` omits both deliberately,
+#: on the grounds that an absent entry means "no model was involved" and is more
+#: informative than an empty string.
+#:
+#: The previous set here excluded ``validation`` and included
+#: ``document-intelligence``, which was wrong on both counts: stage 1 never calls
+#: a model, so demanding an attribution for it capped a flawless live run at
+#: 87.5%, while stage 9 *does* call one — ``judge_claims`` — whenever a claim
+#: lands in the ambiguous band, and its attribution went unchecked.
+_NON_GENERATIVE_STAGES: frozenset[str] = frozenset({"document-intelligence", "publishing"})
+
+
 # ─────────────────────────────────────────────────────────────── small helpers
 
 
 def _pct(numerator: float, denominator: float) -> float:
-    """A share as 0-100. An empty denominator is 100: nothing owed, nothing owing."""
+    """A share as 0-100. An empty denominator is 100: nothing owed, nothing owing.
+
+    Callers must not pass ``max(n, 1)`` as the denominator to dodge the zero case.
+    That converts "there was nothing to check" into "nothing passed", which is the
+    opposite answer — see ``concept_scheduling``, where it charged stage 3's empty
+    output to stage 4 as a hard zero at weight 2.0.
+    """
     if denominator <= 0:
         return 100.0
     return 100.0 * numerator / denominator
@@ -174,8 +197,8 @@ def _stage_document_intelligence(ctx: EvalContext) -> StageEvaluation:
         )
     )
 
-    pages = int(source.get("page_count") or 0)
-    words = int(source.get("word_count") or 0)
+    pages = _int(source.get("page_count"))
+    words = _int(source.get("word_count"))
     if pages and words:
         # A born-digital page of prose runs 200-600 words. Far below that means
         # the extractor returned page furniture and little else — the signature
@@ -628,29 +651,44 @@ def _stage_planner(ctx: EvalContext) -> StageEvaluation:
 
     scheduled = set(ctx.period_of_concept())
     untaught = sorted(concept_ids - scheduled)
-    metrics.append(
-        measured(
-            "concept_scheduling",
-            "Every concept is scheduled into a period",
-            _pct(len(concept_ids) - len(untaught), max(len(concept_ids), 1)),
-            f"{len(concept_ids) - len(untaught)} of {len(concept_ids)} concepts are taught in "
-            f"some period." + (f" Untaught: {', '.join(untaught[:5])}." if untaught else ""),
-            weight=2.0,
-            evidence=[_ev("/teaching_plan/periods", f"{len(periods)} periods scheduled")],
-            recommendations=(
-                [
-                    _fix(
-                        "Extend the plan or drop the concepts nothing teaches.",
-                        "A concept extracted but never taught is work the teacher paid for and "
-                        "cannot use.",
-                        "high",
-                    )
-                ]
-                if untaught
-                else []
-            ),
+    if not concept_ids:
+        # `max(len(concept_ids), 1)` used to sit in the denominator here, which
+        # turned "stage 3 extracted nothing" into "stage 4 scheduled 0% of the
+        # concepts" — a hard zero at weight 2.0, charged to the stage that had
+        # nothing to schedule. Stage 4 cannot be graded on a plan for no concepts.
+        metrics.append(
+            not_measurable(
+                "concept_scheduling",
+                "Every concept is scheduled into a period",
+                "No concepts were extracted, so there is nothing for the plan to schedule. "
+                "This is stage 3's gap and cannot be charged to stage 4.",
+                needed="at least one concept from knowledge extraction",
+            )
         )
-    )
+    else:
+        metrics.append(
+            measured(
+                "concept_scheduling",
+                "Every concept is scheduled into a period",
+                _pct(len(concept_ids) - len(untaught), len(concept_ids)),
+                f"{len(concept_ids) - len(untaught)} of {len(concept_ids)} concepts are taught in "
+                f"some period." + (f" Untaught: {', '.join(untaught[:5])}." if untaught else ""),
+                weight=2.0,
+                evidence=[_ev("/teaching_plan/periods", f"{len(periods)} periods scheduled")],
+                recommendations=(
+                    [
+                        _fix(
+                            "Extend the plan or drop the concepts nothing teaches.",
+                            "A concept extracted but never taught is work the teacher paid for "
+                            "and cannot use.",
+                            "high",
+                        )
+                    ]
+                    if untaught
+                    else []
+                ),
+            )
+        )
 
     # Prerequisite order — the check the finished artifact cannot answer for
     # itself. An edge A -> B means A must be taught no later than B.
@@ -721,12 +759,12 @@ def _stage_planner(ctx: EvalContext) -> StageEvaluation:
         for period in periods:
             allocation = period.get("time_allocation")
             spent = (
-                sum(int(seg.get("minutes") or 0) for seg in _as_list(allocation))
+                sum(_int(seg.get("minutes")) for seg in _as_list(allocation))
                 if isinstance(allocation, list)
                 else 0
             )
             if spent > budget:
-                overruns.append((int(period.get("period_no") or 0), spent))
+                overruns.append((_int(period.get("period_no")), spent))
         metrics.append(
             measured(
                 "time_budget",
@@ -784,8 +822,8 @@ def _stage_lessons(ctx: EvalContext) -> StageEvaluation:
     periods = ctx.periods
 
     if periods:
-        covered = {int(c.get("period_no") or 0) for c in content}
-        planned = {int(p.get("period_no") or 0) for p in periods}
+        covered = {_int(c.get("period_no")) for c in content}
+        planned = {_int(p.get("period_no")) for p in periods}
         gaps = sorted(planned - covered)
         metrics.append(
             measured(
@@ -827,7 +865,7 @@ def _stage_lessons(ctx: EvalContext) -> StageEvaluation:
         filled = sum(len(_present(c, blocks)[0]) for c in content)
         total = len(content) * len(blocks)
         thin = [
-            (int(c.get("period_no") or 0), _present(c, blocks)[1])
+            (_int(c.get("period_no")), _present(c, blocks)[1])
             for c in content
             if _present(c, blocks)[1]
         ]
@@ -1026,7 +1064,7 @@ def _stage_activities(ctx: EvalContext) -> StageEvaluation:
 
     budget = ctx.period_minutes
     if budget:
-        overruns = [a for a in activities if int(a.get("duration_minutes") or 0) > budget]
+        overruns = [a for a in activities if _int(a.get("duration_minutes")) > budget]
         metrics.append(
             measured(
                 "timing_fit",
@@ -1204,7 +1242,7 @@ def _stage_assessments(ctx: EvalContext) -> StageEvaluation:
         actual: dict[str, int] = {}
         for item in items:
             actual[str(item.get("kind"))] = actual.get(str(item.get("kind")), 0) + 1
-        claimed = {str(k): int(v) for k, v in by_kind.items()}
+        claimed = {str(k): _int(v) for k, v in by_kind.items()}
         mismatches = {
             k: (claimed.get(k, 0), actual.get(k, 0))
             for k in set(claimed) | set(actual)
@@ -1241,14 +1279,14 @@ def _stage_assessments(ctx: EvalContext) -> StageEvaluation:
 
     total_marks = ctx.assessments.get("total_marks")
     if isinstance(total_marks, int | float):
-        summed = sum(int(i.get("marks") or 0) for i in items)
+        summed = sum(_int(i.get("marks")) for i in items)
         metrics.append(
             measured(
                 "marks_consistency",
                 "Total marks equal the sum of the items",
-                100.0 if int(total_marks) == summed else 0.0,
-                f"Published total is {int(total_marks)}; the items sum to {summed}."
-                + (" They agree." if int(total_marks) == summed else " They do not."),
+                100.0 if _int(total_marks) == summed else 0.0,
+                f"Published total is {_int(total_marks)}; the items sum to {summed}."
+                + (" They agree." if _int(total_marks) == summed else " They do not."),
                 weight=1.0,
                 evidence=[_ev("/assessments/total_marks", f"{total_marks} vs {summed} summed")],
             )
@@ -1437,8 +1475,8 @@ def _stage_validation(ctx: EvalContext) -> StageEvaluation:
     coverage = coverage if isinstance(coverage, Mapping) else {}
     if coverage:
         taught = len(set(ctx.period_of_concept()) & ctx.concept_ids)
-        claimed_taught = int(coverage.get("concepts_taught") or 0)
-        claimed_total = int(coverage.get("concepts_total") or 0)
+        claimed_taught = _int(coverage.get("concepts_taught"))
+        claimed_total = _int(coverage.get("concepts_total"))
         actual_total = len(ctx.concept_ids)
 
         disagreements: list[str] = []
@@ -1573,17 +1611,32 @@ def _stage_publishing(ctx: EvalContext) -> StageEvaluation:
 
     models = generator.get("models_by_stage")
     models = models if isinstance(models, Mapping) else {}
-    generative = [s for s in STAGE_NAMES if s not in {"validation", "publishing"}]
+    generative = [s for s in STAGE_NAMES if s not in _NON_GENERATIVE_STAGES]
     attributed = [s for s in generative if models.get(s)]
+    unattributed = [s for s in generative if not models.get(s)]
     metrics.append(
         measured(
             "model_attribution",
-            "Each stage names the model that ran it",
+            "Each model-calling stage names the model that ran it",
             _pct(len(attributed), len(generative)),
             f"{len(attributed)} of {len(generative)} model-calling stages record which model "
-            "produced their output.",
+            "produced their output"
+            + (f"; missing {', '.join(unattributed)}." if unattributed else ".")
+            + f" {', '.join(sorted(_NON_GENERATIVE_STAGES))} are excluded because they make "
+            "no model call, so an absent entry for them is correct rather than missing.",
             weight=1.0,
             evidence=[_ev("/generator/models_by_stage", str(dict(models))[:200])],
+            recommendations=(
+                [
+                    _fix(
+                        f"Report the model used by {', '.join(unattributed)}.",
+                        "Without it a regression cannot be attributed to a model change.",
+                        "low",
+                    )
+                ]
+                if unattributed
+                else []
+            ),
         )
     )
 
@@ -1637,7 +1690,7 @@ def _stage_publishing(ctx: EvalContext) -> StageEvaluation:
     )
 
     cost = provenance.get("total_cost_usd")
-    tokens_in = int(provenance.get("total_tokens_in") or 0)
+    tokens_in = _int(provenance.get("total_tokens_in"))
     if isinstance(cost, int | float) and tokens_in:
         metrics.append(
             measured(
@@ -1645,7 +1698,7 @@ def _stage_publishing(ctx: EvalContext) -> StageEvaluation:
                 "Cost and token usage are accounted for",
                 100.0,
                 f"${float(cost):.4f} across {tokens_in:,} input and "
-                f"{int(provenance.get('total_tokens_out') or 0):,} output tokens.",
+                f"{_int(provenance.get('total_tokens_out')):,} output tokens.",
                 weight=0.5,
                 evidence=[_ev("/provenance/total_cost_usd", f"${float(cost):.4f}")],
             )

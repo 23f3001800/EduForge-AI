@@ -17,8 +17,9 @@ fallback for models it does not price.
 
 from __future__ import annotations
 
-from typing import ClassVar
+from typing import Any, ClassVar
 
+from contracts.llm import ModelSpec
 from core.llm.providers.openai_compat import OpenAICompatibleAdapter
 
 __all__ = ["DEFAULT_BASE_URL", "OpenRouterAdapter"]
@@ -41,3 +42,16 @@ class OpenRouterAdapter(OpenAICompatibleAdapter):
         "openai/gpt-4.1-nano": (0.10, 0.40),
         "openai/gpt-4.1-mini": (0.40, 1.60),
     }
+
+    def _depth_controls(self, spec: ModelSpec) -> dict[str, Any]:
+        """OpenRouter's unified `reasoning` object.
+
+        Safe to send to any model: OpenRouter normalises it to whatever the
+        upstream vendor supports and drops it for models that reason at no
+        configurable depth, rather than rejecting the request. That is what makes
+        one field usable across a router fronting many vendors — and why the
+        effort configured per stage can finally reach the model instead of being
+        discarded at this boundary.
+        """
+        effort = self._effort(spec)
+        return {"reasoning": {"effort": effort}} if effort else {}

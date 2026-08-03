@@ -92,9 +92,17 @@ def fold(text: str) -> str:
 
 
 def contains_verbatim(quote: str, span: str) -> bool:
-    """Does ``quote`` appear in ``span``, ignoring punctuation and case?"""
+    """Does ``quote`` appear in ``span`` as whole words, ignoring punctuation and case?
+
+    The containment test is on space-padded strings so it aligns to token
+    boundaries. Raw substring containment credits a citation for a match that
+    straddles words — ``contains_verbatim("art of war", "a part of warfare")`` was
+    True — which is the one failure mode this check exists to catch, since a quote
+    that cannot be found in the source is worse than no quote at all: it reads as
+    authority.
+    """
     needle = fold(quote)
-    return bool(needle) and needle in fold(span)
+    return bool(needle) and f" {needle} " in f" {fold(span)} "
 
 
 def lexical_overlap(claim: str, span: str) -> float:
@@ -217,15 +225,36 @@ def mentions_vocabulary(text: str, vocabulary: frozenset[str]) -> bool:
     return any(term in present if " " not in term else term in folded for term in vocabulary)
 
 
-_DIGIT = re.compile(r"\d")
-_FRAME = re.compile(r"['\"]|\bsentence (?:frame|starter)\b|\btemplate\b|:\s*\S")
+#: A quantity attached to a unit or a symbol — "12 N", "3 m/s", "a = F/m", "1857".
+#: A bare digit is not enough: "Spend 5 minutes on this" and "Answer question 3"
+#: contain digits and name no content, and accepting them made every timing note
+#: and every cross-reference read as a concrete anchor.
+_QUANTITY = re.compile(r"\d+\s*(?:[a-zA-Z°%/]+|$)|[a-zA-Z]\s*=\s*\S")
+
+#: A literal the teacher hands over verbatim: a quoted phrase of real length, or a
+#: named sentence frame. A lone quotation mark or a trailing colon is punctuation,
+#: not a scaffold, and both used to qualify.
+_FRAME = re.compile(
+    r"['\"][^'\"]{12,}['\"]|\bsentence (?:frame|starter|stem)\b|\bword bank\b|\btemplate\b"
+)
 
 
 def has_concrete_anchor(text: str, vocabulary: frozenset[str]) -> bool:
     """Is this instruction anchored to something a teacher could point at?
 
     Three ways to qualify, any one of which is enough: it names package
-    vocabulary, it contains a number, or it supplies a literal (a quoted sentence
-    frame, a worked form after a colon). Generic advice does none of the three.
+    vocabulary, it states a quantity with a unit or a symbol, or it supplies a
+    literal the teacher hands over. Generic advice does none of the three.
+
+    The bar on the second and third routes is deliberately higher than it was.
+    Accepting any digit, any quotation mark and any colon meant "Do the
+    following:" and "Spend 5 minutes" were scored as anchored instructions, which
+    is a formatting test wearing a specificity test's name — and every generator
+    that noticed would have learned to add colons. Where a check needs to know
+    that an instruction is *about this material*, :func:`mentions_vocabulary` is
+    the only route that can establish it, and callers that need certainty should
+    use it directly rather than this three-way disjunction.
     """
-    return bool(mentions_vocabulary(text, vocabulary) or _DIGIT.search(text) or _FRAME.search(text))
+    return bool(
+        mentions_vocabulary(text, vocabulary) or _QUANTITY.search(text) or _FRAME.search(text)
+    )

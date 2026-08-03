@@ -41,17 +41,24 @@ class _CreateJob(JobOptions):
 
 
 async def _fail_job(store: Store, job_id: UUID, exc: Exception) -> None:
-    """Record a pre-pipeline failure the same way ``run_job`` records its own."""
+    """Record a pre-pipeline failure the same way ``run_job`` records its own.
+
+    Persist the terminal event before flipping the job to a terminal status —
+    the same ordering ``run_job`` follows and for the same reason: the SSE
+    endpoint replays from the event log, so a reader that polls ``GET /jobs``
+    the instant ``update_job`` returns must always find the terminal event
+    already there, never a terminal status with no event to show for it.
+    """
     job = await store.get_job(job_id)
     if job is None:
         return
+    await ProgressEmitter(store, job_id)(
+        stage="failed", progress=0, level="error", message=f"{type(exc).__name__}: {exc}"
+    )
     job.status = "failed"
     job.error = {"type": type(exc).__name__, "message": str(exc)}
     job.finished_at = datetime.now(UTC)
     await store.update_job(job)
-    await ProgressEmitter(store, job_id)(
-        stage="failed", progress=0, level="error", message=f"{type(exc).__name__}: {exc}"
-    )
 
 
 def _spawn(store: Store, job: JobRecord, settings: Settings, roster: RosterBuilder) -> None:

@@ -43,7 +43,7 @@ __all__ = ["KEY", "LABEL", "METHOD", "WEIGHT", "score"]
 
 KEY = "objectives"
 LABEL = "Objective quality"
-WEIGHT = 0.12
+WEIGHT = 0.08
 METHOD = "hybrid"
 
 #: Below this an objective is a label, not a behaviour: there is no room for a

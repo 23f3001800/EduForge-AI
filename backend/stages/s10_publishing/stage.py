@@ -19,6 +19,7 @@ allowed to differ, everywhere else a stage produces everything it can.
 
 from __future__ import annotations
 
+import asyncio
 from typing import Any
 
 from contracts.jobs import ArtifactKind, JobOptions
@@ -60,7 +61,11 @@ class PublishingStage:
             artifacts: dict[str, str] = {}
             for index, kind in enumerate(wanted):
                 await span.progress(index / max(len(wanted), 1), message=f"rendering {kind}")
-                rendered = RENDERERS[kind](tkp)
+                # fpdf2 lays out and rasterises three PDFs synchronously — CPU-bound
+                # work that, run inline, blocks the one event loop that also serves
+                # every SSE stream and every other job in the process. Off the loop
+                # for the same reason stage 1's parsers are (stages/s1.../stage.py).
+                rendered = await asyncio.to_thread(RENDERERS[kind], tkp)
                 if not rendered:
                     span.warn(f"{kind}: rendered zero bytes")
                     continue

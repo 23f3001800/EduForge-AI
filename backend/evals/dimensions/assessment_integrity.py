@@ -16,7 +16,12 @@ The interesting failures all pass schema validation:
   is testing test-taking, not the subject.
 * **Rubrics that restate the question.** Levels labelled Good / Fair / Poor with
   descriptors to match cannot separate two scripts. A level descriptor has to say
-  what the work *contains*, which is checkable: does it reference the content?
+  what the work *contains*, which is checkable — but not by counting its words.
+  This module used to accept any descriptor of five words or more as substantive,
+  which is why "The response demonstrates an excellent understanding overall"
+  passed and scored *above* "Correct value with units." The check is now whether
+  adjacent levels differ in the content they name, with grading adjectives
+  stripped first; see :mod:`evals.discrimination`.
 * **A blueprint that no longer describes the bank.** The blueprint is supposed to
   be the design the bank was built to. When the two disagree, the coverage story
   the package tells about itself is fiction.
@@ -34,16 +39,17 @@ from collections import Counter
 from collections.abc import Mapping
 from typing import Any
 
-from evals.context import EvalContext
+from evals.context import EvalContext, coerce_int
+from evals.discrimination import descriptor_discrimination
 from evals.lexicons import HEDGE_MARKERS, UNOBSERVABLE_MARKERS
-from evals.text import fold, jaccard, mentions_vocabulary, normalise, word_count
+from evals.text import fold, mentions_vocabulary, normalise, word_count
 from evals.types import DimensionScore, Finding, Metric, mean
 
 __all__ = ["KEY", "LABEL", "METHOD", "WEIGHT", "score"]
 
 KEY = "assessment_integrity"
 LABEL = "Assessment integrity"
-WEIGHT = 0.12
+WEIGHT = 0.15
 METHOD = "deterministic"
 
 #: Options that exist because the model needed a fourth line.
@@ -53,8 +59,11 @@ _FILLER_OPTIONS = ("all of the above", "none of the above", "both a and b", "all
 #: option is doing the testing.
 LENGTH_TELL_RATIO = 1.8
 
-#: A descriptor shorter than this cannot say what the work contains.
-MIN_DESCRIPTOR_WORDS = 5
+#: Below this, adjacent levels do not name different work and a marker has nothing
+#: to decide a borderline script on. Applied to
+#: :func:`evals.discrimination.descriptor_discrimination`, which measures content,
+#: not length — a long descriptor made entirely of grading adjectives scores 0.
+MIN_DESCRIPTOR_DISCRIMINATION = 0.75
 
 
 def _mcq_structure(item: Mapping[str, Any]) -> tuple[float, list[str]]:
@@ -104,6 +113,7 @@ def score(ctx: EvalContext) -> DimensionScore:
     structure: list[float] = []
     distractors: list[float] = []
     rubrics: list[float] = []
+    rubric_structures: list[float] = []
 
     mcqs = [(i, item) for i, item in enumerate(items) if str(item.get("kind")) == "mcq"]
     linked = 0
@@ -204,9 +214,9 @@ def score(ctx: EvalContext) -> DimensionScore:
         path = f"/assessments/items/{index}"
         rubric = item.get("rubric") or {}
         levels = list(rubric.get("levels") or [])
-        marks = [int(level.get("marks") or 0) for level in levels]
+        marks = [coerce_int(level.get("marks")) for level in levels]
         descriptors = [str(level.get("descriptor") or "") for level in levels]
-        extended = int(item.get("marks") or 0) >= ctx.expectations.extended_response_marks
+        extended = coerce_int(item.get("marks")) >= ctx.expectations.extended_response_marks
 
         hedged = [
             d
@@ -214,39 +224,60 @@ def score(ctx: EvalContext) -> DimensionScore:
             if any(h in normalise(d) for h in HEDGE_MARKERS)
             or any(u in normalise(d) for u in UNOBSERVABLE_MARKERS)
         ]
-        overlapping = any(
-            jaccard(a, b) >= 0.8 for i, a in enumerate(descriptors) for b in descriptors[i + 1 :]
-        )
-        checks = {
+        # Descriptors are compared by what they say the work *contains*, in mark
+        # order, so "excellent understanding" against "good understanding" reads
+        # as the non-discrimination it is rather than as two distinct levels.
+        ordered = [d for _, d in sorted(zip(marks, descriptors, strict=True), reverse=True)]
+        discrimination = descriptor_discrimination(ordered)
+        # Structure and discrimination are scored apart because they fail apart and
+        # are worth different amounts. A rubric can have four levels, four distinct
+        # mark values and a stated criterion — every structural box ticked — and
+        # still be unmarkable, which is the state vacuous descriptors produce. The
+        # structure is hygiene; whether a marker can separate two scripts with it is
+        # the point of having a rubric at all.
+        structure_checks = {
             "a rubric": bool(levels),
             "at least two levels": len(levels) >= 2,
             "levels that award different marks": len(set(marks)) == len(marks) and bool(marks),
             "enough levels for an extended response": (
                 len(levels) >= ctx.expectations.min_rubric_levels_for_extended if extended else True
             ),
-            "descriptors with substance": bool(descriptors)
-            and all(word_count(d) >= MIN_DESCRIPTOR_WORDS for d in descriptors)
-            and not hedged,
-            "descriptors that differ": not overlapping,
-            "descriptors tied to the content": any(
-                mentions_vocabulary(d, ctx.vocabulary) for d in descriptors
-            ),
         }
-        rubrics.append(sum(checks.values()) / len(checks))
-        broken = [name for name, ok in checks.items() if not ok]
+        rubric_structures.append(sum(structure_checks.values()) / len(structure_checks))
+
+        tied = any(mentions_vocabulary(d, ctx.vocabulary) for d in descriptors)
+        # Hedged descriptors ("a good answer", "some understanding") are graded to
+        # zero rather than deducted from: they are the exact failure the content
+        # comparison exists to catch, and a rubric built from them discriminates
+        # nothing however many levels it declares.
+        rubrics.append(0.0 if hedged else (0.7 * discrimination + 0.3 * (1.0 if tied else 0.0)))
+
+        broken = [name for name, ok in structure_checks.items() if not ok]
+        if discrimination < MIN_DESCRIPTOR_DISCRIMINATION or hedged or not tied:
+            findings.append(
+                Finding(
+                    "ASM_RUBRIC_INDISCRIMINATE",
+                    f"{path}/rubric",
+                    f"adjacent levels score {discrimination:.2f} on naming different work"
+                    + (" and hedge rather than describe it" if hedged else "")
+                    + ("; no level names anything this package teaches" if not tied else "")
+                    + ". Two markers would land on different levels for the same "
+                    "borderline script, which makes the marks it awards arbitrary",
+                )
+            )
         if broken:
             findings.append(
                 Finding(
-                    "ASM_RUBRIC_WEAK",
+                    "ASM_RUBRIC_MALFORMED",
                     f"{path}/rubric",
-                    f"lacks {', '.join(broken)}; two markers would not agree on a "
-                    "borderline script",
+                    f"lacks {', '.join(broken)}; the level ladder itself is broken before "
+                    "any question of what the descriptors say",
                 )
             )
 
     # --- arithmetic and blueprint honesty -------------------------------------
-    actual_marks = sum(int(i.get("marks") or 0) for i in items)
-    declared_marks = int(ctx.assessments.get("total_marks") or 0)
+    actual_marks = sum(coerce_int(i.get("marks")) for i in items)
+    declared_marks = coerce_int(ctx.assessments.get("total_marks"))
     blueprint = ctx.blueprint
     by_kind = Counter(str(i.get("kind")) for i in items)
     by_bloom = Counter(str(i.get("bloom_level")) for i in items)
@@ -255,11 +286,13 @@ def score(ctx: EvalContext) -> DimensionScore:
         "total_marks agrees with the items": actual_marks == declared_marks,
         "blueprint item counts match the bank": (
             not blueprint.get("items_by_kind")
-            or {str(k): int(v) for k, v in blueprint["items_by_kind"].items()} == dict(by_kind)
+            or {str(k): coerce_int(v) for k, v in blueprint["items_by_kind"].items()}
+            == dict(by_kind)
         ),
         "blueprint Bloom counts match the bank": (
             not blueprint.get("items_by_bloom")
-            or {str(k): int(v) for k, v in blueprint["items_by_bloom"].items()} == dict(by_bloom)
+            or {str(k): coerce_int(v) for k, v in blueprint["items_by_bloom"].items()}
+            == dict(by_bloom)
         ),
     }
     arithmetic = sum(arithmetic_checks.values()) / len(arithmetic_checks)
@@ -312,13 +345,46 @@ def score(ctx: EvalContext) -> DimensionScore:
     else:
         linkage = 1.0
 
+    # A bank with no MCQs has no MCQ defects, and a bank with no constructed
+    # responses has no rubrics to disagree about. Both are legitimate shapes, so
+    # the metric is reported at weight zero rather than scored 1.0 — a free 1.0
+    # for an absent section is the same arithmetic that made "no citations" score
+    # perfect citation integrity.
+    absent = "not scored: a bank of a different shape owes nothing here"
+
     metrics = (
-        Metric("mcq_structure", mean(structure), 0.20, f"{len(mcqs)} MCQ(s) checked"),
-        Metric("distractor_quality", mean(distractors), 0.20, "plausible, explained, not filler"),
-        Metric("rubric_discrimination", mean(rubrics), 0.25, f"{len(constructed)} rubric(s)"),
-        Metric("marks_and_blueprint", arithmetic, 0.15, f"{actual_marks} marks in the bank"),
-        Metric("kind_mix", mix, 0.10, f"against the {ctx.profile} assessment mix"),
-        Metric("misconception_linkage", linkage, 0.10, "items trace to a diagnosed error"),
+        Metric(
+            "mcq_structure",
+            mean(structure),
+            0.15 if mcqs else 0.0,
+            f"{len(mcqs)} MCQ(s) checked" if mcqs else f"no MCQs in this bank; {absent}",
+        ),
+        Metric(
+            "distractor_quality",
+            mean(distractors),
+            0.20 if mcqs else 0.0,
+            "plausible, explained, not filler" if mcqs else f"no MCQs in this bank; {absent}",
+        ),
+        Metric(
+            "rubric_structure",
+            mean(rubric_structures),
+            0.08 if rubric_structures else 0.0,
+            f"{len(constructed)} rubric(s): levels, distinct marks, enough of them"
+            if rubric_structures
+            else f"no constructed-response items; {absent}",
+        ),
+        Metric(
+            "rubric_discrimination",
+            mean(rubrics),
+            0.35 if rubrics else 0.0,
+            f"{len(constructed)} rubric(s): do adjacent levels name different work, and "
+            "does any level name this package's content?"
+            if rubrics
+            else f"no constructed-response items; {absent}",
+        ),
+        Metric("marks_and_blueprint", arithmetic, 0.12, f"{actual_marks} marks in the bank"),
+        Metric("kind_mix", mix, 0.05, f"against the {ctx.profile} assessment mix"),
+        Metric("misconception_linkage", linkage, 0.05, "items trace to a diagnosed error"),
     )
 
     return DimensionScore(

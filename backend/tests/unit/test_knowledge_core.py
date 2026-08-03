@@ -14,14 +14,14 @@ from __future__ import annotations
 import json
 import re
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 from uuid import uuid4
 
 import pytest
 from pydantic import BaseModel
 
 from contracts.classification import Classification
-from contracts.llm import LLMUsage, ModelSpec, ProviderRouting
+from contracts.llm import LLMUsage, ModelSpec, ProviderRouting, ReasoningConfig
 from core.llm.base import ContentRefused, LLMProviderError, RawCompletion
 from core.llm.client import BudgetExhausted, LLMClient, TokenBudget
 from core.llm.prompts import document_block, evidence_rules
@@ -243,13 +243,20 @@ async def test_client_repairs_once_then_succeeds() -> None:
     assert "CORRECTION REQUIRED" in adapter.calls[1]["user"]
 
 
+class Verdict(BaseModel):
+    """A stand-in for a stage output whose required fields degrade honestly."""
+
+    label: Literal["unknown", "supported", "contradicted"]
+    note: str
+
+
 async def test_client_degrades_rather_than_killing_the_job() -> None:
     """One weak stage must not discard the other nine."""
     adapter = StubAdapter({"bad": 1}, {"still": "bad"})
     client = _client(adapter)
     result = await client.parse(
         stage="educational-classification",
-        output_model=Classification,
+        output_model=Verdict,
         system="s",
         user_content="u",
     )
@@ -263,12 +270,113 @@ async def test_refusal_degrades_and_is_not_retried() -> None:
     client = _client(adapter)
     result = await client.parse(
         stage="educational-classification",
-        output_model=Classification,
+        output_model=Verdict,
         system="s",
         user_content="u",
     )
     assert result.degraded is True
     assert len(adapter.calls) == 1
+
+
+# ──────────────────────────────────── degraded placeholders (silent mis-routing)
+
+
+def test_a_degraded_literal_takes_the_member_that_means_unknown() -> None:
+    """Not the first one declared. Declaration order is an accident."""
+    from core.llm.client import _placeholders
+
+    values = _placeholders(Verdict)
+    assert values["label"] == "unknown"
+    assert values["note"] == ""
+
+
+def test_a_literal_with_no_neutral_member_refuses_rather_than_inventing() -> None:
+    """The bug this exists for, stated as a test.
+
+    `PedagogyProfile` is declared starting with `quantitative`, so taking the
+    first member routed a failed classification — a poetry chapter, say — through
+    the quantitative strategy for eight further stages, while the stage warned
+    that it had defaulted to `mixed`. Every downstream artefact then looked like a
+    confident judgement about material nothing had read.
+    """
+    from core.llm.client import PlaceholderUnavailable, _placeholders
+
+    with pytest.raises(PlaceholderUnavailable) as raised:
+        _placeholders(Classification)
+
+    message = str(raised.value)
+    assert "difficulty" in message
+    assert "degraded_value" in message, "the error must name the way out"
+
+
+async def test_a_caller_supplied_fallback_is_used_verbatim() -> None:
+    """The stage that owns the vocabulary decides what 'no answer' means in it."""
+    from stages.s2_classification.stage import DEGRADED_CLASSIFICATION
+
+    client = _client(StubAdapter({"bad": 1}, {"still": "bad"}))
+    result = await client.parse(
+        stage="educational-classification",
+        output_model=Classification,
+        system="s",
+        user_content="u",
+        degraded_value=DEGRADED_CLASSIFICATION,
+    )
+    assert result.degraded is True
+    assert result.value.pedagogy_profile == "mixed"
+
+
+# ─────────────────────────────────────────── the degraded flag reaches provenance
+
+
+async def test_the_degraded_fallback_records_its_own_outcome() -> None:
+    """`degraded` was never a recorded outcome anywhere, so nothing could report it.
+
+    The provenance in every published package derives its per-stage `degraded`
+    flag from `any(call.outcome == "degraded")`. Every path that fell back to a
+    placeholder recorded only the *attempt* that failed — `error` or `refused` —
+    and returned. The flag was therefore hardcoded false in every package ever
+    published, while claiming to be measured.
+    """
+    client = _client(StubAdapter({"bad": 1}, {"still": "bad"}))
+    await client.parse(
+        stage="educational-classification",
+        output_model=Verdict,
+        system="s",
+        user_content="u",
+    )
+    assert "degraded" in [c.outcome for c in client.calls]
+
+
+async def test_the_degraded_flag_survives_into_the_stage_report() -> None:
+    """End to end: a placeholder answer must be visible in the published package."""
+    from orchestration.graph import _usage_of
+
+    client = _client(StubAdapter(fail_with=ContentRefused("declined")))
+    await client.parse(
+        stage="educational-classification",
+        output_model=Verdict,
+        system="s",
+        user_content="u",
+    )
+    report = _usage_of(client.calls)
+    assert report["degraded"] is True
+    # The marker was never sent anywhere and reserved nothing, so it must not be
+    # billed as an attempt — that would misreport the price in the other direction.
+    assert report["attempts"] == 1
+
+
+async def test_a_clean_run_still_reports_undegraded() -> None:
+    """The flag has to be able to say no, or it says nothing."""
+    from orchestration.graph import _usage_of
+
+    client = _client(StubAdapter(CLASSIFICATION))
+    await client.parse(
+        stage="educational-classification",
+        output_model=Classification,
+        system="s",
+        user_content="u",
+    )
+    assert _usage_of(client.calls)["degraded"] is False
 
 
 async def test_non_retryable_provider_errors_are_not_retried() -> None:
@@ -383,6 +491,25 @@ async def test_classification_stage_emits_a_usable_profile() -> None:
     assert get_strategy(profile).name == "quantitative"
 
 
+async def test_a_failed_classification_routes_to_mixed_not_to_quantitative() -> None:
+    """The mis-routing this whole path exists to prevent, at the stage boundary.
+
+    Eight later stages read `pedagogy_profile`. If a failed call yields
+    `quantitative`, a poetry chapter gets problem sets and numerical assessment
+    items, and nothing in the package says the value was never judged.
+    """
+    stage = ClassificationStage(_client(StubAdapter({"bad": 1}, {"worse": 2})))
+    output = await stage.run(
+        StageContext(job_id=uuid4(), options={}, emit=None),
+        {"structured_document": _document()},
+    )
+    classification = output["classification"]
+    assert classification["pedagogy_profile"] == "mixed"
+    assert get_strategy(classification["pedagogy_profile"]).name == "mixed"
+    # Confidence of zero everywhere is how a reader tells this from a judgement.
+    assert set(classification["low_confidence_fields"]) >= {"subject", "difficulty"}
+
+
 async def test_low_confidence_fields_are_surfaced_not_swallowed() -> None:
     payload = {
         **CLASSIFICATION,
@@ -475,3 +602,215 @@ def test_openai_compatible_schema_rewrite_satisfies_strict_mode() -> None:
     cleaned = rewrite_schema_for_strict_mode(Classification.model_json_schema())
     assert set(cleaned["required"]) == set(cleaned["properties"])
     assert cleaned["additionalProperties"] is False
+
+
+# ──────────────────────────────────────────────────────── token-ceiling handling
+
+#: Groq's actual 413 body, copied from the run this work came out of.
+GROQ_413 = (
+    "groq 413: Request too large for model `openai/gpt-oss-20b` in organization "
+    "org_x service tier on_demand on tokens per minute (TPM): Limit 8000, Used 0, "
+    "Requested 38566. Please try again in 4m37.302s."
+)
+
+
+def test_the_groq_rate_limit_message_is_actually_parsed() -> None:
+    """The regression that made the fit-and-retry path dead code.
+
+    The pattern required `Requested` to follow `Limit` immediately. Groq's real
+    message interposes `Used`, so it matched nothing on the one provider it was
+    written for, and every oversized request went through four retries to the
+    same rejection.
+    """
+    from core.llm.providers.openai_compat import OpenAICompatibleAdapter
+
+    spec = ModelSpec(provider="groq", model="openai/gpt-oss-20b", max_tokens=4000)
+    fitted = OpenAICompatibleAdapter._fit_to_token_ceiling(spec, LLMProviderError(GROQ_413))
+    # 38566 requested - 4000 reserved = 34566 of prompt, which alone exceeds 8000:
+    # no reservation rescues this request, so shrinking one would be a lie.
+    assert fitted is None
+
+
+def test_a_reservation_that_can_be_shrunk_to_fit_is_shrunk() -> None:
+    from core.llm.providers.openai_compat import OpenAICompatibleAdapter
+
+    message = (
+        "groq 413: Request too large ... on tokens per minute (TPM): "
+        "Limit 8000, Used 500, Requested 9000."
+    )
+    spec = ModelSpec(provider="groq", model="openai/gpt-oss-20b", max_tokens=4000)
+    fitted = OpenAICompatibleAdapter._fit_to_token_ceiling(spec, LLMProviderError(message))
+    assert fitted is not None
+    # 9000 - 4000 = 5000 prompt; 8000 - 500 used - 5000 - 256 margin = 2244.
+    assert fitted.max_tokens == 2244
+    assert fitted.max_tokens + 5000 + 500 < 8000
+
+
+def test_a_429_about_tokens_per_minute_is_treated_as_a_ceiling_error() -> None:
+    """Groq answers a per-minute token overrun with 429 as often as 413."""
+    from core.llm.providers.openai_compat import OpenAICompatibleAdapter
+
+    message = (
+        "groq 429: Rate limit reached for model `openai/gpt-oss-20b` on tokens "
+        "per minute (TPM): Limit 8000, Used 1000, Requested 9500."
+    )
+    spec = ModelSpec(provider="groq", model="openai/gpt-oss-20b", max_tokens=4000)
+    assert OpenAICompatibleAdapter._fit_to_token_ceiling(spec, LLMProviderError(message))
+
+
+def test_a_plain_request_rate_limit_is_left_to_normal_backoff() -> None:
+    """A requests-per-minute 429 has no token arithmetic to do; shrinking the
+    reservation would send a smaller request into the same closed window."""
+    from core.llm.providers.openai_compat import OpenAICompatibleAdapter
+
+    message = "groq 429: Rate limit reached: requests per minute. Please try again in 12s."
+    spec = ModelSpec(provider="groq", model="openai/gpt-oss-20b", max_tokens=4000)
+    assert OpenAICompatibleAdapter._fit_to_token_ceiling(spec, LLMProviderError(message)) is None
+
+
+def test_the_reservation_is_clamped_before_the_request_is_sent() -> None:
+    """Reacting to a 413 costs a round trip and depends on parsing prose. When the
+    ceiling is declared the arithmetic is available up front."""
+    from core.llm.providers.openai_compat import OpenAICompatibleAdapter
+
+    spec = ModelSpec(
+        provider="groq", model="openai/gpt-oss-20b", max_tokens=4000, tpm_ceiling=8000
+    )
+    messages = [{"role": "user", "content": "x" * 16_000}]  # ~4000 tokens
+    fitted = OpenAICompatibleAdapter._fit_before_sending(spec, messages, None)
+    assert fitted.max_tokens == 8000 - 4000 - 256
+    assert 4000 + fitted.max_tokens <= 8000
+
+
+def test_the_schema_counts_toward_the_ceiling_too() -> None:
+    """Under json_schema mode it travels in the request body rather than a
+    message, and for our contract models it is thousands of tokens."""
+    from core.llm.providers.openai_compat import OpenAICompatibleAdapter
+
+    spec = ModelSpec(
+        provider="groq", model="openai/gpt-oss-20b", max_tokens=4000, tpm_ceiling=8000
+    )
+    messages = [{"role": "user", "content": "x" * 16_000}]
+    bare = OpenAICompatibleAdapter._fit_before_sending(spec, messages, None)
+    with_schema = OpenAICompatibleAdapter._fit_before_sending(
+        spec, messages, {"type": "json_schema", "json_schema": Classification.model_json_schema()}
+    )
+    assert with_schema.max_tokens < bare.max_tokens
+
+
+def test_a_prompt_that_cannot_fit_fails_loudly_rather_than_being_sent() -> None:
+    """No reservation is small enough to rescue it, so four retries would all fail
+    identically. The message has to name the real problem: send less document."""
+    from core.llm.providers.openai_compat import OpenAICompatibleAdapter
+
+    spec = ModelSpec(
+        provider="groq", model="openai/gpt-oss-20b", max_tokens=4000, tpm_ceiling=8000
+    )
+    messages = [{"role": "user", "content": "x" * 200_000}]
+    with pytest.raises(LLMProviderError, match="prompt must be smaller"):
+        OpenAICompatibleAdapter._fit_before_sending(spec, messages, None)
+
+
+def test_a_route_without_a_declared_ceiling_is_left_alone() -> None:
+    from core.llm.providers.openai_compat import OpenAICompatibleAdapter
+
+    spec = ModelSpec(provider="openrouter", model="big", max_tokens=16000)
+    messages = [{"role": "user", "content": "x" * 400_000}]
+    assert OpenAICompatibleAdapter._fit_before_sending(spec, messages, None) is spec
+
+
+def test_the_groq_profile_declares_the_ceiling_its_comment_describes() -> None:
+    """The constraint was prose next to the numbers it constrained, so nothing
+    enforced it and nothing could size a prompt against it."""
+    routing = load_routing(REPO / "config" / "models.yaml", "groq")
+    from contracts.primitives import STAGE_NAMES
+
+    for stage in STAGE_NAMES:
+        spec = routing.for_stage(stage)
+        assert spec.tpm_ceiling == 8000, f"{stage} inherits no ceiling"
+        assert spec.max_tokens < spec.tpm_ceiling, (
+            f"{stage} reserves {spec.max_tokens} of an {spec.tpm_ceiling} ceiling, "
+            "leaving nothing for the prompt"
+        )
+
+
+# ───────────────────────────────────────────────────────── the prompt budget
+
+
+def test_prompt_budget_subtracts_everything_that_is_not_document() -> None:
+    from core.llm.base import TPM_SAFETY_MARGIN
+
+    spec = ModelSpec(provider="groq", model="m", max_tokens=3000, tpm_ceiling=8000)
+    client = LLMClient(routing=ProviderRouting(default=spec), adapters={})
+    assert client.prompt_budget(overhead_tokens=1500) == 8000 - 3000 - TPM_SAFETY_MARGIN - 1500
+
+
+def test_prompt_budget_is_none_when_no_ceiling_is_declared() -> None:
+    """Distinct from zero: zero means the ceiling exists and is already spent."""
+    spec = ModelSpec(provider="openrouter", model="m", max_tokens=8000)
+    client = LLMClient(routing=ProviderRouting(default=spec), adapters={})
+    assert client.prompt_budget() is None
+
+
+def test_prompt_budget_never_goes_negative() -> None:
+    spec = ModelSpec(provider="groq", model="m", max_tokens=3000, tpm_ceiling=8000)
+    client = LLMClient(routing=ProviderRouting(default=spec), adapters={})
+    assert client.prompt_budget(overhead_tokens=99_999) == 0
+
+
+# ────────────────────────────────────────────── configured knobs are honoured
+
+
+def test_reasoning_effort_reaches_the_groq_request() -> None:
+    """It was configured on every stage of every profile and sent on none of them.
+    A config that lies is worse than one that is silent."""
+    from core.llm.providers.groq_provider import GroqAdapter
+
+    spec = ModelSpec(
+        provider="groq",
+        model="openai/gpt-oss-20b",
+        reasoning=ReasoningConfig(effort="low"),
+    )
+    assert GroqAdapter("key")._depth_controls(spec) == {"reasoning_effort": "low"}
+
+
+def test_effort_beyond_this_protocols_range_maps_down_rather_than_vanishing() -> None:
+    """`xhigh` asks for the deepest available; `high` is the deepest here."""
+    from core.llm.providers.groq_provider import GroqAdapter
+
+    spec = ModelSpec(
+        provider="groq", model="openai/gpt-oss-20b", reasoning=ReasoningConfig(effort="xhigh")
+    )
+    assert GroqAdapter("key")._depth_controls(spec) == {"reasoning_effort": "high"}
+
+
+def test_a_model_that_cannot_reason_is_not_sent_the_field() -> None:
+    """Groq 400s on `reasoning_effort` for non-reasoning models, and an advisory
+    knob must never be able to fail a call."""
+    from core.llm.providers.groq_provider import GroqAdapter
+
+    spec = ModelSpec(
+        provider="groq",
+        model="llama-3.1-8b-instant",
+        reasoning=ReasoningConfig(effort="high"),
+    )
+    assert GroqAdapter("key")._depth_controls(spec) == {}
+
+
+def test_a_route_with_no_configured_effort_sends_nothing() -> None:
+    """`None` means 'provider default' and must stay distinguishable from a value."""
+    from core.llm.providers.groq_provider import GroqAdapter
+
+    spec = ModelSpec(provider="groq", model="openai/gpt-oss-20b")
+    assert GroqAdapter("key")._depth_controls(spec) == {}
+
+
+def test_openrouter_sends_its_own_reasoning_shape() -> None:
+    """'OpenAI compatible' does not agree on this field, so the base class sends
+    nothing and each adapter that knows its wire format overrides."""
+    from core.llm.providers.openrouter_provider import OpenRouterAdapter
+
+    spec = ModelSpec(
+        provider="openrouter", model="x:free", reasoning=ReasoningConfig(effort="medium")
+    )
+    assert OpenRouterAdapter("key")._depth_controls(spec) == {"reasoning": {"effort": "medium"}}

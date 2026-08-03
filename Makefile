@@ -76,8 +76,9 @@ evals:  ## Run the rubric and per-stage evaluation suites
 score:  ## Score samples/ and print the per-stage report
 	cd $(BACKEND) && ../.venv/bin/python -m evals score ../samples/*/
 
-samples:  ## Regenerate samples/ (packages, PDFs, eval reports) from the fixtures
-	$(PY) scripts/build_samples.py
+samples:  ## Capture samples/ from REAL pipeline runs (needs a running server + API key)
+	$(PY) scripts/capture_sample.py Books/leph101.pdf --name quantitative-physics
+	$(PY) scripts/capture_sample.py "Books/wiki_French_Revolution.pdf" --name narrative-history
 
 clean:  ## Remove caches and build artifacts
 	rm -rf .pytest_cache .ruff_cache .mypy_cache

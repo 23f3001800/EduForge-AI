@@ -23,9 +23,9 @@ import pytest
 from api.deps import set_store
 from api.main import create_app
 from api.routes.evaluations import set_history
-from api.samples import seed_samples
 from core.storage.memory import InMemoryStore
 from evals.store import EvaluationRecord, EvaluationStore
+from tests.fixtures.seeding import seed_packages
 
 
 @pytest.fixture
@@ -37,7 +37,7 @@ async def client() -> Any:
     the profile partitioning exists to prevent.
     """
     store = InMemoryStore()
-    await seed_samples(store)
+    await seed_packages(store)
     set_store(store)
     set_history(EvaluationStore())
 

@@ -70,6 +70,17 @@ class ModelSpec(StrictModel):
         description="Provider-native model id, e.g. 'claude-opus-5' or a Gemini model id.",
     )
     max_tokens: int = Field(default=16000, ge=1)
+    tpm_ceiling: int | None = Field(
+        default=None,
+        ge=1,
+        description="Hard tokens-per-minute ceiling this route must fit inside, "
+        "where `max_tokens` counts as RESERVED budget rather than measured usage — "
+        "so the real constraint is `prompt + max_tokens <= tpm_ceiling`. Groq's "
+        "free tier is 8000 and rejects an oversized reservation with a 413 before "
+        "the model ever runs. None means 'no ceiling worth planning around'; the "
+        "adapter still handles a rejection, but a stage cannot size its prompts in "
+        "advance, which is the difference between fitting and retrying.",
+    )
     reasoning: ReasoningConfig | None = Field(
         default=None,
         description="None means 'provider default'. Not every provider or model "

@@ -229,9 +229,20 @@ class ClassroomContentStage:
                 )
                 return content.model_dump(mode="json"), notes
 
-            # gather preserves input order, so periods come back sequenced even
-            # though they were produced out of order.
-            results = await asyncio.gather(*(generate(brief) for brief in briefs))
+            # TaskGroup rather than asyncio.gather: gather does not cancel its
+            # siblings when one coroutine raises, so a mid-run failure left the
+            # other periods' calls in flight, making billable LLM requests for a
+            # job that had already failed and would never look at their output.
+            # TaskGroup cancels every sibling the instant one task raises.
+            #
+            # Tasks are appended in submission order and read back in that same
+            # order below, so periods stay sequenced even though they complete
+            # out of order — the same guarantee `gather` gave for free.
+            tasks: list[asyncio.Task[tuple[dict[str, Any], list[str]]]] = []
+            async with asyncio.TaskGroup() as tg:
+                for brief in briefs:
+                    tasks.append(tg.create_task(generate(brief)))
+            results = [task.result() for task in tasks]
 
             contents: list[dict[str, Any]] = []
             for brief, (content, notes) in zip(briefs, results, strict=True):

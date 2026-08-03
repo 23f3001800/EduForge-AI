@@ -27,6 +27,7 @@
         "rationale": "Isolates friction as the cause of stopping, not the absence of force."
       }
     ],
-    "severity": "high"
+    "severity": "high",
+    "why_it_happens": null
   }
 ]

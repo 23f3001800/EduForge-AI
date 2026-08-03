@@ -16,19 +16,36 @@ which would break the first time a package is generated in another language.
 Period *count* is not scored against a number. There is no correct number of
 periods for a document, only a correct number given its concept load, so what is
 scored is whether any single period is carrying more than a class can hold.
+
+**On absent edges.** ``prerequisites_respected`` used to average an empty list to
+1.0, which made deleting the entire concept graph the cheapest route to perfect
+sequencing: no edges, no violations, full marks. Absence of a constraint is not
+satisfaction of it. The metric is now reported at weight zero when there is
+nothing to check, and the *presence* of an ordering claim is scored separately —
+a package with several concepts and no declared prerequisite anywhere has an
+order nobody can defend, and that is a real deficiency in stage 3's output rather
+than a free pass for stage 4.
 """
 
 from __future__ import annotations
 
-from evals.context import EvalContext
+from evals.context import EvalContext, coerce_int
 from evals.types import DimensionScore, Finding, Metric, mean
 
 __all__ = ["KEY", "LABEL", "METHOD", "WEIGHT", "score"]
 
 KEY = "sequencing"
 LABEL = "Sequencing and load"
-WEIGHT = 0.08
+WEIGHT = 0.06
 METHOD = "deterministic"
+
+#: At or above this many concepts *spread across more than one period*, the plan
+#: has made an ordering decision, and a package that declares no prerequisite
+#: relation anywhere is asserting that every idea is independent of every other.
+#: Occasionally true; usually a graph the extractor did not build. Below it —
+#: one concept, or everything taught in a single period — no ordering was chosen
+#: and there is nothing to defend.
+MIN_CONCEPTS_EXPECTING_AN_ORDER = 2
 
 #: How close the teacher script must come to the period's actual length before it
 #: counts as covering the lesson. A script that ends at minute 22 of a 40-minute
@@ -80,6 +97,31 @@ def score(ctx: EvalContext) -> DimensionScore:
             )
     prerequisite_score = mean(ordered)
 
+    # Is there an ordering claim at all? Scored separately from whether it was
+    # honoured, because "no edges" and "no violations" must not be the same
+    # number. Only asserted where a graph is genuinely owed: a two-concept
+    # package with one edge, or a one-concept package with none, is not a defect.
+    concept_count = len(ctx.concept_ids)
+    if concept_count >= MIN_CONCEPTS_EXPECTING_AN_ORDER and len(periods) > 1:
+        graph_present = 1.0 if edges else 0.0
+        # Weighted level with `prerequisites_respected` on purpose: declaring an
+        # order and honouring it are worth the same, because a package that
+        # declares none cannot be caught breaking one.
+        graph_weight = 0.35
+        if not edges:
+            findings.append(
+                Finding(
+                    "SEQ_NO_PREREQUISITE_GRAPH",
+                    "/knowledge/concept_graph/edges",
+                    f"{concept_count} concepts are taught in a fixed order and not one "
+                    "prerequisite relation is declared between them; the order the plan "
+                    "chose cannot be checked, defended, or re-derived",
+                )
+            )
+    else:
+        graph_present = 1.0
+        graph_weight = 0.0
+
     # --- load balance ---------------------------------------------------------
     counts = [len(period.get("concept_ids") or []) for period in periods]
     ideal = sum(counts) / len(counts)
@@ -112,16 +154,16 @@ def score(ctx: EvalContext) -> DimensionScore:
             )
 
     # --- arc ------------------------------------------------------------------
-    content_by_period = {int(c.get("period_no") or 0): c for c in ctx.classroom_content}
-    activity_periods = {int(a.get("period_no") or 0) for a in ctx.activities}
+    content_by_period = {coerce_int(c.get("period_no")): c for c in ctx.classroom_content}
+    activity_periods = {coerce_int(a.get("period_no")) for a in ctx.activities}
     duration = ctx.period_minutes or 0
 
     arcs: list[float] = []
     for period in periods:
-        number = int(period.get("period_no") or 0)
+        number = coerce_int(period.get("period_no"))
         content = content_by_period.get(number, {})
         script = list(content.get("teacher_script") or [])
-        reach = max((int(s.get("minute_end") or 0) for s in script), default=0)
+        reach = max((coerce_int(s.get("minute_end")) for s in script), default=0)
 
         beats = {
             "slots": len(period.get("time_allocation") or []) >= expects.min_time_slots_per_period,
@@ -149,11 +191,23 @@ def score(ctx: EvalContext) -> DimensionScore:
         Metric(
             "prerequisites_respected",
             prerequisite_score,
-            0.35,
-            f"{len(ordered)} prerequisite edge(s) checked",
+            0.35 if ordered else 0.0,
+            f"{len(ordered)} prerequisite edge(s) checked"
+            if ordered
+            else "no prerequisite edge connects two scheduled concepts; reported, not "
+            "scored — an unconstrained order is not a correct one",
         ),
-        Metric("load_balance", balance, 0.20, f"concepts per period: {counts}"),
-        Metric("period_load", mean(within), 0.20, "no period over- or under-filled"),
+        Metric(
+            "prerequisite_graph_present",
+            graph_present,
+            graph_weight,
+            "the package declares an ordering it can be held to"
+            if graph_weight
+            else f"{len(ctx.concept_ids)} concept(s) across {len(periods)} period(s): no "
+            "ordering decision was made, so none is owed a justification",
+        ),
+        Metric("load_balance", balance, 0.15, f"concepts per period: {counts}"),
+        Metric("period_load", mean(within), 0.15, "no period over- or under-filled"),
         Metric("period_arc", mean(arcs), 0.25, "introduce, practise, check, consolidate"),
         Metric(
             "periods_per_concept",

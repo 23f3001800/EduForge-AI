@@ -29,9 +29,53 @@ from core.llm.client import LLMClient
 from core.llm.prompts import document_block
 from stages.base import StageContext, stage_span
 
-__all__ = ["ClassificationStage", "build_sample"]
+__all__ = ["DEGRADED_CLASSIFICATION", "ClassificationStage", "build_sample"]
 
 MAX_SAMPLE_CHARS = 6000
+
+
+def _degraded_classification() -> Classification:
+    """What this stage means by "the call failed and we know nothing".
+
+    Every field here is a deliberate choice, which is the entire point of stating
+    it at the call site rather than letting the client synthesise one.
+
+    ``pedagogy_profile`` is the field that matters: it routes prompt strategy,
+    activity weighting, assessment mix, and the validation ruleset for the eight
+    stages after this one. The generic placeholder builder used to fill a required
+    Literal with its first member, and ``PedagogyProfile`` is declared starting
+    with ``quantitative`` — so a failed classification call silently ran a poetry
+    chapter through the quantitative strategy end to end, while this stage's own
+    warning said it had defaulted to ``mixed``. Nothing downstream could tell that
+    apart from a confident judgement.
+
+    ``mixed`` is the honest answer instead, and it is honest precisely because it
+    is the weakest setting: it tells every later stage to assume nothing. The
+    system prompt above tells the *model* not to choose it as a safe middle
+    option, which is a different question — that instruction is about a model
+    that has read the document and is hedging. Here nothing read the document.
+
+    ``difficulty`` has no neutral member at all, so it is set to the middle band
+    and the confidences record that none of this was measured.
+    """
+    return Classification.model_validate(
+        {
+            "subject": "Unknown",
+            "grade_band": "Unknown",
+            "difficulty": "intermediate",
+            "topic": "Unknown",
+            "category": "unknown",
+            "language": "und",  # BCP-47 for "undetermined" — a real tag, not a guess.
+            "pedagogy_profile": "mixed",
+            "confidences": dict.fromkeys(
+                ("subject", "grade_band", "difficulty", "topic", "category", "language"), 0.0
+            ),
+        }
+    )
+
+
+#: Module-level so a test can assert on it without reaching into the stage.
+DEGRADED_CLASSIFICATION = _degraded_classification()
 
 SYSTEM = """You classify educational documents for a teaching-material pipeline.
 
@@ -137,11 +181,15 @@ class ClassificationStage:
                 output_model=Classification,
                 system=SYSTEM,
                 user_content=f"{document_block(sample)}\n\n{instructions}",
+                degraded_value=_degraded_classification(),
             )
 
             classification = result.value
             if result.degraded:
-                span.warn("classification degraded; downstream strategy defaults to 'mixed'")
+                span.warn(
+                    "classification degraded; pedagogy_profile set to 'mixed' and every "
+                    "confidence to 0 — downstream strategy assumes nothing"
+                )
             if classification.low_confidence_fields:
                 span.warn("low confidence: " + ", ".join(classification.low_confidence_fields))
 

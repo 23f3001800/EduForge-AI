@@ -65,6 +65,53 @@ class Settings(BaseSettings):
     retention_days: int = Field(default=30, ge=1)
     demo_access_code: str | None = None
 
+    # ── ingestion hardening (NFR-09) ────────────────────────────────────────
+    #: DOCX and PPTX are ZIP archives, so an upload's size says nothing about
+    #: what it expands to. A 2.18 MB DOCX declaring 2.9 GB of members is a
+    #: memory-exhaustion attack that every byte-count limit upstream passes.
+    #: These three bound the archive itself, before a parser opens it.
+    max_archive_uncompressed_mb: int = Field(default=200, ge=1)
+    max_archive_ratio: int = Field(default=200, ge=2)
+    max_archive_members: int = Field(default=2000, ge=1)
+
+    #: Extraction ceilings, enforced at one choke point for all four parsers.
+    #: An NCERT chapter yields ~2.7k blocks and ~98k characters; these sit far
+    #: enough above that only an engineered document reaches them.
+    max_blocks_per_document: int = Field(default=200_000, ge=1_000)
+    max_text_chars: int = Field(default=20_000_000, ge=100_000)
+
+    #: Parsing runs in a child process so ``parse_timeout_s`` can actually end
+    #: the work: cancelling a thread is not possible, killing a process is.
+    #: Set false to fall back to the in-thread path where a deployment forbids
+    #: subprocesses; the timeout then bounds the *wait*, not the work.
+    parse_in_subprocess: bool = True
+    parse_workers: int = Field(default=2, ge=1)
+    #: RLIMIT_AS for a parse child. An NCERT chapter peaks near 430 MB, so this
+    #: leaves real headroom while still turning runaway growth into one dead
+    #: child instead of an OOM-killed service.
+    parse_memory_mb: int = Field(default=2048, ge=256)
+
+    # ── OCR (FAQ Q7: "Scanned PDF" is a declared input kind) ────────────────
+    #: Which recogniser runs on pages that carry no text layer. ``auto`` tries
+    #: the hosted reader first and falls back through the local engines, so a
+    #: deployment without a key still starts. ``none`` disables OCR entirely.
+    #: Swapping this is the only change needed to change engines — nothing
+    #: downstream of stage 1 knows which one ran.
+    ocr_engine: Literal["auto", "azure", "tesseract", "easyocr", "none"] = "auto"
+    azure_doc_intel_endpoint: str | None = None
+    azure_doc_intel_key: str | None = None
+
+    #: Below this mean confidence the package carries a warning and the teacher
+    #: is told which pages were read by machine. Not a rejection threshold: a
+    #: 0.72 page is usually still usable, and silently discarding a chapter
+    #: helps nobody. 0.80 is where Azure's own per-word scores start
+    #: correlating with visible transcription errors on textbook type.
+    ocr_min_confidence: float = Field(default=0.80, ge=0.0, le=1.0)
+    #: Beyond this many scanned pages, OCR is refused rather than run — the
+    #: hosted tier is metered per page and a 400-page scan is a bill, not a
+    #: chapter. FAQ Q1 says the expected input is a single chapter.
+    ocr_max_pages: int = Field(default=60, ge=1)
+
     # ── observability ───────────────────────────────────────────────────────
     log_level: str = "INFO"
     #: JSON in a deployment where a log aggregator reads it; plain text is
@@ -99,6 +146,14 @@ class Settings(BaseSettings):
     @property
     def max_upload_bytes(self) -> int:
         return self.max_upload_mb * 1024 * 1024
+
+    @property
+    def max_archive_uncompressed_bytes(self) -> int:
+        return self.max_archive_uncompressed_mb * 1024 * 1024
+
+    @property
+    def parse_memory_bytes(self) -> int:
+        return self.parse_memory_mb * 1024 * 1024
 
 
 @lru_cache(maxsize=1)
