@@ -62,7 +62,7 @@ COPY config/ config/
 # NOT installed, deliberately:
 #   `platform_deps` (sqlalchemy/alembic/psycopg/pgvector) — nothing connects to
 #       Postgres yet; the store is in-memory (see docs/12-deployment.md).
-RUN pip install --no-cache-dir -e "backend[api,llm,parsing,render]"
+RUN pip install --no-cache-dir -e "backend[api,llm,parsing,render,ocr]"
 
 # Built frontend assets. main.py does not currently mount them (see
 # docs/12-deployment.md "Must-fix before production") — this makes the asset
