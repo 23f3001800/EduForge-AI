@@ -673,9 +673,7 @@ def test_the_reservation_is_clamped_before_the_request_is_sent() -> None:
     ceiling is declared the arithmetic is available up front."""
     from core.llm.providers.openai_compat import OpenAICompatibleAdapter
 
-    spec = ModelSpec(
-        provider="groq", model="openai/gpt-oss-20b", max_tokens=4000, tpm_ceiling=8000
-    )
+    spec = ModelSpec(provider="groq", model="openai/gpt-oss-20b", max_tokens=4000, tpm_ceiling=8000)
     messages = [{"role": "user", "content": "x" * 16_000}]  # ~4000 tokens
     fitted = OpenAICompatibleAdapter._fit_before_sending(spec, messages, None)
     assert fitted.max_tokens == 8000 - 4000 - 256
@@ -687,9 +685,7 @@ def test_the_schema_counts_toward_the_ceiling_too() -> None:
     message, and for our contract models it is thousands of tokens."""
     from core.llm.providers.openai_compat import OpenAICompatibleAdapter
 
-    spec = ModelSpec(
-        provider="groq", model="openai/gpt-oss-20b", max_tokens=4000, tpm_ceiling=8000
-    )
+    spec = ModelSpec(provider="groq", model="openai/gpt-oss-20b", max_tokens=4000, tpm_ceiling=8000)
     messages = [{"role": "user", "content": "x" * 16_000}]
     bare = OpenAICompatibleAdapter._fit_before_sending(spec, messages, None)
     with_schema = OpenAICompatibleAdapter._fit_before_sending(
@@ -703,9 +699,7 @@ def test_a_prompt_that_cannot_fit_fails_loudly_rather_than_being_sent() -> None:
     identically. The message has to name the real problem: send less document."""
     from core.llm.providers.openai_compat import OpenAICompatibleAdapter
 
-    spec = ModelSpec(
-        provider="groq", model="openai/gpt-oss-20b", max_tokens=4000, tpm_ceiling=8000
-    )
+    spec = ModelSpec(provider="groq", model="openai/gpt-oss-20b", max_tokens=4000, tpm_ceiling=8000)
     messages = [{"role": "user", "content": "x" * 200_000}]
     with pytest.raises(LLMProviderError, match="prompt must be smaller"):
         OpenAICompatibleAdapter._fit_before_sending(spec, messages, None)
@@ -807,10 +801,52 @@ def test_a_route_with_no_configured_effort_sends_nothing() -> None:
 
 def test_openrouter_sends_its_own_reasoning_shape() -> None:
     """'OpenAI compatible' does not agree on this field, so the base class sends
-    nothing and each adapter that knows its wire format overrides."""
+    nothing and each adapter that knows its wire format overrides.
+
+    It must ride in ``extra_body``. ``reasoning`` is OpenRouter's extension, not
+    an OpenAI schema field, so the SDK rejects it as a top-level keyword before
+    the request is ever sent. This test previously asserted the top-level shape
+    and passed while every live OpenRouter call died with ``TypeError:
+    AsyncCompletions.create() got an unexpected keyword argument 'reasoning'`` —
+    a shape assertion that agreed with the code and disagreed with the provider.
+    """
     from core.llm.providers.openrouter_provider import OpenRouterAdapter
 
     spec = ModelSpec(
         provider="openrouter", model="x:free", reasoning=ReasoningConfig(effort="medium")
     )
-    assert OpenRouterAdapter("key")._depth_controls(spec) == {"reasoning": {"effort": "medium"}}
+    controls = OpenRouterAdapter("key")._depth_controls(spec)
+    assert controls == {"extra_body": {"reasoning": {"effort": "medium"}}}
+
+
+def test_every_depth_control_is_a_keyword_the_sdk_accepts() -> None:
+    """The assertion the shape test could not make: are these arguments real?
+
+    Each adapter names its own knob, so a per-adapter shape test can only check
+    the code against itself. This checks the code against the SDK signature —
+    the thing that actually rejected the request in production. ``extra_body``
+    is the documented escape hatch for provider extensions and is accepted for
+    anything.
+    """
+    import inspect
+
+    from openai.resources.chat.completions import AsyncCompletions
+
+    from core.llm.providers.groq_provider import GroqAdapter
+    from core.llm.providers.openrouter_provider import OpenRouterAdapter
+
+    accepted = set(inspect.signature(AsyncCompletions.create).parameters)
+
+    for adapter, model in (
+        (GroqAdapter("key"), "openai/gpt-oss-20b"),
+        (OpenRouterAdapter("key"), "x:free"),
+    ):
+        spec = ModelSpec(
+            provider=adapter.name,  # type: ignore[arg-type]
+            model=model,
+            reasoning=ReasoningConfig(effort="medium"),
+        )
+        for keyword in adapter._depth_controls(spec):
+            assert keyword in accepted, (
+                f"{adapter.name} sends {keyword!r}, which AsyncCompletions.create() does not accept"
+            )

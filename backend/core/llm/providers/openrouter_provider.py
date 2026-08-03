@@ -52,6 +52,13 @@ class OpenRouterAdapter(OpenAICompatibleAdapter):
         one field usable across a router fronting many vendors — and why the
         effort configured per stage can finally reach the model instead of being
         discarded at this boundary.
+
+        Sent via ``extra_body`` because ``reasoning`` is OpenRouter's own
+        extension, not a field in the OpenAI schema the SDK validates against.
+        Passing it as a top-level keyword raises ``TypeError: unexpected keyword
+        argument 'reasoning'`` before any request leaves the process — which is
+        exactly what happened on the first live run after this was added, on the
+        one provider the change was never exercised against.
         """
         effort = self._effort(spec)
-        return {"reasoning": {"effort": effort}} if effort else {}
+        return {"extra_body": {"reasoning": {"effort": effort}}} if effort else {}

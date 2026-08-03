@@ -198,7 +198,7 @@ make check         # what CI runs: schema drift + lint + boundaries + tests
 make boundaries    # import-linter — a stage importing a stage fails here
 make evals         # the rubric + per-stage discrimination suites
 make score         # score samples/ and print the per-stage report
-make samples       # regenerate samples/ from the fixtures
+make samples       # capture samples/ from REAL runs (needs a server + key)
 make dev           # run the API (also serves the built frontend)
 make docker-build  # build the production image
 ```
@@ -333,10 +333,19 @@ More in [`docs/`](docs/) — [SRS](docs/01-srs.md), [HLD](docs/02-hld.md),
 Two graders, answering two different questions, deliberately never averaged
 together.
 
-**The rubric** (`evals.dimensions`) asks *is this good teaching?* — nine
-deterministic dimensions: objectives, Bloom distribution, coverage, sequencing,
-grounding, activities, differentiation, assessment integrity, classroom content.
-An LLM judge is optional and never load-bearing.
+**The rubric** (`evals.dimensions`) asks *is this good teaching?* — eleven
+deterministic dimensions: content fidelity, objectives, Bloom distribution,
+coverage, sequencing, grounding, activities, differentiation, assessment
+integrity, classroom content, period integrity. An LLM judge is optional and
+never load-bearing.
+
+**The rubric is checked against itself.** `evals.degradations` sabotages a good
+package fifteen ways and asserts a *minimum score drop for each*. That test
+exists because an earlier version of this rubric did not discriminate at all:
+the total spread across every sabotage was 0.011, and two of them **raised** the
+score, because word-count minimums let padding beat precision. A vacuous rubric
+descriptor now costs 0.053 instead of gaining 0.009; off-topic content costs
+0.055 instead of exactly nothing.
 
 **The per-stage framework** (`evals.stagewise`) asks *did stage n do its job?*
 — eleven evaluators checking each stage's contract with the next one. A package
@@ -474,6 +483,40 @@ the record it would sit in has been built.
 
 ---
 
+### Scanned pages
+
+FAQ Q7 lists **Scanned PDF** as an input kind, and says NCERT chapters carry
+images, diagrams, tables and equations. A page with no text layer is detected,
+read, and merged into the parse.
+
+The engine is a port, not a library call — Azure Document Intelligence,
+Tesseract and EasyOCR all satisfy it, and `OCR_ENGINE` picks one. Nothing
+downstream of stage 1 can tell which ran.
+
+**Confidence is part of the contract.** OCR is the one step whose output can be
+*confidently wrong*: every later stage checks its claims against the source
+text, so if OCR misread the source, those checks confirm the error instead of
+catching it. Grounding cannot see beneath itself. So the confidence, the pages
+read, and the pages that could not be read are all carried into the package and
+shown to the teacher — and a confidence below `OCR_MIN_CONFIDENCE` raises a
+warning naming the pages to check. An engine that reports no confidence records
+`null`, never a flattering default.
+
+Detection is calibrated against real documents rather than assumed. An earlier
+threshold flagged two perfectly readable NCERT pages as scanned, and image
+coverage turned out to be 1.00 on *every* page of that book because of a
+decorative border — so coverage is used only to tell a scan from a blank page,
+never as evidence of scanning. Measured: **0 false positives** across two real
+chapters, **3 of 3** caught on an image-only PDF, 0.976 confidence recovering
+real text.
+
+A false positive is the worse failure and the rule reflects that: missing a
+scanned page costs one page, but running OCR on a page that parsed cleanly
+spends a metered call and overwrites exact text with a guess that nothing
+downstream can detect.
+
+---
+
 ## Bonus features
 
 Status is stated honestly — a ✅ means it is built *and* verified, and where it
@@ -534,9 +577,11 @@ engine rather than HarfBuzz, so conjuncts are not typographically perfect.
 - Devanagari **glyphs** render correctly (verified by round-tripping text back
   out of the PDF), but complex-script shaping uses fpdf2's own engine rather than
   HarfBuzz, so conjuncts are not typographically perfect.
-- Scanned PDFs are rejected with a clear error rather than OCR'd.
-- Per-stage token/cost provenance is empty: no stage threads its usage back into
-  graph state, so publishing has nothing honest to report there.
+- **OCR page cap.** Scanned pages are read (see below), but the Azure free
+  tier analyses only the first two pages of a request and rejects anything over
+  4 MB. Pages beyond that are reported in `failed_pages` rather than silently
+  dropped, so a partial read never looks like a whole one. A paid tier removes
+  both limits.
 
 ---
 
