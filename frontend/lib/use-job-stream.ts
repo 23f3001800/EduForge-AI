@@ -147,8 +147,20 @@ export function useJobStream(jobId: string | null, enabled = true) {
       }
     };
 
+    // Every name the server can put in an SSE `event:` field, from
+    // `backend/api/routes/events.py::_event_name`. A frame whose name has no
+    // listener is not delivered to `onmessage` — that only receives frames with
+    // no name at all — so a missing name here is a frame the UI never sees.
+    //
+    // "warning" was missing, and it is the name the server uses for *every*
+    // frame at level warning or error that is not the terminal one. So the
+    // stages that reported trouble streamed it, the server persisted it, replay
+    // resent it, and the client dropped it on the floor: no warning ever
+    // reached the timeline, no stage was ever marked as having warned, and a
+    // mid-run error was invisible unless it also killed the job.
     source.onmessage = handle;
     source.addEventListener("progress", handle as EventListener);
+    source.addEventListener("warning", handle as EventListener);
     source.addEventListener("completed", handle as EventListener);
     source.addEventListener("failed", handle as EventListener);
 

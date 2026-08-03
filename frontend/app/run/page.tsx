@@ -145,12 +145,24 @@ function RunView() {
     queryKey: ["job", jobId],
     queryFn: () => getJob(jobId as string),
     enabled: Boolean(jobId),
-    // Stopped on the snapshot's own status as well as on the stream's terminal
-    // frame: when EventSource never opened, `terminal` stays null forever and a
-    // finished run would otherwise be polled every five seconds for as long as
-    // the tab stayed open.
+    // Stopped on the snapshot's own status, and deliberately *not* on the
+    // stream's terminal frame.
+    //
+    // Stopping on `terminal` looks right and is a data-loss bug: the SSE
+    // `completed` frame arrives well before the poll that follows it, so
+    // cancelling the poll then freezes the snapshot at its last in-flight
+    // value. Everything the worker writes only at the end — `usage.tokens`,
+    // `cost_usd`, `warnings` — is written *after* that frame
+    // (worker/runner.py:171-187), so the run would render its final accounting
+    // as "0 tokens, $0.00" and then say that zero was the true figure.
+    //
+    // The snapshot's own status is the condition that both terminates and is
+    // late enough to be complete: the worker sets it in the same update that
+    // writes the totals, so the first poll to observe a terminal status is also
+    // the first to carry them. It is reached whether or not EventSource ever
+    // opened, which is what stops a finished run being polled forever.
     refetchInterval: (query) =>
-      terminal || TERMINAL_STATUSES.has(query.state.data?.status ?? "") ? false : 5000,
+      TERMINAL_STATUSES.has(query.state.data?.status ?? "") ? false : 5000,
   });
 
   const status = job?.status ?? null;
