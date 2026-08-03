@@ -30,6 +30,17 @@ SAMPLES = ROOT / "samples"
 OUT = SAMPLES / "teacher_knowledge_packages.json"
 PACKAGE_NAME = "teacher_knowledge_package.json"
 
+#: Sample directories kept out of the submission bundle.
+#:
+#: ``multilingual-hindi`` is a real run — the same NCERT chapter as
+#: ``quantitative-physics`` with ``output_language=hi`` — and it stays on disk
+#: under ``samples/`` as the evidence for the multilingual claim. It is excluded
+#: here because the bundle is what a reader opens to see what the system
+#: produces, and two of its three entries would be the same source document.
+#: That reads as padding, and padding is the thing this bundle most needs not to
+#: look like.
+EXCLUDED = {"multilingual-hindi"}
+
 
 def _entry(directory: Path) -> dict[str, Any]:
     package = json.loads((directory / PACKAGE_NAME).read_text(encoding="utf-8"))
@@ -74,7 +85,11 @@ def _entry(directory: Path) -> dict[str, Any]:
 
 
 def main() -> int:
-    directories = sorted(d for d in SAMPLES.iterdir() if (d / PACKAGE_NAME).is_file())
+    directories = sorted(
+        d
+        for d in SAMPLES.iterdir()
+        if (d / PACKAGE_NAME).is_file() and d.name not in EXCLUDED
+    )
     if not directories:
         print("no sample packages found; run `make samples` first")
         return 1

@@ -598,12 +598,24 @@ async def check_grounding(
                     "reason": verdict.reason,
                 }
             )
+            predicted = verdict.claim.kind == "predicted"
             issues.append(
                 make_issue(
-                    code="GROUNDING_PARTIALLY_SUPPORTED_CLAIM",
+                    code=(
+                        "GROUNDING_LOOSELY_FILED_PREDICTION"
+                        if predicted
+                        else "GROUNDING_PARTIALLY_SUPPORTED_CLAIM"
+                    ),
                     message=(
-                        f"claim at {verdict.claim.path} is only partially supported "
-                        f"by its cited source ({verdict.reason})"
+                        (
+                            f"predicted difficulty at {verdict.claim.path} is only "
+                            f"loosely related to the passage it cites ({verdict.reason})"
+                        )
+                        if predicted
+                        else (
+                            f"claim at {verdict.claim.path} is only partially supported "
+                            f"by its cited source ({verdict.reason})"
+                        )
                     ),
                     path=verdict.claim.path,
                     stage=verdict.claim.stage,

@@ -40,7 +40,7 @@ from stages.s10_publishing.render.assessment_book import (
     render_assessment_book_pdf,
 )
 from stages.s10_publishing.render.document import TkpDocument
-from stages.s10_publishing.render.fonts import DEVANAGARI_FONT, has_devanagari
+from stages.s10_publishing.render.fonts import DEVANAGARI_FONT, has_devanagari, typeset
 from stages.s10_publishing.render.lesson_plan import render_lesson_plan_pdf
 from stages.s10_publishing.render.markdown_bundle import render_markdown_bundle
 from stages.s10_publishing.render.teacher_guide import render_teacher_guide_pdf
@@ -190,6 +190,47 @@ def test_devanagari_text_renders_as_real_glyphs_not_tofu() -> None:
     # rendered boxes because the glyphs were absent could not round-trip this.
     text = "\n".join(_pdf_pages(data))
     assert hindi_topic in text
+
+
+def test_a_maths_symbol_the_font_cannot_draw_is_never_silently_dropped() -> None:
+    """fpdf2 drops an uncoverable glyph and logs; nothing else notices.
+
+    NotoSans has no mathematical-operators block, so 24 of the symbols a physics
+    or calculus chapter uses were being deleted on the way to the page. "E ∝
+    1/r²" rendered as "E  1/r²" — still fluent, still plausible, and no longer
+    what the source said. A quantitative package is exactly where that matters,
+    which is exactly where it was happening.
+    """
+    stem = "For a point charge E ∝ 1/r², and E → 0 as r → ∞, so E ≈ 0 when r ≫ a."
+    tkp = assemble_package(_full_state())
+    tkp = tkp.model_copy(
+        update={"classification": tkp.classification.model_copy(update={"topic": stem})}
+    )
+
+    text = "\n".join(_pdf_pages(render_lesson_plan_pdf(tkp)))
+
+    # Each symbol reaches the page as *something* legible rather than vanishing.
+    for symbol, expected in (("∝", "proportional to"), ("→", "->"), ("∞", "infinity")):
+        assert symbol not in text, f"{symbol!r} survived into a font that cannot draw it"
+        assert expected in text, f"{symbol!r} was dropped instead of substituted"
+
+
+def test_a_symbol_the_font_does_cover_is_left_alone() -> None:
+    """The substitution table is gated on the font's real cmap, so a covered
+    glyph must pass through untouched — otherwise a future wider font would be
+    disfigured by fallbacks it no longer needs."""
+    # The lookalike characters are the entire point of the assertion: these are
+    # the real Greek and mathematical codepoints the font does cover, and
+    # replacing them with their Latin lookalikes would test nothing.
+    covered = "±30 °C, Δx × 2, α + π"  # noqa: RUF001
+    assert typeset(covered) == covered
+
+
+def test_control_characters_never_reach_the_page() -> None:
+    """Measured: U+0002 and U+0012 travelled from a source PDF through parsing,
+    chunking and generation into a rendered artifact. They are not content."""
+    assert typeset("charge\x02 density\x12") == "charge density"
+    assert typeset("line one\nline two\tindented") == "line one\nline two\tindented"
 
 
 # ────────────────────────────────────────────────────────────── answer key
