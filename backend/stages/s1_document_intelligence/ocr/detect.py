@@ -70,6 +70,30 @@ class PageTextProfile:
     def chars_per_sqin(self) -> float:
         return self.chars / self.area_sqin if self.area_sqin > 0 else 0.0
 
+    def is_scanned_at(self, char_floor: int | None = None) -> bool:
+        """``is_scanned``, against a caller-supplied character floor.
+
+        The floor is the parameter, not the density line, and that is a
+        correction rather than a preference. On A4 (96.7 sq in) a page holding
+        fewer than ``MIN_CHARS_PER_PAGE`` characters cannot exceed 0.62 chars
+        per square inch — below every density threshold in play. So the early
+        return on the floor decides every A4 page and the density test never
+        runs: tuning the density line looks like a control and is not one.
+
+        Density still earns its place for unusual page geometry, where a small
+        page can carry few characters and still be dense, so it stays.
+
+        A hint may move this boundary. It may not overturn a clear reading: the
+        ink requirement below is untouched, so a text page with no images is
+        never called a scan however the uploader described the file.
+        """
+        floor = MIN_CHARS_PER_PAGE if char_floor is None else char_floor
+        if self.chars >= floor:
+            return False
+        if self.chars_per_sqin >= MIN_CHARS_PER_SQIN:
+            return False
+        return self.image_area_share >= IMAGE_AREA_SHARE
+
     @property
     def is_scanned(self) -> bool:
         """No usable text layer, so the words are locked inside pixels.

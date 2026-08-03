@@ -108,8 +108,15 @@ def build_engine(settings: Settings) -> OcrEngine | None:
     return None
 
 
-def scanned_pages(profiles: list[PageTextProfile]) -> list[int]:
-    return [profile.page for profile in profiles if profile.is_scanned]
+def scanned_pages(profiles: list[PageTextProfile], *, char_floor: int | None = None) -> list[int]:
+    """Pages with no usable text layer.
+
+    ``char_floor`` overrides the default per-page character floor, which is how
+    the uploader's declared document kind (FAQ Q7) reaches this decision without
+    being allowed to make it outright. See :meth:`PageTextProfile.is_scanned_at`
+    for why the floor rather than the density line is the control worth exposing.
+    """
+    return [p.page for p in profiles if p.is_scanned_at(char_floor)]
 
 
 def recognise_scanned_pages(
