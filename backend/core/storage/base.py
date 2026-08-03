@@ -186,6 +186,15 @@ class Store(ABC):
     async def get_package(self, package_id: UUID) -> PackageRecord | None: ...
 
     @abstractmethod
+    async def delete_package(self, package_id: UUID) -> bool:
+        """Remove a package. Returns whether one was there to remove.
+
+        Implementations must refuse to delete a sample: the seeded packages are
+        the instance's shared reference set, and one visitor clearing them would
+        empty the demonstration for everyone who arrives afterwards.
+        """
+
+    @abstractmethod
     async def list_samples(self) -> list[PackageRecord]: ...
 
     @abstractmethod

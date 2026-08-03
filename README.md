@@ -181,7 +181,17 @@ auto-passes without a model call *unless* `contradiction_risk` fires; everything
 else is batched to an LLM judge. The auto-pass is deliberately one-directional —
 low overlap means paraphrase, not fabrication, and treating it as fabrication
 reported four of seven claims in the reference package as hallucinations that
-nothing had read.
+nothing had read. Claims are split by kind before they are scored: an *extracted*
+claim asserts what the document says, while a *predicted* one — a misconception,
+a learning gap — asserts something about students, and no textbook records which
+errors learners make, so demanding that the cited passage entail it demanded the
+impossible. Measured on a 935-word calculus chapter, all 9 extracted claims
+grounded cleanly while all 4 predicted ones failed, giving 9.5/13 = 0.731 and a
+`fail` verdict on a package whose extraction was perfect. A predicted claim is
+now judged on whether it is filed against the right source passage rather than on
+whether that passage entails it, and the same document scored 0.95 /
+`pass_with_warnings`; an off-topic prediction still fails, under
+`GROUNDING_MISFILED_PREDICTION` and `GROUNDING_LOOSELY_FILED_PREDICTION`.
 
 **Prompt-injection handling.** Document text is wrapped in a `<document_content>`
 block that the document itself cannot close early, and is declared to the model
@@ -653,6 +663,7 @@ and read from `.env`.
 | `Open_Router_API_KEY` | — | **Required** for `production` and `dev`; boot fails without it |
 | `OPEN_ROUTER_BASE_URL` | `https://openrouter.ai/api/v1` | |
 | `MODELS_CONFIG_PATH` | `config/models.yaml` | Routing table |
+| `ACCESS_KEY` | `""` — open | Optional shared key required to upload a document, start a job, or cancel one, sent as `X-Access-Key` (`backend/api/access.py`). Empty by default, so a local run against your own provider key needs no configuration. Reading — samples, packages, evaluations, artifacts — always stays open. A spend gate, not authentication: there are no accounts and it cannot say who is calling |
 | `MAX_UPLOAD_MB` | `25` | Enforced by a bounded read, not just the declared content length |
 | `MAX_PAGES` | `300` | |
 | `PARSE_TIMEOUT_S` | `90` | |
@@ -704,8 +715,10 @@ client parses one shape. Internal tracebacks are never returned.
 | `POST` | `/jobs` | Create and start a pipeline job. `202` |
 | `GET` | `/jobs/{job_id}` | Job status and progress |
 | `POST` | `/jobs/{job_id}/retry` | `202`. Resumes at the first incomplete stage; completed stages are restored from checkpoint, never re-executed or re-billed |
+| `POST` | `/jobs/{job_id}/cancel` | Stops the running pipeline task and marks the job `cancelled`. `200`. Gated by `ACCESS_KEY` |
 | `GET` | `/jobs/{job_id}/events` | **SSE** progress stream with a monotonic cursor, so a browser refresh mid-run resumes rather than restarting |
 | `GET` | `/packages/{package_id}` | The full Teacher Knowledge Package |
+| `DELETE` | `/packages/{package_id}` | Deletes a generated package. `204`, or `409` on a seeded sample, which is shared by everyone using the instance. Not gated: deleting spends nothing and starts nothing |
 | `GET` | `/packages/{package_id}/validation` | Stage 9's validation report |
 | `GET` | `/packages/{package_id}/artifacts` | Available artifacts |
 | `GET` | `/packages/{package_id}/artifacts/{kind}` | Download one of `tkp_json`, `lesson_plan_pdf`, `teacher_guide_pdf`, `assessment_book_pdf`, `markdown_bundle` |
@@ -714,9 +727,14 @@ client parses one shape. Internal tracebacks are never returned.
 | `GET` | `/evaluations` | Evaluation history |
 | `GET` | `/evaluations/{run_id}` | One recorded evaluation |
 | `GET` | `/evaluations/benchmark` | Cross-run benchmark for a profile |
-| `GET` | `/options` | Curriculum boards, teaching styles, document kinds, artifact kinds — served from the same YAML the pipeline reads, so the upload form cannot drift from the backend |
+| `GET` | `/options` | Curriculum boards, teaching styles, document kinds, artifact kinds — served from the same YAML the pipeline reads, so the upload form cannot drift from the backend. Also the output-language dropdown (`backend/pedagogy/languages.py`), restricted to languages whose script the stage-10 fonts can typeset — Latin and Devanagari, so English, Hindi, Marathi, Nepali, Sanskrit, French, Spanish, German, Portuguese, Indonesian. Offering a script the renderer cannot draw would produce a PDF of tofu boxes |
 | `GET` | `/samples` | Summaries of any seeded reference packages |
 | `GET` | `/stats` | What this instance has done since restart: jobs, per-stage durations, LLM attempts and retry rate, subject / profile / language distribution |
+
+The endpoints that spend money — `POST /documents`, `POST /jobs`, and the job
+`retry` and `cancel` routes — are gated by `ACCESS_KEY` when it is set
+(`backend/api/access.py`). It is unset by default, and every read path is open
+regardless.
 
 Operational endpoints outside the prefix: `GET /healthz` (liveness, deliberately
 checks no dependency), `GET /readyz` (reports `llm_profile` and
@@ -897,10 +915,13 @@ package.** No Postgres implementation exists — `DATABASE_URL` is declared on
 `Settings` and read by nothing. The `Store` port is written so a durable backend
 drops in without touching a route, but that backend is not written.
 
-**There is no authentication.** No login, no API key, no tenancy, and no rate
-limiting in application code. Anyone with the URL can upload a document and read
-any package by id. `DEMO_ACCESS_CODE` exists on `Settings` and is checked
-nowhere. `/metrics` is unauthenticated by design.
+**There is no authentication.** No login, no accounts, no tenancy, and no rate
+limiting in application code. `ACCESS_KEY` gates the endpoints that spend money —
+upload, start, retry, cancel — but it is one shared key, not authentication: it
+cannot say who is calling, and it is empty by default, so anyone with the URL can
+upload a document unless a deployment sets it. Reading stays open in every case,
+so any package can be read by id. `DEMO_ACCESS_CODE` exists on `Settings` and is
+checked nowhere. `/metrics` is unauthenticated by design.
 
 **Free-tier model quota.** The deployed `production` profile uses OpenRouter's
 free tier, documented at **50 requests per day** — roughly one chapter. A `429`
@@ -945,7 +966,7 @@ exists instead is **claim-to-source traceability**, which is a different thing:
 | Mandatory evidence spans (`Grounded.evidence`, `min_length=1`) | Every claim points at a chunk and a verbatim quote |
 | Deterministic citation verification (stage 3) | The quote provably appears in the chunk it cites |
 | Per-call log (`LLMClient.calls` → `CallRecord`) | Every attempt including failures, attributed to a stage |
-| Provenance block on the TKP plus `GeneratorInfo` | Which models produced which stages |
+| Provenance block on the TKP plus `GeneratorInfo` | Which models produced which stages, and `generator.output_language` — the language the teaching content was written in, distinct from `source.detected_language`, which describes the input |
 | Prometheus metrics and `/stats` | Aggregate call, token, cost and duration behaviour |
 
 That answers "where did this sentence come from?". It does not answer "show me

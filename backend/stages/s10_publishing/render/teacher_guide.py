@@ -27,8 +27,13 @@ def _activities_for(period_no: int, activities: list[Activity]) -> list[Activity
 def _render_period(doc: TkpDocument, content: PeriodContent, activities: list[Activity]) -> None:
     doc.h1(f"Period {content.period_no}")
 
-    doc.h2("Entry Ticket")
-    doc.body(content.entry_ticket.prompt)
+    # The two tickets and the mentor moment are set in tinted blocks rather
+    # than run in with everything else. All three are things a teacher reaches
+    # for at a specific moment — the first two minutes, the last two, and the
+    # point where the class needs a story — so they have to be findable without
+    # reading the page. The bulk of the period is script, which is read in
+    # order and needs no such marker.
+    doc.callout("Entry ticket", content.entry_ticket.prompt)
     doc.muted(f"Expected response: {content.entry_ticket.expected_response}")
     doc.spacer()
 
@@ -79,8 +84,7 @@ def _render_period(doc: TkpDocument, content: PeriodContent, activities: list[Ac
         doc.muted(f"   Expected: {question.expected_answer}")
     doc.spacer()
 
-    doc.h2("Exit Ticket")
-    doc.body(content.exit_ticket.prompt)
+    doc.callout("Exit ticket", content.exit_ticket.prompt)
     doc.muted(f"Success indicator: {content.exit_ticket.success_indicator}")
     doc.spacer()
 
@@ -90,8 +94,9 @@ def _render_period(doc: TkpDocument, content: PeriodContent, activities: list[Ac
     doc.muted(f"Estimated time: {content.homework.estimated_minutes} min")
     doc.spacer()
 
-    doc.h2(f"Mentor Moment — {content.mentor_moment.title}")
-    doc.body(content.mentor_moment.story)
+    doc.callout(
+        f"Mentor moment — {content.mentor_moment.title}", content.mentor_moment.story
+    )
     doc.muted(f"Takeaway: {content.mentor_moment.takeaway}")
 
 

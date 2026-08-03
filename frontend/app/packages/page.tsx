@@ -10,21 +10,24 @@ import {
   GraduationCap,
   Layers,
   ShieldCheck,
+  Trash2,
   TriangleAlert,
 } from "lucide-react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
-import { Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useState } from "react";
+import { toast } from "sonner";
 import { ArtifactsPanel } from "@/components/package/artifacts";
 import { EvaluationPanel } from "@/components/package/evaluation";
 import { PipelinePanel } from "@/components/package/pipeline";
 import { EvidenceList, type Evidence } from "@/components/package/evidence";
 import { OcrNotice } from "@/components/package/ocr";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState, ErrorState } from "@/components/ui/states";
-import { getPackage } from "@/lib/api";
+import { deletePackage, getPackage, getSamples } from "@/lib/api";
 import { describeError, traceIdOf } from "@/lib/errors";
 import { labelFor } from "@/lib/format";
 
@@ -100,6 +103,16 @@ function Section({ title, count, children }: { title: string; count: number; chi
 function ViewerBody() {
   const params = useSearchParams();
   const packageId = params?.get("id") ?? null;
+  const router = useRouter();
+  const [deleting, setDeleting] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+
+  // Whether this is one of the instance's seeded reference packages. The TKP
+  // itself carries no such flag - it is a property of how the package got into
+  // this store, not of the package - so it is answered by membership in the
+  // samples list, which is already cached for the chooser.
+  const { data: samples } = useQuery({ queryKey: ["samples"], queryFn: getSamples });
+  const isSample = (samples?.samples ?? []).some((s) => s.package_id === packageId);
 
   const { data, isPending, isError, error } = useQuery({
     queryKey: ["package", packageId],
@@ -169,9 +182,45 @@ function ViewerBody() {
               {classification.chapter ? ` · ${classification.chapter}` : ""}
             </p>
           </div>
-          <Badge tone={VALIDATION_TONE[validation.status] ?? "neutral"}>
-            {labelFor(String(validation.status ?? "unknown"))}
-          </Badge>
+          <div className="flex shrink-0 items-center gap-2">
+            <Badge tone={VALIDATION_TONE[validation.status] ?? "neutral"}>
+              {labelFor(String(validation.status ?? "unknown"))}
+            </Badge>
+            {/* Absent for samples. The server refuses to delete them — they are
+                the instance's shared reference set — so offering the button
+                would be offering a click that can only fail. */}
+            {packageId && !isSample ? (
+              <Button
+                variant="ghost"
+                size="sm"
+                loading={deleting}
+                onClick={async () => {
+                  if (!confirmingDelete) {
+                    setConfirmingDelete(true);
+                    return;
+                  }
+                  setDeleting(true);
+                  try {
+                    await deletePackage(packageId);
+                    toast.success("Package deleted");
+                    router.push("/samples");
+                  } catch (error) {
+                    toast.error(describeError(error).title);
+                    setDeleting(false);
+                    setConfirmingDelete(false);
+                  }
+                }}
+                onBlur={() => setConfirmingDelete(false)}
+              >
+                <Trash2 className="size-3.5" aria-hidden />
+                {/* Two clicks rather than a modal. Deletion here removes one
+                    package from an in-memory store — recoverable by re-running
+                    — so a dialog would cost more attention than the action
+                    warrants, while a single click would be too easy to hit. */}
+                {confirmingDelete ? "Click again to confirm" : "Delete"}
+              </Button>
+            ) : null}
+          </div>
         </div>
 
         <div className="flex flex-wrap gap-2">

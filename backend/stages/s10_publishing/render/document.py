@@ -35,6 +35,9 @@ _ACCENT = (23, 78, 140)
 #: Tint behind callouts and table headers. Light enough to photocopy cleanly.
 _TINT = (238, 242, 247)
 
+#: Reversed-out text on an accent fill.
+_PAPER = (255, 255, 255)
+
 
 class TkpDocument(FPDF):
     """A4 document with the fonts, margins, and section helpers every artifact shares."""
@@ -162,22 +165,38 @@ class TkpDocument(FPDF):
             self.multi_cell(0, 4, eyebrow.upper(), new_x=XPos.LMARGIN, new_y=YPos.NEXT)
             self.set_text_color(*_INK)
             self.ln(0.5)
-        self.set_font(LATIN_FONT, "B", size=15)
-        self.multi_cell(0, 8, text, new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-        self.ln(1)
-        self.set_draw_color(*_ACCENT)
-        self.set_line_width(0.6)
-        self.line(self.l_margin, self.get_y(), self.w - self.r_margin, self.get_y())
-        self.set_line_width(0.2)
+        # A filled band rather than text over a rule. These documents are used
+        # by flipping, not reading front to back — a teacher looking for Period
+        # 4 mid-lesson finds a solid block at a glance where bold-on-white
+        # needs the page held still and read.
+        self.set_fill_color(*_ACCENT)
+        self.set_text_color(*_PAPER)
+        self.set_font(LATIN_FONT, "B", size=14)
+        self.set_x(self.l_margin)
+        self.multi_cell(0, 9, f"  {text}", fill=True, new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+        self.set_text_color(*_INK)
         self.ln(4)
         self.set_font(LATIN_FONT, size=10.5)
 
     def h2(self, text: str) -> None:
+        """A subsection, set in the accent colour.
+
+        Colour does the work a second size step would otherwise have to, and
+        does it without making the heading bigger — which matters in a document
+        that already carries an h1 band above it. It also gives interior pages
+        some structure to see: before this, everything past page 1 was
+        undifferentiated grey.
+
+        Weight carries it if the page is photocopied to black and white, so the
+        colour is reinforcement rather than the only signal.
+        """
         if self.get_y() > self.h - self.b_margin - 26:
             self.add_page()
         self.ln(3)
-        self.set_font(LATIN_FONT, "B", size=12)
-        self.multi_cell(0, 6.5, text, new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+        self.set_font(LATIN_FONT, "B", size=11.5)
+        self.set_text_color(*_ACCENT)
+        self.multi_cell(0, 6, text, new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+        self.set_text_color(*_INK)
         self.set_draw_color(*_RULE)
         self.line(self.l_margin, self.get_y() + 0.5, self.w - self.r_margin, self.get_y() + 0.5)
         self.ln(3)

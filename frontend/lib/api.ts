@@ -243,6 +243,28 @@ export interface Stats {
 
 // ───────────────────────────────────────────────────────────── requests
 
+export async function cancelJob(jobId: string): Promise<{ status: JobStatus }> {
+  return request(`/jobs/${jobId}/cancel`, { method: "POST" });
+}
+
+export async function deletePackage(packageId: string): Promise<void> {
+  // 204, so there is no body to parse — `request` would choke on the empty
+  // response trying to read JSON out of it.
+  const response = await fetch(
+    `${API_BASE}/packages/${packageId}`,
+    withAccessKey({ method: "DELETE" }),
+  );
+  if (!response.ok) {
+    let body: unknown = null;
+    try {
+      body = await response.json();
+    } catch {
+      /* a 204 has no body, and neither does a proxy error page */
+    }
+    throw new ApiError(response.status, body);
+  }
+}
+
 export async function uploadDocument(file: File, signal?: AbortSignal): Promise<UploadResponse> {
   const form = new FormData();
   form.append("file", file);

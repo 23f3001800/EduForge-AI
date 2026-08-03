@@ -162,5 +162,14 @@ class InMemoryStore(Store):
     async def list_samples(self) -> list[PackageRecord]:
         return [p for p in self._packages.values() if p.is_sample]
 
+    async def delete_package(self, package_id: UUID) -> bool:
+        record = self._packages.get(package_id)
+        # A sample belongs to the instance, not to whoever is looking at it.
+        # Deleting one would empty the demonstration for every later visitor.
+        if record is None or record.is_sample:
+            return False
+        del self._packages[package_id]
+        return True
+
     async def list_packages(self) -> list[PackageRecord]:
         return list(self._packages.values())
