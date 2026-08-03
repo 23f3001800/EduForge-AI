@@ -30,6 +30,16 @@ export interface StreamEvent {
   level: "info" | "warning" | "error";
   message?: string | null;
   ts?: string | null;
+  /**
+   * Additive keys the emitter puts on the terminal `completed` frame: the id of
+   * the package that was published, and the validation status that decided
+   * whether the job ended `succeeded` or `succeeded_partial`.
+   *
+   * Optional and typed `unknown`-ish on purpose — these come out of
+   * `JSON.parse`, so every reader narrows before rendering.
+   */
+  package_id?: string | null;
+  status?: string | null;
 }
 
 export type ConnectionState = "connecting" | "open" | "closed";
@@ -55,6 +65,24 @@ function save(jobId: string, events: StreamEvent[]): void {
   }
 }
 
+/**
+ * The terminal marker inside a timeline, if it is already there.
+ *
+ * Needed because of how (2) above interacts with replay: after a refresh the
+ * restored timeline may already contain the `completed` or `failed` frame, and
+ * the reconnect resumes *past* it — so the server correctly sends nothing, and a
+ * `terminal` state derived only from newly arriving frames stays null forever.
+ * That left a finished run rendering as "Building your package", reconnecting to
+ * a stream that had nothing left to say.
+ */
+function terminalOf(events: StreamEvent[]): "completed" | "failed" | null {
+  for (const event of events) {
+    if (event.stage === "completed") return "completed";
+    if (event.stage === "failed") return "failed";
+  }
+  return null;
+}
+
 export function clearTimeline(jobId: string): void {
   try {
     sessionStorage.removeItem(STORAGE_PREFIX + jobId);
@@ -75,6 +103,16 @@ export function useJobStream(jobId: string | null, enabled = true) {
     const restored = load(jobId);
     seen.current = new Set(restored.map((e) => e.seq));
     setEvents(restored);
+
+    const restoredTerminal = terminalOf(restored);
+    if (restoredTerminal) {
+      // The run is over and its whole timeline is in hand. Opening a stream here
+      // would connect, receive nothing, be closed by the server and be retried
+      // by the browser, forever — for a job that can never emit again.
+      setTerminal(restoredTerminal);
+      setConnection("closed");
+      return;
+    }
 
     const lastSeq = restored.reduce((max, e) => Math.max(max, e.seq), 0);
     // EventSource cannot set request headers, so the cursor goes in the query
@@ -100,8 +138,13 @@ export function useJobStream(jobId: string | null, enabled = true) {
         return next;
       });
 
-      if (event.stage === "completed") setTerminal("completed");
-      if (event.stage === "failed") setTerminal("failed");
+      if (event.stage === "completed" || event.stage === "failed") {
+        setTerminal(event.stage === "completed" ? "completed" : "failed");
+        // Same reasoning as the restore path: the server closes the stream after
+        // a terminal frame, and an EventSource left open reconnects on its own.
+        source.close();
+        setConnection("closed");
+      }
     };
 
     source.onmessage = handle;

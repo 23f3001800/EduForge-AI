@@ -20,6 +20,7 @@ other, so the id scheme is mirrored in both and pinned by a test.
 
 from __future__ import annotations
 
+import asyncio
 from collections.abc import Mapping
 from typing import Any
 
@@ -219,12 +220,25 @@ class ActivityGenerationStage:
                 f"{language_directive(options.get('output_language'))}"
             )
 
-            activities: list[dict[str, Any]] = []
-            for index, slot in enumerate(slots):
-                await span.progress(
-                    index / len(slots),
-                    message=f"{slot.activity_type} for period {slot.period_no}",
-                )
+            total = len(slots)
+            done = 0
+
+            async def generate(slot: ActivitySlot) -> tuple[dict[str, Any], list[str]]:
+                """One activity, start to finish.
+
+                Slots are independent — each carries its own period, concepts and
+                objectives, drawn from the plan rather than from a sibling slot —
+                so there is no ordering constraint between them, only within one.
+                Generating them concurrently is the same move stage 5 made for
+                periods, and for the same reason: this stage was the second-largest
+                share of a run's wall time and was paying for it one round trip at
+                a time.
+
+                Concurrency is bounded by the LLM client's own semaphore rather
+                than here, so the ceiling stays in one place and a provider's rate
+                limit is respected across every stage at once, not per stage.
+                """
+                nonlocal done
                 relevant = [
                     m
                     for m in all_misconceptions
@@ -247,9 +261,39 @@ class ActivityGenerationStage:
                     span.warn(f"{slot.activity_id}: activity generation degraded")
 
                 activity, notes = build_activity(slot, result.value, concepts_by_id)
+
+                done += 1
+                # Reported on completion rather than on start, and scaled below
+                # 1.0 — see stage 5's `ClassroomContentStage.run` for why: with
+                # slots finishing out of submission order, reporting on start can
+                # run progress backwards, and reaching a full 1.0 here would race
+                # the closing summary below it.
+                await span.progress(
+                    0.95 * done / total,
+                    message=f"{slot.activity_type} for period {slot.period_no}",
+                )
+                return activity.model_dump(mode="json"), notes
+
+            # TaskGroup rather than asyncio.gather: gather does not cancel its
+            # siblings when one coroutine raises, so a mid-run failure would leave
+            # the other slots' calls in flight, making billable LLM requests for a
+            # job that had already failed. TaskGroup cancels every sibling the
+            # instant one task raises.
+            #
+            # Tasks are appended in submission order and read back in that same
+            # order below, so activities stay sequenced even though they complete
+            # out of order — the same guarantee `gather` gave for free.
+            tasks: list[asyncio.Task[tuple[dict[str, Any], list[str]]]] = []
+            async with asyncio.TaskGroup() as tg:
+                for slot in slots:
+                    tasks.append(tg.create_task(generate(slot)))
+            results = [task.result() for task in tasks]
+
+            activities: list[dict[str, Any]] = []
+            for slot, (activity, notes) in zip(slots, results, strict=True):
                 for note in notes:
                     span.warn(f"{slot.activity_id}: {note}")
-                activities.append(activity.model_dump(mode="json"))
+                activities.append(activity)
 
             distinct = {a["type"] for a in activities}
             await span.progress(

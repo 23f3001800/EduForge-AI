@@ -23,10 +23,12 @@ import {
   type EvaluationDocument,
   type EvaluationMetric,
   type Measurability,
+  type RubricDimension,
   type StageEvaluation,
 } from "@/lib/api";
 import { cn } from "@/lib/cn";
 import { describeError, traceIdOf } from "@/lib/errors";
+import { labelFor } from "@/lib/format";
 
 /**
  * The evaluation view.
@@ -233,6 +235,129 @@ function StageCard({ stage }: { stage: StageEvaluation }) {
   );
 }
 
+/**
+ * One rubric dimension — "is this good teaching", per aspect.
+ *
+ * Nothing here knows which dimensions exist. The backend's list grows
+ * (content_fidelity and period_integrity are the two most recent additions) and
+ * a hardcoded list in the UI would silently drop them from the report while the
+ * overall score they contributed to kept moving. Everything below is driven off
+ * the array the API returns.
+ *
+ * Scores arrive as 0-1 here, unlike the stage scores above which are 0-100. The
+ * conversion happens once, at the point of display.
+ */
+function DimensionCard({ dimension }: { dimension: RubricDimension }) {
+  const [open, setOpen] = useState(false);
+  const panelId = `dimension-${dimension.key}`;
+  const score = dimension.applicable ? dimension.score : null;
+  const detailCount = dimension.metrics.length + dimension.findings.length;
+
+  return (
+    <Card>
+      <CardContent className="pt-5">
+        <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <h4 className="font-semibold">{dimension.label}</h4>
+              <Badge tone="neutral">{Math.round(dimension.weight * 100)}% of the rubric</Badge>
+              {score === null ? <Badge tone="neutral">Not scored</Badge> : null}
+            </div>
+            {/* An inapplicable dimension gets the reason instead of a number.
+                Same rule as a not_measurable metric: no bar, no digits, no
+                colour borrowed from the score scale. */}
+            {score === null ? (
+              <p className="mt-1.5 text-sm leading-relaxed text-fg-muted">
+                {dimension.reason ||
+                  "This dimension does not apply to this package, so it carries no score."}
+              </p>
+            ) : (
+              <div className="mt-2">
+                <ScoreBar score={score * 100} />
+              </div>
+            )}
+          </div>
+
+          <div className="shrink-0 text-right">
+            {score === null ? (
+              <span className="inline-flex items-center gap-1.5 text-sm text-fg-faint">
+                <CircleSlash className="size-4" aria-hidden />
+                No score
+              </span>
+            ) : (
+              <span className="text-2xl font-bold tabular-nums">{(score * 100).toFixed(0)}</span>
+            )}
+          </div>
+        </div>
+
+        {detailCount > 0 ? (
+          <>
+            <button
+              type="button"
+              onClick={() => setOpen((v) => !v)}
+              aria-expanded={open}
+              aria-controls={panelId}
+              className="mt-3 inline-flex min-h-11 items-center gap-1.5 text-sm font-medium text-accent"
+            >
+              <ChevronDown
+                className={cn("size-4 transition-transform", open && "rotate-180")}
+                aria-hidden
+              />
+              {dimension.metrics.length} check{dimension.metrics.length === 1 ? "" : "s"}
+              {dimension.findings.length > 0
+                ? `, ${dimension.findings.length} finding${dimension.findings.length > 1 ? "s" : ""}`
+                : ""}
+            </button>
+
+            {open ? (
+              <div id={panelId} className="mt-3 flex flex-col gap-3 border-t border-border pt-3">
+                {dimension.metrics.map((metric) => (
+                  <div key={metric.key} className="text-sm">
+                    <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+                      <span className="font-medium">{labelFor(metric.key)}</span>
+                      {/* Weight zero means the backend reports this and refuses
+                          to score it. Printing its value as a percentage would
+                          turn a deliberate abstention into a mark. */}
+                      {metric.weight > 0 ? (
+                        <span className="tabular-nums text-fg-muted">
+                          {(metric.value * 100).toFixed(0)}
+                          <span className="ml-1 text-xs text-fg-faint">
+                            weight {metric.weight}
+                          </span>
+                        </span>
+                      ) : (
+                        <span className="text-xs text-fg-faint">reported, not scored</span>
+                      )}
+                    </div>
+                    {metric.note ? (
+                      <p className="mt-0.5 leading-relaxed text-fg-muted">{metric.note}</p>
+                    ) : null}
+                  </div>
+                ))}
+
+                {dimension.findings.map((finding, index) => (
+                  <div
+                    key={`${finding.code}-${index}`}
+                    className="rounded-md border border-border bg-surface p-3 text-sm"
+                  >
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Badge tone="warning">{labelFor(finding.code)}</Badge>
+                      <code className="rounded bg-raised px-1.5 py-0.5 font-mono text-xs text-fg-muted [overflow-wrap:anywhere]">
+                        {finding.path}
+                      </code>
+                    </div>
+                    <p className="mt-1.5 text-fg-muted">{finding.detail}</p>
+                  </div>
+                ))}
+              </div>
+            ) : null}
+          </>
+        ) : null}
+      </CardContent>
+    </Card>
+  );
+}
+
 function Verdict({ document }: { document: EvaluationDocument }) {
   const { summary, comparison } = document;
   const delta = comparison.overall_delta;
@@ -353,6 +478,13 @@ export function EvaluationPanel({ packageId }: { packageId: string }) {
 
   const document = query.data;
   const high = document.recommendations.filter((r) => r.severity === "high");
+  // Guarded rather than trusted: `rubric` is a nested object on a payload the
+  // backend is free to extend, and an older report may not carry dimensions at
+  // all. An absent list renders no section, not an empty one.
+  const dimensions = Array.isArray(document.rubric?.dimensions) ? document.rubric.dimensions : [];
+  const absentByDesign = Array.isArray(document.rubric?.absent_by_design)
+    ? document.rubric.absent_by_design.filter((key): key is string => typeof key === "string")
+    : [];
 
   return (
     <div className="flex flex-col gap-8">
@@ -396,6 +528,34 @@ export function EvaluationPanel({ packageId }: { packageId: string }) {
               </li>
             ))}
           </ul>
+        </section>
+      ) : null}
+
+      {dimensions.length > 0 ? (
+        <section aria-labelledby="dimensions">
+          <h3
+            id="dimensions"
+            className="text-sm font-semibold uppercase tracking-wide text-fg-faint"
+          >
+            Teaching quality, by dimension
+          </h3>
+          <p className="mt-2 max-w-2xl text-sm text-fg-muted">
+            The rubric half of the verdict: {document.summary.rubric_score.toFixed(1)} out of 100,
+            banded {document.summary.rubric_band}. Each dimension carries the weight shown; a
+            dimension that does not apply to this package carries no score rather than a zero.
+          </p>
+          {absentByDesign.length > 0 ? (
+            <p className="mt-2 max-w-2xl text-sm text-fg-muted">
+              <span className="font-medium">Absent by design:</span>{" "}
+              {absentByDesign.map((key) => labelFor(key)).join(", ")} — expected to be missing from
+              a {document.profile} package, so their absence is not scored as a gap.
+            </p>
+          ) : null}
+          <div className="mt-3 flex flex-col gap-3">
+            {dimensions.map((dimension) => (
+              <DimensionCard key={dimension.key} dimension={dimension} />
+            ))}
+          </div>
         </section>
       ) : null}
 

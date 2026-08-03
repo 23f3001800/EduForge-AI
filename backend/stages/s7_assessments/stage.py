@@ -27,6 +27,7 @@ holds an empty bank would pass schema validation and be useless in a classroom.
 
 from __future__ import annotations
 
+import asyncio
 import string
 from collections.abc import Mapping
 from typing import Any
@@ -331,12 +332,28 @@ class AssessmentGenerationStage:
             mcq_system = MCQ_SYSTEM + common
             cr_system = CR_SYSTEM + common
 
-            items: list[AssessmentItem] = []
-            for index, spec in enumerate(blueprint.specs):
-                await span.progress(
-                    index / len(blueprint.specs),
-                    message=f"item {index + 1} of {len(blueprint.specs)} ({spec.kind})",
-                )
+            total = len(blueprint.specs)
+            done = 0
+
+            async def generate(
+                index: int, spec: ItemSpec
+            ) -> tuple[AssessmentItem | None, list[str]]:
+                """One assessment item, start to finish.
+
+                Items are independent of each other — each is drawn from its own
+                blueprint slot with its own concepts and objective — so there is
+                no ordering constraint between them, only within one: an MCQ whose
+                distractors failed is reissued as a constructed-response item
+                using the *same* slot, and that second call must follow the first
+                rather than race it. That reissue stays a plain sequential
+                `await` inside this function; only the loop across items below is
+                fanned out.
+
+                Concurrency is bounded by the LLM client's own semaphore rather
+                than here, so the ceiling stays in one place and a provider's rate
+                limit is respected across every stage at once, not per stage.
+                """
+                nonlocal done
                 relevant = [
                     m
                     for m in all_misconceptions
@@ -397,6 +414,33 @@ class AssessmentGenerationStage:
                         span.warn(f"{spec.item_id}: generation degraded")
                     item, notes = build_constructed(spec, result_cr.value, kind, spec.marks)
 
+                done += 1
+                # Reported on completion rather than on start, and scaled below
+                # 1.0 — see stage 5's `ClassroomContentStage.run` for why: with
+                # items finishing out of submission order, reporting on start can
+                # run progress backwards.
+                await span.progress(
+                    0.95 * done / total, message=f"item {index + 1} of {total} ({spec.kind})"
+                )
+                return item, notes
+
+            # TaskGroup rather than asyncio.gather: gather does not cancel its
+            # siblings when one coroutine raises, so a mid-run failure would leave
+            # the other items' calls in flight, making billable LLM requests for a
+            # job that had already failed. TaskGroup cancels every sibling the
+            # instant one task raises.
+            #
+            # Tasks are appended in submission order and read back in that same
+            # order below, so items stay sequenced even though they complete out
+            # of order — the same guarantee `gather` gave for free.
+            tasks: list[asyncio.Task[tuple[AssessmentItem | None, list[str]]]] = []
+            async with asyncio.TaskGroup() as tg:
+                for index, spec in enumerate(blueprint.specs):
+                    tasks.append(tg.create_task(generate(index, spec)))
+            results = [task.result() for task in tasks]
+
+            items: list[AssessmentItem] = []
+            for spec, (item, notes) in zip(blueprint.specs, results, strict=True):
                 if item is None:
                     # Never fabricated. A wrong answer key is worse than a shorter bank.
                     span.warn(f"{spec.item_id}: dropped — {'; '.join(notes)}")

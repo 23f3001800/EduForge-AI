@@ -19,13 +19,14 @@ import { ArtifactsPanel } from "@/components/package/artifacts";
 import { EvaluationPanel } from "@/components/package/evaluation";
 import { PipelinePanel } from "@/components/package/pipeline";
 import { EvidenceList, type Evidence } from "@/components/package/evidence";
+import { OcrNotice } from "@/components/package/ocr";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState, ErrorState } from "@/components/ui/states";
 import { getPackage } from "@/lib/api";
 import { describeError, traceIdOf } from "@/lib/errors";
-import { titleCase } from "@/lib/format";
+import { labelFor } from "@/lib/format";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type Any = Record<string, any>;
@@ -169,12 +170,12 @@ function ViewerBody() {
             </p>
           </div>
           <Badge tone={VALIDATION_TONE[validation.status] ?? "neutral"}>
-            {titleCase(String(validation.status ?? "unknown"))}
+            {labelFor(String(validation.status ?? "unknown"))}
           </Badge>
         </div>
 
         <div className="flex flex-wrap gap-2">
-          <Badge tone="accent">{titleCase(String(classification.pedagogy_profile ?? "mixed"))}</Badge>
+          <Badge tone="accent">{labelFor(String(classification.pedagogy_profile ?? "mixed"))}</Badge>
           <Badge>{plan.total_periods} periods</Badge>
           <Badge>{plan.period_duration_minutes} min each</Badge>
           {typeof validation.grounding_score === "number" ? (
@@ -185,6 +186,11 @@ function ViewerBody() {
           ) : null}
         </div>
       </header>
+
+      {/* Above everything, because it qualifies everything: if the source text
+          was misread, every citation below was checked against the misreading.
+          Renders nothing at all when no page needed OCR, which is the usual case. */}
+      <OcrNotice ocr={tkp.source?.ocr} />
 
       <ArtifactsPanel packageId={packageId} />
 
@@ -229,7 +235,7 @@ function ViewerBody() {
                     key={objective.objective_id}
                     className="flex flex-wrap items-start gap-2 rounded-md border border-border p-3"
                   >
-                    <Badge tone="accent">{titleCase(objective.bloom_level)}</Badge>
+                    <Badge tone="accent">{labelFor(objective.bloom_level)}</Badge>
                     <span className="min-w-0 flex-1 text-sm">{objective.statement}</span>
                   </li>
                 ))}
@@ -397,7 +403,7 @@ function ViewerBody() {
                     <CardContent className="pt-5">
                       <div className="flex flex-wrap items-center justify-between gap-2">
                         <span className="text-xs font-bold uppercase tracking-wide text-fg-faint">
-                          {titleCase(concept.importance ?? "")}
+                          {labelFor(concept.importance ?? "")}
                         </span>
                       </div>
                       <h4 className="mt-1 font-semibold">{concept.name}</h4>
@@ -448,7 +454,7 @@ function ViewerBody() {
               <Card key={activity.activity_id}>
                 <CardContent className="pt-5">
                   <div className="flex flex-wrap items-center gap-2">
-                    <Badge tone="accent">{titleCase(activity.type)}</Badge>
+                    <Badge tone="accent">{labelFor(activity.type)}</Badge>
                     <Badge>{activity.duration_minutes} min</Badge>
                   </div>
                   <h4 className="mt-2 font-semibold">{activity.title}</h4>
@@ -495,8 +501,8 @@ function ViewerBody() {
                       <CardContent className="pt-5">
                         <div className="flex flex-wrap items-center gap-2">
                           <span className="font-mono text-xs text-fg-faint">Q{index + 1}</span>
-                          <Badge tone="accent">{titleCase(item.kind)}</Badge>
-                          <Badge>{titleCase(item.bloom_level)}</Badge>
+                          <Badge tone="accent">{labelFor(item.kind)}</Badge>
+                          <Badge>{labelFor(item.bloom_level)}</Badge>
                           <Badge>{item.marks} marks</Badge>
                         </div>
                         <p className="mt-2">{item.stem}</p>
@@ -583,7 +589,7 @@ function ViewerBody() {
                             : "neutral"
                       }
                     >
-                      {titleCase(gap.severity)} severity
+                      {labelFor(gap.severity)} severity
                     </Badge>
                   </div>
                   <p className="mt-2 font-medium">{gap.misconception}</p>
@@ -620,7 +626,7 @@ function ViewerBody() {
                 <CardContent className="pt-5">
                   <p className="text-sm text-fg-muted">Status</p>
                   <Badge tone={VALIDATION_TONE[validation.status] ?? "neutral"} className="mt-1">
-                    {titleCase(String(validation.status ?? ""))}
+                    {labelFor(String(validation.status ?? ""))}
                   </Badge>
                 </CardContent>
               </Card>
@@ -637,7 +643,7 @@ function ViewerBody() {
               <Card>
                 <CardContent className="pt-5">
                   <p className="text-sm text-fg-muted">Profile ruleset</p>
-                  <p className="mt-1 font-medium">{titleCase(String(validation.profile_ruleset ?? "—"))}</p>
+                  <p className="mt-1 font-medium">{labelFor(String(validation.profile_ruleset ?? "—"))}</p>
                 </CardContent>
               </Card>
             </div>
@@ -651,7 +657,7 @@ function ViewerBody() {
                       <li key={index} className="rounded-md border border-border p-3 text-sm">
                         <div className="flex flex-wrap items-center gap-2">
                           <Badge tone={issue.severity === "error" ? "danger" : "warning"}>
-                            {titleCase(issue.severity ?? "")}
+                            {labelFor(issue.severity ?? "")}
                           </Badge>
                           <span className="font-mono text-xs text-fg-faint">{issue.code}</span>
                         </div>
