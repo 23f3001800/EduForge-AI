@@ -184,25 +184,25 @@ function StageCard({ stage }: { stage: StageEvaluation }) {
 
   return (
     <Card>
-      <CardContent className="pt-5">
+      <CardContent className="px-4 py-3">
         <button
           type="button"
           onClick={() => setOpen((v) => !v)}
           aria-expanded={open}
           aria-controls={panelId}
-          className="flex w-full items-center gap-4 text-left"
+          className="flex w-full items-center gap-3 text-left"
         >
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="font-semibold">{stage.label}</span>
+              <span className="text-sm font-semibold">{stage.label}</span>
               {stage.not_measurable > 0 ? (
                 <Badge tone="neutral">{stage.not_measurable} not measurable</Badge>
               ) : null}
             </div>
-            <div className="mt-2">
+            <div className="mt-1.5">
               <ScoreBar score={stage.score} />
             </div>
-            <p className="mt-1.5 text-xs text-fg-faint">
+            <p className="mt-1 text-[11px] text-fg-faint">
               {stage.measured} measured
               {stage.judged > 0 ? `, ${stage.judged} judged` : ""} · confidence{" "}
               {(stage.confidence * 100).toFixed(0)}%
@@ -211,14 +211,14 @@ function StageCard({ stage }: { stage: StageEvaluation }) {
 
           <div className="shrink-0 text-right">
             {stage.score === null ? (
-              <span className="text-sm text-fg-faint">n/a</span>
+              <span className="text-xs text-fg-faint">n/a</span>
             ) : (
-              <span className="text-2xl font-bold tabular-nums">{stage.score.toFixed(0)}</span>
+              <span className="text-lg font-bold tabular-nums">{stage.score.toFixed(0)}</span>
             )}
           </div>
 
           <ChevronDown
-            className={cn("size-5 shrink-0 text-fg-faint transition-transform", open && "rotate-180")}
+            className={cn("size-4 shrink-0 text-fg-faint transition-transform", open && "rotate-180")}
             aria-hidden
           />
         </button>
@@ -556,7 +556,13 @@ export function EvaluationPanel({ packageId }: { packageId: string }) {
               a {document.profile} package, so their absence is not scored as a gap.
             </p>
           ) : null}
-          <div className="mt-3 flex flex-col gap-2">
+          {/* Two columns, not one. Eleven dimensions in a single stack is a
+              page of scrolling to answer "which ones are weak?", which is the
+              only question this section exists to answer. Kept at two on the
+              widest breakpoint rather than three: each card holds a score bar
+              and an expandable finding list, and three columns squeezes the
+              bar to where its length stops being readable. */}
+          <div className="mt-3 grid gap-2 lg:grid-cols-2">
             {dimensions.map((dimension) => (
               <DimensionCard key={dimension.key} dimension={dimension} />
             ))}
@@ -568,7 +574,7 @@ export function EvaluationPanel({ packageId }: { packageId: string }) {
         <h3 id="stages" className="text-sm font-semibold uppercase tracking-wide text-fg-faint">
           Per stage
         </h3>
-        <div className="mt-3 flex flex-col gap-3">
+        <div className="mt-3 grid gap-2 lg:grid-cols-2">
           {document.stages.map((stage) => (
             <StageCard key={stage.stage} stage={stage} />
           ))}
