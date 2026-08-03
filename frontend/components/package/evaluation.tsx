@@ -255,24 +255,29 @@ function DimensionCard({ dimension }: { dimension: RubricDimension }) {
 
   return (
     <Card>
-      <CardContent className="pt-5">
-        <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
+      {/* Eleven dimensions sit in one column, so each card is sized to be
+          scanned in a list rather than read on its own: compact padding, and a
+          score at heading size instead of display size. The number still wins
+          the row — it is the largest tabular figure in it — without every
+          dimension demanding a full screen of attention. */}
+      <CardContent className="px-4 py-3">
+        <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-1.5">
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
-              <h4 className="font-semibold">{dimension.label}</h4>
-              <Badge tone="neutral">{Math.round(dimension.weight * 100)}% of the rubric</Badge>
+              <h4 className="text-sm font-semibold">{dimension.label}</h4>
+              <Badge tone="neutral">{Math.round(dimension.weight * 100)}%</Badge>
               {score === null ? <Badge tone="neutral">Not scored</Badge> : null}
             </div>
             {/* An inapplicable dimension gets the reason instead of a number.
                 Same rule as a not_measurable metric: no bar, no digits, no
                 colour borrowed from the score scale. */}
             {score === null ? (
-              <p className="mt-1.5 text-sm leading-relaxed text-fg-muted">
+              <p className="mt-1 text-xs leading-relaxed text-fg-muted">
                 {dimension.reason ||
                   "This dimension does not apply to this package, so it carries no score."}
               </p>
             ) : (
-              <div className="mt-2">
+              <div className="mt-1.5">
                 <ScoreBar score={score * 100} />
               </div>
             )}
@@ -280,12 +285,12 @@ function DimensionCard({ dimension }: { dimension: RubricDimension }) {
 
           <div className="shrink-0 text-right">
             {score === null ? (
-              <span className="inline-flex items-center gap-1.5 text-sm text-fg-faint">
-                <CircleSlash className="size-4" aria-hidden />
+              <span className="inline-flex items-center gap-1.5 text-xs text-fg-faint">
+                <CircleSlash className="size-3.5" aria-hidden />
                 No score
               </span>
             ) : (
-              <span className="text-2xl font-bold tabular-nums">{(score * 100).toFixed(0)}</span>
+              <span className="text-lg font-bold tabular-nums">{(score * 100).toFixed(0)}</span>
             )}
           </div>
         </div>
@@ -297,7 +302,7 @@ function DimensionCard({ dimension }: { dimension: RubricDimension }) {
               onClick={() => setOpen((v) => !v)}
               aria-expanded={open}
               aria-controls={panelId}
-              className="mt-3 inline-flex min-h-11 items-center gap-1.5 text-sm font-medium text-accent"
+              className="mt-2 inline-flex min-h-9 items-center gap-1.5 text-xs font-medium text-accent"
             >
               <ChevronDown
                 className={cn("size-4 transition-transform", open && "rotate-180")}
@@ -551,7 +556,7 @@ export function EvaluationPanel({ packageId }: { packageId: string }) {
               a {document.profile} package, so their absence is not scored as a gap.
             </p>
           ) : null}
-          <div className="mt-3 flex flex-col gap-3">
+          <div className="mt-3 flex flex-col gap-2">
             {dimensions.map((dimension) => (
               <DimensionCard key={dimension.key} dimension={dimension} />
             ))}
@@ -584,17 +589,17 @@ export function EvaluationPanel({ packageId }: { packageId: string }) {
           These carry no score. Each says what it would take to measure — a labelled corpus,
           a classroom trial, response data. Reporting a number here would mean inventing one.
         </p>
-        <ul className="mt-3 grid gap-2 md:grid-cols-2">
+        <ul className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
           {document.not_measurable.map((entry) => (
             <li
               key={`${entry.stage}-${entry.metric}`}
-              className="rounded-lg border border-dashed border-border p-4"
+              className="rounded-lg border border-dashed border-border px-3 py-2.5"
             >
-              <div className="flex items-center gap-2">
-                <Lightbulb className="size-4 shrink-0 text-fg-faint" aria-hidden />
-                <span className="font-medium">{entry.label}</span>
+              <div className="flex items-center gap-1.5">
+                <Lightbulb className="size-3.5 shrink-0 text-fg-faint" aria-hidden />
+                <span className="text-sm font-medium">{entry.label}</span>
               </div>
-              <p className="mt-1.5 text-sm leading-relaxed text-fg-muted">{entry.reason}</p>
+              <p className="mt-1 text-xs leading-relaxed text-fg-muted">{entry.reason}</p>
             </li>
           ))}
         </ul>

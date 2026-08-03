@@ -20,6 +20,7 @@ from api.deps import get_store
 from contracts.jobs import ArtifactKind, DocumentKind, TeachingStyle
 from core.storage.base import Store
 from pedagogy.curriculum import load_boards
+from pedagogy.languages import OUTPUT_LANGUAGES
 
 router = APIRouter(tags=["options"])
 
@@ -39,6 +40,13 @@ async def get_options() -> dict[str, Any]:
             # `generic` first: it is the right answer for most teachers and must
             # not sit at the bottom of an alphabetical list.
             for name, profile in sorted(boards.items(), key=lambda kv: (kv[0] != "generic", kv[0]))
+        ],
+        # Served rather than hardcoded in the form for the same reason boards
+        # are: the constraint is a shipped font, and the backend is the only
+        # side that knows which fonts shipped.
+        "output_languages": [
+            {"value": language.code, "label": language.label, "script": language.script}
+            for language in OUTPUT_LANGUAGES
         ],
         "teaching_styles": list(get_args(TeachingStyle)),
         "document_kinds": list(get_args(DocumentKind)),

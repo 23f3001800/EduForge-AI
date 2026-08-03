@@ -379,6 +379,7 @@
       "lesson-generation": "nvidia/nemotron-3-super-120b-a12b:free",
       "teaching-planner": "nvidia/nemotron-3-super-120b-a12b:free"
     },
+    "output_language": null,
     "providers_by_stage": {
       "activity-generation": "openrouter",
       "assessment-generation": "openrouter",

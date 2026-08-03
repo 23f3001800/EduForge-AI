@@ -127,6 +127,13 @@ def assemble_package(state: dict[str, Any]) -> TeacherKnowledgePackage:
             # config — config describes what a stage was *configured* to use,
             # which diverges the moment a fallback fires.
             **_generator_fields(reports),
+            # The language the teaching content was *written* in, which
+            # source.detected_language does not answer: an English chapter can
+            # be taught in Hindi, and two packages from one input then differ
+            # with nothing in either saying why. Only stages 4-8 honour it —
+            # stage 3's evidence quotes stay in the source language so the
+            # grounding check can still match them verbatim.
+            "output_language": (state.get("options") or {}).get("output_language") or None,
         },
         "source": state["structured_document"]["metadata"],
         "classification": state["classification"],

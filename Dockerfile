@@ -50,6 +50,13 @@ COPY backend/ backend/
 # (REPO_ROOT = parents[2] of backend/core/config.py), so it must sit next to
 # backend/, not inside it.
 COPY config/ config/
+# The sample packages, seeded into the store at startup by api/samples.py so a
+# first-time visitor sees real output before spending a model call. Read from a
+# REPO_ROOT-relative path, so like config/ it sits beside backend/, not inside.
+#
+# The source PDFs and the submission bundle are excluded in .dockerignore: the
+# seeder never opens them, and they are 12 MB of the 13 MB the directory weighs.
+COPY samples/ samples/
 
 # `api`     -> fastapi, uvicorn, python-multipart, sse-starlette (serve the app)
 # `llm`     -> langgraph, plus the provider SDK (openai backs both OpenRouter,

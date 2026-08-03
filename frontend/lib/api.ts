@@ -173,8 +173,17 @@ export interface BoardOption {
   period_minutes: number;
 }
 
+/** An output language the renderer ships a font for. */
+export interface LanguageOption {
+  value: string;
+  label: string;
+  /** Unicode script — the reason the list is short. See pedagogy/languages.py. */
+  script: string;
+}
+
 export interface OptionsResponse {
   curriculum_boards: BoardOption[];
+  output_languages: LanguageOption[];
   teaching_styles: string[];
   document_kinds: string[];
   artifact_kinds: string[];
