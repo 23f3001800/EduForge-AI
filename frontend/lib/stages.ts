@@ -23,6 +23,21 @@ export const STAGE_ORDER = [
 
 export type StageKey = (typeof STAGE_ORDER)[number];
 
+const STAGE_KEYS: ReadonlySet<string> = new Set(STAGE_ORDER);
+
+/**
+ * Narrow a stage name that arrived over the wire.
+ *
+ * `ProgressEvent.stage` is a plain `str` on the backend precisely because it
+ * also carries the terminal markers "queued", "completed" and "failed", which
+ * are not stages. Every reader has to separate the two before indexing
+ * `STAGE_LABELS`, and casting instead of checking is how "queued" ends up
+ * rendering as `undefined`.
+ */
+export function isStageKey(value: string): value is StageKey {
+  return STAGE_KEYS.has(value);
+}
+
 export const STAGE_LABELS: Record<StageKey, string> = {
   "document-intelligence": "Document intelligence",
   "educational-classification": "Classification",
