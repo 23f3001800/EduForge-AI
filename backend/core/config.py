@@ -54,6 +54,11 @@ class Settings(BaseSettings):
     embeddings: Literal["none", "local", "api"] = "none"
 
     # ── limits & safety ─────────────────────────────────────────────────────
+    #: Shared key required to upload a document or start a job. Empty (the
+    #: default) leaves both open, which is right for a local run against the
+    #: operator's own provider key. A deployment spending someone else's money
+    #: sets it. See api/access.py for why this is a spend gate, not auth.
+    access_key: str = ""
     max_upload_mb: int = Field(default=25, ge=1)
     max_pages: int = Field(default=300, ge=1)
     parse_timeout_s: int = Field(default=90, ge=1)

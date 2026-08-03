@@ -24,6 +24,7 @@ from uuid import uuid4
 
 from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
 
+from api.access import require_access
 from api.deps import get_app_settings, get_store
 from core.config import Settings
 from core.storage.base import DocumentRecord, Store
@@ -129,7 +130,7 @@ async def _read_bounded(file: UploadFile, limit: int) -> bytes:
 
 
 
-@router.post("/documents", status_code=201)
+@router.post("/documents", status_code=201, dependencies=[Depends(require_access)])
 async def upload_document(
     request: Request,
     file: Annotated[UploadFile, File()],

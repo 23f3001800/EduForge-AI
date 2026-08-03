@@ -20,6 +20,7 @@ from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Response
 
+from api.access import require_access
 from api.deps import RosterBuilder, get_app_settings, get_roster_builder, get_store
 from contracts.jobs import JobOptions
 from core.config import Settings
@@ -84,7 +85,7 @@ def _spawn(store: Store, job: JobRecord, settings: Settings, roster: RosterBuild
     task.add_done_callback(_background.discard)
 
 
-@router.post("/jobs", status_code=202)
+@router.post("/jobs", status_code=202, dependencies=[Depends(require_access)])
 async def create_job(
     body: _CreateJob,
     idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
@@ -140,7 +141,7 @@ async def get_job(job_id: UUID, store: Store = Depends(get_store)) -> dict[str, 
     }
 
 
-@router.post("/jobs/{job_id}/retry", status_code=202)
+@router.post("/jobs/{job_id}/retry", status_code=202, dependencies=[Depends(require_access)])
 async def retry_job(
     job_id: UUID,
     from_stage: str | None = None,

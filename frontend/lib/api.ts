@@ -52,8 +52,39 @@ export class ApiError extends Error {
   }
 }
 
+/** Where the access key lives, when the instance asks for one. */
+const ACCESS_KEY_STORAGE = "eduforge.access_key";
+
+export function getAccessKey(): string {
+  if (typeof window === "undefined") return "";
+  return window.localStorage.getItem(ACCESS_KEY_STORAGE) ?? "";
+}
+
+export function setAccessKey(key: string): void {
+  if (typeof window === "undefined") return;
+  const trimmed = key.trim();
+  if (trimmed) window.localStorage.setItem(ACCESS_KEY_STORAGE, trimmed);
+  else window.localStorage.removeItem(ACCESS_KEY_STORAGE);
+}
+
+/**
+ * Attach the access key when one is stored.
+ *
+ * Sent on every request rather than only the two that need it, because which
+ * endpoints are gated is the server's decision and duplicating that list here
+ * is how the two drift apart. An instance with no key configured ignores the
+ * header entirely.
+ */
+function withAccessKey(init?: RequestInit): RequestInit | undefined {
+  const key = getAccessKey();
+  if (!key) return init;
+  const headers = new Headers(init?.headers);
+  headers.set("X-Access-Key", key);
+  return { ...init, headers };
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(`${API_BASE}${path}`, init);
+  const response = await fetch(`${API_BASE}${path}`, withAccessKey(init));
   if (!response.ok) {
     let body: unknown = null;
     try {
@@ -215,7 +246,14 @@ export interface Stats {
 export async function uploadDocument(file: File, signal?: AbortSignal): Promise<UploadResponse> {
   const form = new FormData();
   form.append("file", file);
-  const response = await fetch(`${API_BASE}/documents`, { method: "POST", body: form, signal });
+  // Not `request`: that helper parses JSON and sets no body, while this needs
+  // FormData with the browser's own multipart boundary. It still goes through
+  // `withAccessKey` — upload is one of the two gated endpoints, so skipping it
+  // here would 401 the very first step of a run.
+  const response = await fetch(
+    `${API_BASE}/documents`,
+    withAccessKey({ method: "POST", body: form, signal }),
+  );
   if (!response.ok) {
     let body: unknown = null;
     try {
