@@ -16,7 +16,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
-LLMProfile = Literal["production", "dev", "ci"]
+LLMProfile = Literal["production", "anthropic", "dev", "ci"]
 
 
 class Settings(BaseSettings):
@@ -124,6 +124,7 @@ class Settings(BaseSettings):
         requirement = {
             "production": ("Open_Router_API_KEY", self.open_router_api_key),
             "dev": ("Open_Router_API_KEY", self.open_router_api_key),
+            "anthropic": ("ANTHROPIC_API_KEY", self.anthropic_api_key),
         }.get(self.llm_profile)
         if requirement is None:
             return self
