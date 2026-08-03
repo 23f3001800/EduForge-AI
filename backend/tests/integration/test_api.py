@@ -13,6 +13,7 @@ from __future__ import annotations
 import asyncio
 import json
 from typing import Any
+from uuid import uuid4
 
 import httpx
 import pytest
@@ -595,3 +596,66 @@ async def test_the_header_wins_over_the_query_parameter(
     )
     # The header says "I have everything", so nothing is replayed.
     assert _parse_sse(response.text) == []
+
+
+# ──────────────────────────────────────────────────────── access key gate
+
+
+@pytest.fixture
+async def gated_client() -> Any:
+    """An instance configured with an access key, like the public deployment."""
+    from core.config import get_settings
+
+    settings = get_settings()
+    previous = settings.access_key
+    settings.access_key = "s3cret"
+    try:
+        set_store(InMemoryStore())
+        set_roster_builder(_stub_roster)
+        transport = httpx.ASGITransport(app=create_app())
+        async with httpx.AsyncClient(transport=transport, base_url="http://test") as c:
+            yield c
+    finally:
+        settings.access_key = previous
+
+
+async def test_spending_endpoints_are_closed_without_the_key(
+    gated_client: httpx.AsyncClient,
+) -> None:
+    """Upload and job creation are what cost money, so they are what is gated.
+
+    The deployed instance runs on a paid key with no login in front of it, and a
+    full run is dozens of model calls — an open job endpoint is an open invoice.
+    """
+    upload = await gated_client.post(
+        "/api/v1/documents", files={"file": ("a.pdf", PDF, "application/pdf")}
+    )
+    assert upload.status_code == 401
+    assert upload.json()["error"]["code"] == "access_key_required"
+
+    job = await gated_client.post("/api/v1/jobs", json={"document_id": str(uuid4())})
+    assert job.status_code == 401
+
+
+async def test_reading_stays_open_when_a_key_is_configured(
+    gated_client: httpx.AsyncClient,
+) -> None:
+    """Serving a sample costs nothing, and gating it would defeat the point of
+    publishing a demonstration at all."""
+    for path in ("/api/v1/samples", "/api/v1/options", "/healthz"):
+        assert (await gated_client.get(path)).status_code == 200, path
+
+
+async def test_the_key_opens_the_gate(gated_client: httpx.AsyncClient) -> None:
+    response = await gated_client.post(
+        "/api/v1/documents",
+        files={"file": ("a.pdf", PDF, "application/pdf")},
+        headers={"X-Access-Key": "s3cret"},
+    )
+    assert response.status_code == 201
+
+
+async def test_an_unconfigured_instance_needs_no_key(client: httpx.AsyncClient) -> None:
+    """The default is open. A local run against the operator's own provider key,
+    and every evaluator who clones the repo, must work with no configuration."""
+    assert await _upload(client)
