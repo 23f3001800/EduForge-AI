@@ -2,25 +2,21 @@
 
 Stages never see a provider SDK. They call ``LLMClient.parse(output_model=...)``
 and receive a validated Pydantic object. This module defines the narrow port that
-makes that possible across Anthropic, Gemini, and recorded replay.
+makes that possible across OpenRouter and recorded replay.
 
 **Deliberately narrow.** We abstract *only* "given a schema, return a validated
-instance of it". Provider-specific machinery — Anthropic prompt caching and
-adaptive thinking, Gemini context caching and thinking budget — lives behind the
-port and is configured per provider, never exposed at the call site. Abstracting
-those too would flatten every provider to its dumbest common denominator, which
-is the usual way a multi-provider layer quietly costs more than it saves.
+instance of it". Provider-specific machinery — prompt caching, adaptive
+reasoning depth, and the like — lives behind the port and is configured per
+provider, never exposed at the call site. Abstracting those too would flatten
+every provider to its dumbest common denominator, which is the usual way a
+multi-provider layer quietly costs more than it saves.
 
 Provider selection policy (docs/02 ADR #11):
 
-* ``openrouter`` — production, the deployed demo, and end-to-end runs. One
-  credential reaches many vendors, and the ``:free`` models are enough to
-  run all ten stages repeatedly.
-* ``gemini``    — local development and single-stage iteration.
-* ``replay``    — CI. Serves recorded cassettes: deterministic, free, offline.
-* ``anthropic`` — implemented but **disabled by default**. Calling it requires
-  ``ALLOW_ANTHROPIC=true``, because billing against that key is an explicit
-  decision rather than something a config typo should be able to trigger.
+* ``openrouter`` — production, the deployed demo, dev iteration, and
+  end-to-end runs. One credential reaches many vendors, and the ``:free``
+  models are enough to run all ten stages repeatedly.
+* ``replay``     — CI. Serves recorded cassettes: deterministic, free, offline.
 
 Quality evaluation (M11) is pinned to the production provider. Tuning prompts
 against one model and shipping another means the eval numbers do not transfer.
@@ -44,11 +40,10 @@ __all__ = [
     "ReasoningConfig",
 ]
 
-LLMProvider = Literal["anthropic", "gemini", "openrouter", "replay"]
+LLMProvider = Literal["azure_openai", "openrouter", "replay"]
 
 #: Reasoning depth, expressed provider-neutrally. Each provider maps it to its own
-#: native control: Anthropic to ``output_config.effort`` with adaptive thinking,
-#: Gemini to a thinking budget. Callers state intent; providers decide mechanism.
+#: native control. Callers state intent; providers decide mechanism.
 Effort = Literal["low", "medium", "high", "xhigh", "max"]
 
 
@@ -66,7 +61,8 @@ class ModelSpec(StrictModel):
     provider: LLMProvider
     model: str = Field(
         min_length=1,
-        description="Provider-native model id, e.g. 'claude-opus-5' or a Gemini model id.",
+        description="Provider-native model id, e.g. an OpenRouter route like "
+        "'nvidia/nemotron-3-super-120b-a12b:free'.",
     )
     max_tokens: int = Field(default=16000, ge=1)
     tpm_ceiling: int | None = Field(

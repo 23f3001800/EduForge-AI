@@ -20,16 +20,12 @@ platform_deps = [
     "prometheus-client>=0.21",
 ]
 llm = [
-    "anthropic>=0.40",
     "langgraph>=0.2",
-    # Both are imported lazily, inside the adapter that needs them, so a missing
-    # one costs nothing until that provider is actually selected. That is also
-    # why their absence here went unnoticed: the suite never constructs a real
-    # adapter, so it stayed green while a production image would have booted,
-    # passed /healthz, and then died with ModuleNotFoundError on the first job.
-    # `openai` backs the OpenRouter adapter — the default production provider.
+    # Imported lazily, inside the adapter that needs it, so it costs nothing
+    # until a provider using it is actually selected. `openai` backs both the
+    # OpenRouter adapter (the default production provider) and the Azure OpenAI
+    # adapter, via `AsyncAzureOpenAI` — the same SDK, a different client class.
     "openai>=2.0",
-    "google-genai>=1.0",
 ]
 api = [
     "fastapi>=0.115",

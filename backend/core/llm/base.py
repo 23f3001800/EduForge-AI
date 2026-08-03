@@ -1,9 +1,9 @@
 """The provider port.
 
 One method: given a Pydantic model and a prompt, return a validated instance.
-Everything provider-specific — Anthropic's prompt caching and adaptive thinking,
-Gemini's response schemas and thinking budget — lives inside an adapter and is
-configured per provider. Stages never learn which provider answered.
+Everything provider-specific — prompt caching, response-schema shaping, and
+reasoning-depth controls — lives inside an adapter and is configured per
+provider. Stages never learn which provider answered.
 
 Deliberately narrow. A port that also abstracted caching and reasoning controls
 would reduce every provider to its weakest common feature set, which is the usual

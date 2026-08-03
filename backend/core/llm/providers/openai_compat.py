@@ -382,7 +382,13 @@ class OpenAICompatibleAdapter:
         This protocol has no request-level cache control at all: providers on it
         cache prefixes automatically or not at all, so there is nothing to send.
         Its contract already says adapters that cannot honour it must ignore it
-        rather than fail, and Anthropic and Gemini do act on it.
+        rather than fail.
+
+        No provider currently in the tree acts on it — the two that did
+        (Anthropic, Gemini) have been removed. The field stays on the contract
+        for the next provider with explicit cache control; until then it is
+        inert, and saying so here is cheaper than someone setting it and
+        wondering why nothing changed.
         """
         return {}
 

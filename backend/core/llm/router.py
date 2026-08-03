@@ -1,8 +1,8 @@
 """Per-stage model routing — resolves `config/models.yaml` into a `ProviderRouting`.
 
 Stages ask for a stage name and receive a `ModelSpec`. They never learn which
-provider answered, which is what allows the same pipeline to run on Anthropic in
-production, Gemini in development, and recorded cassettes in CI.
+provider answered, which is what allows the same pipeline to run on OpenRouter
+in production and development, and recorded cassettes in CI.
 
 Inheritance is two-level and shallow on purpose: a stage entry overrides
 individual fields of its profile's `default`, and anything it omits is inherited.

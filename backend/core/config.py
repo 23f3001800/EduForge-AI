@@ -16,7 +16,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
-LLMProfile = Literal["production", "anthropic", "dev", "ci"]
+LLMProfile = Literal["production", "azure", "dev", "ci"]
 
 
 class Settings(BaseSettings):
@@ -28,13 +28,16 @@ class Settings(BaseSettings):
     llm_profile: LLMProfile = "production"
     open_router_api_key: str | None = None
     open_router_base_url: str = "https://openrouter.ai/api/v1"
-    gemini_api_key: str | None = None
 
-    # Anthropic is implemented but off by default. A key being present in the
-    # environment must not be enough to bill against it — enabling the provider
-    # is a deliberate act, not a side effect of a config typo.
-    anthropic_api_key: str | None = None
-    allow_anthropic: bool = False
+    #: Azure OpenAI. `model` in a ModelSpec names the *deployment*, not a
+    #: catalogue id — Azure routes on what you deployed, and the two need not
+    #: match. The api-version is pinned rather than floating: Azure changes
+    #: request and response shapes between versions, and a silently moving
+    #: target is how a working deployment breaks without a code change.
+    azure_openai_endpoint: str | None = None
+    azure_openai_key: str | None = None
+    azure_openai_api_version: str = "2024-12-01-preview"
+
     models_config_path: Path = REPO_ROOT / "config" / "models.yaml"
 
     # ── storage ─────────────────────────────────────────────────────────────
@@ -124,7 +127,7 @@ class Settings(BaseSettings):
         requirement = {
             "production": ("Open_Router_API_KEY", self.open_router_api_key),
             "dev": ("Open_Router_API_KEY", self.open_router_api_key),
-            "anthropic": ("ANTHROPIC_API_KEY", self.anthropic_api_key),
+            "azure": ("AZURE_OPENAI_KEY", self.azure_openai_key),
         }.get(self.llm_profile)
         if requirement is None:
             return self

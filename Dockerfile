@@ -52,8 +52,8 @@ COPY backend/ backend/
 COPY config/ config/
 
 # `api`     -> fastapi, uvicorn, python-multipart, sse-starlette (serve the app)
-# `llm`     -> langgraph, plus the provider SDKs (openai backs OpenRouter, the
-#              default production provider; google-genai backs Gemini)
+# `llm`     -> langgraph, plus the provider SDK (openai backs both OpenRouter,
+#              the default production provider, and the Azure OpenAI adapter)
 # `parsing` -> pypdf, pdfplumber, python-docx, python-pptx (stage 1 ingestion)
 # `render`  -> fpdf2 (stage 10). Pure Python — no cairo, pango, gdk-pixbuf,
 #              wkhtmltopdf or LaTeX, which is exactly why publishing fits in this
