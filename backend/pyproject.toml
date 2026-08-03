@@ -42,6 +42,16 @@ parsing = [
     "pdfplumber>=0.11",
     "python-docx>=1.1",
     "python-pptx>=1.0",
+    # Page-level text/image profiling and rasterisation for OCR routing.
+    # Self-contained wheels; no system packages, which is what keeps stage 1
+    # buildable in the same container as everything else.
+    "pymupdf>=1.24",
+]
+ocr = [
+    # The default recogniser. An engine is a port (stages/s1_document_intelligence
+    # /ocr), so this extra is the only thing tying the deployment to Azure -
+    # OCR_ENGINE=tesseract or =easyocr swaps it without touching code.
+    "azure-ai-documentintelligence>=1.0",
 ]
 render = [
     # Pure-Python PDF generation — no wkhtmltopdf, no LaTeX, no system packages,
