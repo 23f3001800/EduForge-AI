@@ -13,7 +13,7 @@ from __future__ import annotations
 import asyncio
 import json
 from typing import Any
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import httpx
 import pytest
@@ -544,6 +544,22 @@ async def test_deleting_a_sample_is_refused(seeded_client: httpx.AsyncClient) ->
     # Refused, not silently ignored: the package is still there afterwards.
     still_there = await seeded_client.get(f"/api/v1/packages/{package_id}")
     assert still_there.status_code == 200
+
+
+async def test_the_store_itself_refuses_to_delete_a_sample(
+    seeded_client: httpx.AsyncClient,
+) -> None:
+    """The route's 409 is not the only thing standing between a sample and
+    deletion: ``InMemoryStore.delete_package`` refuses on its own, so a second
+    caller of the store — a future admin route, a script — gets the same
+    protection for free rather than having to remember to re-check ``is_sample``.
+    """
+    listed = (await seeded_client.get("/api/v1/samples")).json()["samples"]
+    package_id = UUID(listed[0]["package_id"])
+    store = get_store()
+
+    assert await store.delete_package(package_id) is False
+    assert await store.get_package(package_id) is not None
 
 
 async def test_deleting_a_package_removes_it(client: httpx.AsyncClient) -> None:
