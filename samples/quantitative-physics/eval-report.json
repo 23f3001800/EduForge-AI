@@ -1,21 +1,21 @@
 {
   "benchmark": {
     "overall": {
-      "max": 97.45,
-      "median": 96.2,
-      "min": 94.96,
-      "n": 2,
-      "p25": 94.96,
-      "p75": 97.45
+      "max": 94.18,
+      "median": 94.18,
+      "min": 94.18,
+      "n": 1,
+      "p25": 94.18,
+      "p75": 94.18
     },
     "profile": "quantitative",
-    "runs": 2,
+    "runs": 1,
     "stages": {
       "activity-generation": {
         "max": 100.0,
         "median": 100.0,
         "min": 100.0,
-        "n": 2,
+        "n": 1,
         "p25": 100.0,
         "p75": 100.0
       },
@@ -23,7 +23,7 @@
         "max": 100.0,
         "median": 100.0,
         "min": 100.0,
-        "n": 2,
+        "n": 1,
         "p25": 100.0,
         "p75": 100.0
       },
@@ -31,31 +31,31 @@
         "max": 92.86,
         "median": 92.86,
         "min": 92.86,
-        "n": 2,
+        "n": 1,
         "p25": 92.86,
         "p75": 92.86
       },
       "educational-classification": {
-        "max": 98.22,
-        "median": 88.98,
-        "min": 79.74,
-        "n": 2,
-        "p25": 79.74,
-        "p75": 98.22
+        "max": 71.38,
+        "median": 71.38,
+        "min": 71.38,
+        "n": 1,
+        "p25": 71.38,
+        "p75": 71.38
       },
       "gap-analysis": {
-        "max": 95.1,
-        "median": 94.61,
+        "max": 94.12,
+        "median": 94.12,
         "min": 94.12,
-        "n": 2,
+        "n": 1,
         "p25": 94.12,
-        "p75": 95.1
+        "p75": 94.12
       },
       "knowledge-extraction": {
         "max": 100.0,
         "median": 100.0,
         "min": 100.0,
-        "n": 2,
+        "n": 1,
         "p25": 100.0,
         "p75": 100.0
       },
@@ -63,7 +63,7 @@
         "max": 100.0,
         "median": 100.0,
         "min": 100.0,
-        "n": 2,
+        "n": 1,
         "p25": 100.0,
         "p75": 100.0
       },
@@ -71,7 +71,7 @@
         "max": 97.27,
         "median": 97.27,
         "min": 97.27,
-        "n": 2,
+        "n": 1,
         "p25": 97.27,
         "p75": 97.27
       },
@@ -79,45 +79,37 @@
         "max": 100.0,
         "median": 100.0,
         "min": 100.0,
-        "n": 2,
+        "n": 1,
         "p25": 100.0,
         "p75": 100.0
       },
       "validation": {
-        "max": 89.04,
-        "median": 85.96,
-        "min": 82.88,
-        "n": 2,
-        "p25": 82.88,
-        "p75": 89.04
+        "max": 82.75,
+        "median": 82.75,
+        "min": 82.75,
+        "n": 1,
+        "p25": 82.75,
+        "p75": 82.75
       }
     },
     "sufficient": false
   },
   "comparison": {
-    "detail": "2 comparable run(s) on record; a baseline needs at least 5 before a fall in score can be told apart from run-to-run variation.",
+    "detail": "1 comparable run(s) on record; a baseline needs at least 5 before a fall in score can be told apart from run-to-run variation.",
     "improvements": [],
     "needed": 5,
     "regressions": [],
-    "runs": 2,
+    "runs": 1,
     "skipped": [],
     "status": "insufficient_history"
   },
-  "evaluated_at": "2026-08-03T18:52:54+00:00",
+  "evaluated_at": "2026-08-04T04:38:07+00:00",
   "grade_band": "11-12",
   "history": [
     {
       "confidence": 0.879,
-      "evaluated_at": "2026-08-03T18:37:34+00:00",
-      "overall": 94.96,
-      "profile": "quantitative",
-      "run_id": "ede51c32-b583-5884-b100-acd88edee73f",
-      "subject": "Physics"
-    },
-    {
-      "confidence": 0.879,
-      "evaluated_at": "2026-08-03T18:37:35+00:00",
-      "overall": 97.45,
+      "evaluated_at": "2026-08-04T04:09:14+00:00",
+      "overall": 94.18,
       "profile": "quantitative",
       "run_id": "38d7259a-9121-5231-8644-b8db6ee27050",
       "subject": "Physics"
@@ -179,25 +171,15 @@
       "stage": "outcomes"
     }
   ],
-  "package_id": "5d18a35e-1b41-4670-ac75-5cb84fe2162b",
+  "package_id": "b5138b0c-295d-405e-bf4a-8348d0846724",
   "profile": "quantitative",
   "recommendations": [
-    {
-      "action": "Derive low_confidence_fields from the confidences map rather than letting the model populate both independently.",
-      "impact": "A field the classifier doubted reaches teachers unflagged.",
-      "metric": "low_confidence_declared",
-      "metric_label": "Low-confidence fields flagged for review",
-      "score": 0.0,
-      "severity": "high",
-      "stage": "educational-classification",
-      "stage_label": "Educational classification"
-    },
     {
       "action": "Route the blocking issues back to their owning stage for repair.",
       "impact": "The package ships with defects its own validator found.",
       "metric": "issue_resolution",
       "metric_label": "No blocking issues remain",
-      "score": 44.44,
+      "score": 57.14,
       "severity": "high",
       "stage": "validation",
       "stage_label": "Validation"
@@ -207,7 +189,7 @@
       "impact": "A citation that does not check out is worse than no citation — a teacher trusts it.",
       "metric": "citation_integrity",
       "metric_label": "Quotes appear in the chunks they cite",
-      "score": 66.67,
+      "score": 59.46,
       "severity": "high",
       "stage": "knowledge-extraction",
       "stage_label": "Knowledge extraction"
@@ -248,7 +230,7 @@
         "metrics": [
           {
             "key": "topic_alignment",
-            "note": "7 of 7 content word(s) in the declared topic \"Electrostatics (Electric charge, Coulomb's law, electric field, Gauss's law)\" appear in what the package teaches",
+            "note": "8 of 8 content word(s) in the declared topic \"Electrostatics (charges, Coulomb's law, electric field, flux, Gauss's law)\" appear in what the package teaches",
             "value": 1.0,
             "weight": 0.5
           },
@@ -260,7 +242,7 @@
           },
           {
             "key": "teaching_content_present",
-            "note": "218 distinct content term(s) across concepts, keywords, definitions and objectives",
+            "note": "210 distinct content term(s) across concepts, keywords, definitions and objectives",
             "value": 1.0,
             "weight": 0.15
           },
@@ -280,8 +262,13 @@
         "findings": [
           {
             "code": "OBJ_BLOOM_MISMATCH",
-            "detail": "tagged 'analyze' but 'derive' denotes 'apply' (1 level(s) apart); either the verb or the tag is wrong",
-            "path": "/knowledge/learning_objectives/1"
+            "detail": "tagged 'analyze' but 'use' denotes 'apply' (1 level(s) apart); either the verb or the tag is wrong",
+            "path": "/knowledge/learning_objectives/2"
+          },
+          {
+            "code": "OBJ_UNRECOGNISED_VERB",
+            "detail": "'given' is not in the observable-verb lexicon; scored neutral and queued for the judge rather than guessed at",
+            "path": "/knowledge/learning_objectives/4"
           }
         ],
         "key": "objectives",
@@ -291,13 +278,13 @@
           {
             "key": "measurable_verb",
             "note": "leading verb denotes an observable act",
-            "value": 1.0,
+            "value": 0.9286,
             "weight": 0.3
           },
           {
             "key": "bloom_honesty",
             "note": "declared level matches the verb",
-            "value": 0.9333,
+            "value": 0.8714,
             "weight": 0.25
           },
           {
@@ -320,7 +307,7 @@
           }
         ],
         "reason": "",
-        "score": 0.9833,
+        "score": 0.9464,
         "weight": 0.08
       },
       {
@@ -328,7 +315,7 @@
         "findings": [
           {
             "code": "BLOOM_LOW_HIGHER_ORDER",
-            "detail": "35% of marks sit at apply or above, against a 40% floor for this profile",
+            "detail": "28% of marks sit at apply or above, against a 40% floor for this profile",
             "path": "/assessments/items"
           }
         ],
@@ -338,20 +325,20 @@
         "metrics": [
           {
             "key": "level_spread",
-            "note": "3 level(s) carry real marks",
+            "note": "4 level(s) carry real marks",
             "value": 1.0,
             "weight": 0.25
           },
           {
             "key": "recall_ceiling",
-            "note": "0% of marks are recall",
+            "note": "7% of marks are recall",
             "value": 1.0,
             "weight": 0.25
           },
           {
             "key": "higher_order_floor",
-            "note": "35% of marks at apply+",
-            "value": 0.8784,
+            "note": "28% of marks at apply+",
+            "value": 0.7095,
             "weight": 0.25
           },
           {
@@ -368,7 +355,7 @@
           }
         ],
         "reason": "",
-        "score": 0.9696,
+        "score": 0.9274,
         "weight": 0.05
       },
       {
@@ -436,8 +423,8 @@
         "findings": [
           {
             "code": "SEQ_PERIOD_OVERLOADED",
-            "detail": "period 5 carries 5 concepts; the workable range for this profile is 1-4",
-            "path": "/teaching_plan/periods/4"
+            "detail": "period 3 carries 5 concepts; the workable range for this profile is 1-4",
+            "path": "/teaching_plan/periods/2"
           }
         ],
         "key": "sequencing",
@@ -446,7 +433,7 @@
         "metrics": [
           {
             "key": "prerequisites_respected",
-            "note": "9 prerequisite edge(s) checked",
+            "note": "8 prerequisite edge(s) checked",
             "value": 1.0,
             "weight": 0.35
           },
@@ -458,7 +445,7 @@
           },
           {
             "key": "load_balance",
-            "note": "concepts per period: [3, 3, 4, 3, 5, 4]",
+            "note": "concepts per period: [3, 3, 5, 4, 4, 3]",
             "value": 0.7273,
             "weight": 0.15
           },
@@ -490,143 +477,148 @@
         "findings": [
           {
             "code": "GND_QUOTE_NOT_IN_SOURCE",
-            "detail": "the quote 'like charges repel and unlike charges attract each other.' does not appear in chunk 'c_0001'; a citation that cannot be found is worse than none, because it reads as authority",
-            "path": "/knowledge/concepts/1/evidence/0"
+            "detail": "the quote 'It is not possible to create or destroy net charge carried b' does not appear in chunk 'c_0003'; a citation that cannot be found is worse than none, because it reads as authority",
+            "path": "/knowledge/concepts/2/evidence/0"
           },
           {
             "code": "GND_QUOTE_NOT_IN_SOURCE",
-            "detail": "the quote 'According to this, we say that the charge Q produces an elec' does not appear in chunk 'c_0013'; a citation that cannot be found is worse than none, because it reads as authority",
+            "detail": "the quote 'Experimentally it is established that all free charges are i' does not appear in chunk 'c_0003'; a citation that cannot be found is worse than none, because it reads as authority",
+            "path": "/knowledge/concepts/3/evidence/0"
+          },
+          {
+            "code": "GND_QUOTE_NOT_IN_SOURCE",
+            "detail": "the quote 'Coulomb’s force law between two point charges q and q locate' does not appear in chunk 'c_0009'; a citation that cannot be found is worse than none, because it reads as authority",
             "path": "/knowledge/concepts/5/evidence/0"
           },
           {
             "code": "GND_QUOTE_NOT_IN_SOURCE",
-            "detail": "the quote 'The number of field lines crossing the area element is propo' does not appear in chunk 'c_0020'; a citation that cannot be found is worse than none, because it reads as authority",
-            "path": "/knowledge/concepts/10/evidence/1"
+            "detail": "the quote 'Equation (1.3) is valid for any sign of q and q whether posi' does not appear in chunk 'c_0009'; a citation that cannot be found is worse than none, because it reads as authority",
+            "path": "/knowledge/concepts/5/evidence/1"
           },
           {
             "code": "GND_QUOTE_NOT_IN_SOURCE",
-            "detail": "the quote 'An electric dipole is a pair of equal and opposite point cha' does not appear in chunk 'c_0022'; a citation that cannot be found is worse than none, because it reads as authority",
-            "path": "/knowledge/concepts/11/evidence/0"
+            "detail": "the quote 'Experimentally, it is verified that force on any charge due\\n' does not appear in chunk 'c_0011'; a citation that cannot be found is worse than none, because it reads as authority",
+            "path": "/knowledge/concepts/6/evidence/0"
           },
           {
             "code": "GND_QUOTE_NOT_IN_SOURCE",
-            "detail": "the quote 'For r >> a ... E p ( r >> a ) (1.15)' does not appear in chunk 'c_0022'; a citation that cannot be found is worse than none, because it reads as authority",
-            "path": "/knowledge/concepts/12/evidence/0"
+            "detail": "the quote 'Thus the total force F on the charge , due to all other char' does not appear in chunk 'c_0011'; a citation that cannot be found is worse than none, because it reads as authority",
+            "path": "/knowledge/concepts/6/evidence/1"
           },
           {
             "code": "GND_QUOTE_NOT_IN_SOURCE",
-            "detail": "the quote 'Notice the important point that the dipole field at large di' does not appear in chunk 'c_0022'; a citation that cannot be found is worse than none, because it reads as authority",
+            "detail": "the quote 'According to this, we say\\nthat the charge Q produces an elec' does not appear in chunk 'c_0013'; a citation that cannot be found is worse than none, because it reads as authority",
+            "path": "/knowledge/concepts/7/evidence/1"
+          },
+          {
+            "code": "GND_QUOTE_NOT_IN_SOURCE",
+            "detail": "the quote 'the number of field lines crossing a unit area,\\nplaced norma' does not appear in chunk 'c_0020'; a citation that cannot be found is worse than none, because it reads as authority",
+            "path": "/knowledge/concepts/11/evidence/1"
+          },
+          {
+            "code": "GND_QUOTE_NOT_IN_SOURCE",
+            "detail": "the quote 'At a point on the equatorial plane\\np\\n= -\\nE\\n( r >> a ) (1.21)' does not appear in chunk 'c_0022'; a citation that cannot be found is worse than none, because it reads as authority",
             "path": "/knowledge/concepts/12/evidence/2"
           },
           {
             "code": "GND_QUOTE_NOT_IN_SOURCE",
-            "detail": "the quote 'Gauss\\x0fs law\\nWe state without proof:\\nElectric flux through a ' does not appear in chunk 'c_0026'; a citation that cannot be found is worse than none, because it reads as authority",
+            "detail": "the quote 'Gauss’s law\\nWe state without proof:\\nElectric flux through a ' does not appear in chunk 'c_0026'; a citation that cannot be found is worse than none, because it reads as authority",
             "path": "/knowledge/concepts/13/evidence/0"
           },
           {
             "code": "GND_QUOTE_NOT_IN_SOURCE",
-            "detail": "the quote 'Coulomb\\x0fs Law : The mutual electrostatic force between two p' does not appear in chunk 'c_0034'; a citation that cannot be found is worse than none, because it reads as authority",
-            "path": "/knowledge/concepts/14/evidence/0"
-          },
-          {
-            "code": "GND_QUOTE_NOT_IN_SOURCE",
-            "detail": "the quote 'The linear charge density l of a wire is defined by\\nD\\nQ\\nl =\\n' does not appear in chunk 'c_0025'; a citation that cannot be found is worse than none, because it reads as authority",
-            "path": "/knowledge/concepts/16/evidence/1"
-          },
-          {
-            "code": "GND_QUOTE_NOT_IN_SOURCE",
-            "detail": "the quote 'The volume charge density (sometimes simply called charge de' does not appear in chunk 'c_0025'; a citation that cannot be found is worse than none, because it reads as authority",
-            "path": "/knowledge/concepts/16/evidence/2"
-          },
-          {
-            "code": "GND_QUOTE_NOT_IN_SOURCE",
-            "detail": "the quote 'Flux through the Gaussian surface\\n= flux through the curved ' does not appear in chunk 'c_0029'; a citation that cannot be found is worse than none, because it reads as authority",
+            "detail": "the quote 'Δ\\nQ\\nλ =\\n(1.24)\\nΔ\\nl' does not appear in chunk 'c_0025'; a citation that cannot be found is worse than none, because it reads as authority",
             "path": "/knowledge/concepts/18/evidence/1"
           },
           {
             "code": "GND_QUOTE_NOT_IN_SOURCE",
-            "detail": "the quote 'Or, E\\n2 2\\ne p e\\n4\\nr r\\n0 0\\n2\\nwhere q = 4 p R s is the total c' does not appear in chunk 'c_0030'; a citation that cannot be found is worse than none, because it reads as authority",
+            "detail": "the quote 'Δ\\nQ\\nρ =\\n(1.25)\\nΔ\\nV' does not appear in chunk 'c_0025'; a citation that cannot be found is worse than none, because it reads as authority",
+            "path": "/knowledge/concepts/18/evidence/2"
+          },
+          {
+            "code": "GND_QUOTE_NOT_IN_SOURCE",
+            "detail": "the quote 'To calculate the field, imagine a cylindrical\\nGaussian surfa' does not appear in chunk 'c_0029'; a citation that cannot be found is worse than none, because it reads as authority",
+            "path": "/knowledge/concepts/19/evidence/0"
+          },
+          {
+            "code": "GND_QUOTE_NOT_IN_SOURCE",
+            "detail": "the quote 'Therefore by Gauss’s law,\\n2 EA = σ A / ε\\n0\\nE σ ε\\nor, = /2\\n0\\n' does not appear in chunk 'c_0030'; a citation that cannot be found is worse than none, because it reads as authority",
             "path": "/knowledge/concepts/20/evidence/0"
           },
           {
             "code": "GND_QUOTE_NOT_IN_SOURCE",
-            "detail": "the quote 'The charge in a volume element D V is r D V . Now, consider ' does not appear in chunk 'c_0026'; a citation that cannot be found is worse than none, because it reads as authority",
+            "detail": "the quote 'By Gauss’s law\\n...Or, E\\n2 2\\nε π ε\\n4\\nr r\\n0 0\\n2\\nwhere q = 4 π ' does not appear in chunk 'c_0030'; a citation that cannot be found is worse than none, because it reads as authority",
             "path": "/knowledge/concepts/21/evidence/0"
           },
           {
             "code": "GND_QUOTE_NOT_IN_SOURCE",
-            "detail": "the quote 'The linear charge density l of a wire is defined by\\nD\\nQ\\nl =\\n' does not appear in chunk 'c_0025'; a citation that cannot be found is worse than none, because it reads as authority",
+            "detail": "the quote 'The dipole moment vector p of an electric dipole is defined ' does not appear in chunk 'c_0022'; a citation that cannot be found is worse than none, because it reads as authority",
             "path": "/knowledge/definitions/4/evidence/0"
           },
           {
             "code": "GND_QUOTE_NOT_IN_SOURCE",
-            "detail": "the quote 'The volume charge density (sometimes simply called charge de' does not appear in chunk 'c_0025'; a citation that cannot be found is worse than none, because it reads as authority",
-            "path": "/knowledge/definitions/5/evidence/0"
-          },
-          {
-            "code": "GND_QUOTE_NOT_IN_SOURCE",
-            "detail": "the quote 'An electric dipole is a pair of equal and opposite charges a' does not appear in chunk 'c_0039'; a citation that cannot be found is worse than none, because it reads as authority",
+            "detail": "the quote 'Δ\\nQ\\nλ =\\n(1.24)\\nΔ\\nl' does not appear in chunk 'c_0025'; a citation that cannot be found is worse than none, because it reads as authority",
             "path": "/knowledge/definitions/7/evidence/0"
           },
           {
             "code": "GND_QUOTE_NOT_IN_SOURCE",
-            "detail": "the quote 'k = 1/4 pe for later convenience, so that Coulomb’s law is w' does not appear in chunk 'c_0008'; a citation that cannot be found is worse than none, because it reads as authority",
-            "path": "/knowledge/formulae/1/evidence/0"
+            "detail": "the quote 'Δ\\nQ\\nρ =\\n(1.25)\\nΔ\\nV' does not appear in chunk 'c_0025'; a citation that cannot be found is worse than none, because it reads as authority",
+            "path": "/knowledge/definitions/8/evidence/0"
           },
           {
             "code": "GND_QUOTE_NOT_IN_SOURCE",
-            "detail": "the quote 'Gauss\\x0fs law\\nWe state without proof:\\nElectric flux through a ' does not appear in chunk 'c_0026'; a citation that cannot be found is worse than none, because it reads as authority",
-            "path": "/knowledge/formulae/7/evidence/0"
+            "detail": "the quote 'Coulomb’s force law between two point charges q and q locate' does not appear in chunk 'c_0009'; a citation that cannot be found is worse than none, because it reads as authority",
+            "path": "/knowledge/formulae/2/evidence/0"
           },
           {
             "code": "GND_QUOTE_NOT_IN_SOURCE",
-            "detail": "the quote 'Flux through the Gaussian surface\\n= flux through the curved ' does not appear in chunk 'c_0029'; a citation that cannot be found is worse than none, because it reads as authority",
+            "detail": "the quote 'At a point on the equatorial plane\\np\\n= -\\nE\\n( r >> a ) (1.21)' does not appear in chunk 'c_0022'; a citation that cannot be found is worse than none, because it reads as authority",
+            "path": "/knowledge/formulae/8/evidence/0"
+          },
+          {
+            "code": "GND_QUOTE_NOT_IN_SOURCE",
+            "detail": "the quote 'Mathematically,\\nk (qq )\\n1 2\\n=\\nˆ\\nq q r\\nF = force on due to\\n1 ' does not appear in chunk 'c_0034'; a citation that cannot be found is worse than none, because it reads as authority",
             "path": "/knowledge/formulae/9/evidence/0"
           },
           {
             "code": "GND_QUOTE_NOT_IN_SOURCE",
-            "detail": "the quote 'Vectorially,\\nq\\n=\\nˆ\\nE r\\n(1.34)\\n2\\np e\\n4 r\\n0' does not appear in chunk 'c_0030'; a citation that cannot be found is worse than none, because it reads as authority",
-            "path": "/knowledge/formulae/11/evidence/0"
+            "detail": "the quote 'Gauss’s law\\nWe state without proof:\\nElectric flux through a ' does not appear in chunk 'c_0026'; a citation that cannot be found is worse than none, because it reads as authority",
+            "path": "/knowledge/formulae/10/evidence/0"
           },
           {
             "code": "GND_QUOTE_NOT_IN_SOURCE",
-            "detail": "the quote 'Flux through the Gaussian surface = E × 2 p rl. The surface ' does not appear in chunk 'c_0029'; a citation that cannot be found is worse than none, because it reads as authority",
-            "path": "/knowledge/examples/0/evidence/0"
+            "detail": "the quote 'Therefore by Gauss’s law,\\n2 EA = σ A / ε\\n0\\nE σ ε\\nor, = /2\\n0\\n' does not appear in chunk 'c_0030'; a citation that cannot be found is worse than none, because it reads as authority",
+            "path": "/knowledge/formulae/12/evidence/0"
           },
           {
             "code": "GND_QUOTE_NOT_IN_SOURCE",
-            "detail": "the quote 'Taking the clue from the preceding discussion, the charged c' does not appear in chunk 'c_0024'; a citation that cannot be found is worse than none, because it reads as authority",
+            "detail": "the quote 'By Gauss’s law\\n...Or, E\\n2 2\\nε π ε\\n4\\nr r\\n0 0\\n2\\nwhere q = 4 π ' does not appear in chunk 'c_0030'; a citation that cannot be found is worse than none, because it reads as authority",
+            "path": "/knowledge/formulae/13/evidence/0"
+          },
+          {
+            "code": "GND_QUOTE_NOT_IN_SOURCE",
+            "detail": "the quote 'The total negative charge in the uniform spherical charge di' does not appear in chunk 'c_0031'; a citation that cannot be found is worse than none, because it reads as authority",
+            "path": "/knowledge/examples/2/evidence/0"
+          },
+          {
+            "code": "GND_QUOTE_NOT_IN_SOURCE",
+            "detail": "the quote 'A simple apparatus to detect charge on a body is the gold-le' does not appear in chunk 'c_0001'; a citation that cannot be found is worse than none, because it reads as authority",
             "path": "/knowledge/applications/0/evidence/0"
           },
           {
             "code": "GND_QUOTE_NOT_IN_SOURCE",
-            "detail": "the quote 'Another person may draw more lines. But the number of lines ' does not appear in chunk 'c_0018'; a citation that cannot be found is worse than none, because it reads as authority",
+            "detail": "the quote 'This property of the materials tells you why a nylon or plas' does not appear in chunk 'c_0002'; a citation that cannot be found is worse than none, because it reads as authority",
+            "path": "/knowledge/applications/1/evidence/0"
+          },
+          {
+            "code": "GND_QUOTE_NOT_IN_SOURCE",
+            "detail": "the quote 'This property of the materials tells you why a nylon or plas' does not appear in chunk 'c_0002'; a citation that cannot be found is worse than none, because it reads as authority",
             "path": "/knowledge/misconceptions/1/evidence/0"
           },
           {
             "code": "GND_QUOTE_NOT_IN_SOURCE",
-            "detail": "the quote 'The field lines crowd where the field is strong and are spac' does not appear in chunk 'c_0018'; a citation that cannot be found is worse than none, because it reads as authority",
-            "path": "/knowledge/misconceptions/1/evidence/1"
-          },
-          {
-            "code": "GND_QUOTE_NOT_IN_SOURCE",
-            "detail": "the quote 'Taking the clue from the preceding discussion, the charged c' does not appear in chunk 'c_0024'; a citation that cannot be found is worse than none, because it reads as authority",
-            "path": "/knowledge/misconceptions/2/evidence/0"
-          },
-          {
-            "code": "GND_QUOTE_NOT_IN_SOURCE",
-            "detail": "the quote 'Another person may draw more lines. But the number of lines ' does not appear in chunk 'c_0018'; a citation that cannot be found is worse than none, because it reads as authority",
+            "detail": "the quote 'This property of the materials tells you why a nylon or plas' does not appear in chunk 'c_0002'; a citation that cannot be found is worse than none, because it reads as authority",
             "path": "/learning_gaps/3/evidence/0"
-          },
-          {
-            "code": "GND_QUOTE_NOT_IN_SOURCE",
-            "detail": "the quote 'The field lines crowd where the field is strong and are spac' does not appear in chunk 'c_0018'; a citation that cannot be found is worse than none, because it reads as authority",
-            "path": "/learning_gaps/3/evidence/1"
-          },
-          {
-            "code": "GND_QUOTE_NOT_IN_SOURCE",
-            "detail": "the quote 'Taking the clue from the preceding discussion, the charged c' does not appear in chunk 'c_0024'; a citation that cannot be found is worse than none, because it reads as authority",
-            "path": "/learning_gaps/4/evidence/0"
           }
         ],
         "key": "grounding",
@@ -635,25 +627,25 @@
         "metrics": [
           {
             "key": "claims_cited",
-            "note": "52 of 52 claim(s) cite the source at all",
+            "note": "56 of 56 claim(s) cite the source at all",
             "value": 1.0,
             "weight": 0.2
           },
           {
             "key": "citation_integrity",
-            "note": "76 evidence span(s) checked verbatim against the source",
-            "value": 0.6316,
+            "note": "75 evidence span(s) checked verbatim against the source",
+            "value": 0.6133,
             "weight": 0.5
           },
           {
             "key": "claim_support",
-            "note": "52 claim(s) checked; 3 in the ambiguous band (0.25-0.6), scored 0.5 and left for the judge",
-            "value": 0.9712,
+            "note": "56 claim(s) checked; 5 in the ambiguous band (0.25-0.6), scored 0.5 and left for the judge",
+            "value": 0.9554,
             "weight": 0.3
           }
         ],
         "reason": "",
-        "score": 0.8071,
+        "score": 0.7933,
         "weight": 0.12
       },
       {
@@ -678,7 +670,7 @@
           {
             "key": "observable_criteria",
             "note": "visible during the lesson",
-            "value": 0.8889,
+            "value": 0.8611,
             "weight": 0.3
           },
           {
@@ -701,7 +693,7 @@
           }
         ],
         "reason": "",
-        "score": 0.9667,
+        "score": 0.9583,
         "weight": 0.07
       },
       {
@@ -720,7 +712,7 @@
           {
             "key": "specific",
             "note": "names something this package teaches",
-            "value": 1.0,
+            "value": 0.9875,
             "weight": 0.4
           },
           {
@@ -743,7 +735,7 @@
           }
         ],
         "reason": "",
-        "score": 1.0,
+        "score": 0.995,
         "weight": 0.04
       },
       {
@@ -758,11 +750,6 @@
             "code": "ASM_MCQ_MALFORMED",
             "detail": "missing answer key matching the correct option; this item cannot be marked as written",
             "path": "/assessments/items/5"
-          },
-          {
-            "code": "ASM_DUPLICATE_OPTIONS",
-            "detail": "two options say the same thing, so the item really has three",
-            "path": "/assessments/items/5/options"
           },
           {
             "code": "ASM_MCQ_MALFORMED",
@@ -792,17 +779,7 @@
           {
             "code": "ASM_RUBRIC_INDISCRIMINATE",
             "detail": "adjacent levels score 1.00 on naming different work and hedge rather than describe it. Two markers would land on different levels for the same borderline script, which makes the marks it awards arbitrary",
-            "path": "/assessments/items/3/rubric"
-          },
-          {
-            "code": "ASM_RUBRIC_INDISCRIMINATE",
-            "detail": "adjacent levels score 1.00 on naming different work and hedge rather than describe it. Two markers would land on different levels for the same borderline script, which makes the marks it awards arbitrary",
-            "path": "/assessments/items/4/rubric"
-          },
-          {
-            "code": "ASM_RUBRIC_INDISCRIMINATE",
-            "detail": "adjacent levels score 1.00 on naming different work and hedge rather than describe it. Two markers would land on different levels for the same borderline script, which makes the marks it awards arbitrary",
-            "path": "/assessments/items/7/rubric"
+            "path": "/assessments/items/8/rubric"
           },
           {
             "code": "ASM_RUBRIC_INDISCRIMINATE",
@@ -810,18 +787,8 @@
             "path": "/assessments/items/10/rubric"
           },
           {
-            "code": "ASM_RUBRIC_INDISCRIMINATE",
-            "detail": "adjacent levels score 1.00 on naming different work and hedge rather than describe it. Two markers would land on different levels for the same borderline script, which makes the marks it awards arbitrary",
-            "path": "/assessments/items/11/rubric"
-          },
-          {
-            "code": "ASM_RUBRIC_INDISCRIMINATE",
-            "detail": "adjacent levels score 1.00 on naming different work and hedge rather than describe it. Two markers would land on different levels for the same borderline script, which makes the marks it awards arbitrary",
-            "path": "/assessments/items/22/rubric"
-          },
-          {
             "code": "ASM_UNLINKED_DISTRACTORS",
-            "detail": "43% of MCQs cite the misconception they probe, though the package extracted 3; the bank scores students without telling the teacher what to reteach",
+            "detail": "0% of MCQs cite the misconception they probe, though the package extracted 2; the bank scores students without telling the teacher what to reteach",
             "path": "/assessments/items"
           }
         ],
@@ -838,7 +805,7 @@
           {
             "key": "distractor_quality",
             "note": "plausible, explained, not filler",
-            "value": 0.9643,
+            "value": 1.0,
             "weight": 0.2
           },
           {
@@ -850,7 +817,7 @@
           {
             "key": "rubric_discrimination",
             "note": "17 rubric(s): do adjacent levels name different work, and does any level name this package's content?",
-            "value": 0.6471,
+            "value": 0.8824,
             "weight": 0.35
           },
           {
@@ -868,12 +835,12 @@
           {
             "key": "misconception_linkage",
             "note": "items trace to a diagnosed error",
-            "value": 0.8571,
+            "value": 0.0,
             "weight": 0.05
           }
         ],
         "reason": "",
-        "score": 0.8234,
+        "score": 0.8701,
         "weight": 0.15
       },
       {
@@ -881,18 +848,18 @@
         "findings": [
           {
             "code": "CLS_BOARD_NOTES_ARE_PROSE",
-            "detail": "1 bullet(s) run past 20 words; nobody writes a paragraph on a blackboard",
+            "detail": "2 bullet(s) run past 20 words; nobody writes a paragraph on a blackboard",
             "path": "/classroom_content/0/blackboard_notes"
+          },
+          {
+            "code": "CLS_BOARD_NOTES_ARE_PROSE",
+            "detail": "4 bullet(s) run past 20 words; nobody writes a paragraph on a blackboard",
+            "path": "/classroom_content/1/blackboard_notes"
           },
           {
             "code": "CLS_BOARD_NOTES_ARE_PROSE",
             "detail": "2 bullet(s) run past 20 words; nobody writes a paragraph on a blackboard",
             "path": "/classroom_content/2/blackboard_notes"
-          },
-          {
-            "code": "CLS_BOARD_NOTES_ARE_PROSE",
-            "detail": "1 bullet(s) run past 20 words; nobody writes a paragraph on a blackboard",
-            "path": "/classroom_content/3/blackboard_notes"
           },
           {
             "code": "CLS_BOARD_NOTES_ARE_PROSE",
@@ -906,13 +873,13 @@
         "metrics": [
           {
             "key": "script_actionability",
-            "note": "35 segment(s): does the note instruct, name this package's content, and say what goes on the board?",
-            "value": 1.0,
+            "note": "34 segment(s): does the note instruct, name this package's content, and say what goes on the board?",
+            "value": 0.9853,
             "weight": 0.28
           },
           {
             "key": "distinct_speaker_notes",
-            "note": "35 script segment(s); one sentence repeated is one note",
+            "note": "34 script segment(s); one sentence repeated is one note",
             "value": 1.0,
             "weight": 0.14
           },
@@ -954,13 +921,13 @@
           },
           {
             "key": "grade_readability",
-            "note": "17.0 words/sentence (band allows 26), 13% long words (allows 24%)",
+            "note": "17.0 words/sentence (band allows 26), 14% long words (allows 24%)",
             "value": 0.0,
             "weight": 0.0
           }
         ],
         "reason": "",
-        "score": 0.9778,
+        "score": 0.9737,
         "weight": 0.15
       },
       {
@@ -969,22 +936,7 @@
           {
             "code": "PER_CHECKPOINT_OFF_PERIOD",
             "detail": "period 1 checks a concept this period does not teach; the check reports on a lesson the class has not just had",
-            "path": "/classroom_content/0/checkpoint_questions/0"
-          },
-          {
-            "code": "PER_CHECKPOINT_OFF_PERIOD",
-            "detail": "period 1 checks a concept this period does not teach; the check reports on a lesson the class has not just had",
             "path": "/classroom_content/0/checkpoint_questions/1"
-          },
-          {
-            "code": "PER_CHECKPOINT_OFF_PERIOD",
-            "detail": "period 1 checks a concept this period does not teach; the check reports on a lesson the class has not just had",
-            "path": "/classroom_content/0/checkpoint_questions/2"
-          },
-          {
-            "code": "PER_CHECKPOINT_OFF_PERIOD",
-            "detail": "period 2 checks a concept this period does not teach; the check reports on a lesson the class has not just had",
-            "path": "/classroom_content/1/checkpoint_questions/1"
           },
           {
             "code": "PER_CHECKPOINT_OFF_PERIOD",
@@ -992,29 +944,9 @@
             "path": "/classroom_content/1/checkpoint_questions/2"
           },
           {
-            "code": "PER_ARTEFACT_OFF_PERIOD",
-            "detail": "period 2's exit ticket names none of the concepts that period teaches (Conductors and insulators, Electric field, Principle of superposition); what the class copies down is not what the period was for",
-            "path": "/classroom_content/1/exit_ticket"
-          },
-          {
-            "code": "PER_CHECKPOINT_OFF_PERIOD",
-            "detail": "period 3 checks a concept this period does not teach; the check reports on a lesson the class has not just had",
-            "path": "/classroom_content/2/checkpoint_questions/0"
-          },
-          {
-            "code": "PER_ARTEFACT_OFF_PERIOD",
-            "detail": "period 3's exit ticket names none of the concepts that period teaches (Electric dipole, Electric flux through a surface, Source charge and test charge, Superposition principle for electric fields); what the class copies down is not what the period was for",
-            "path": "/classroom_content/2/exit_ticket"
-          },
-          {
             "code": "PER_CHECKPOINT_OFF_PERIOD",
             "detail": "period 4 checks a concept this period does not teach; the check reports on a lesson the class has not just had",
             "path": "/classroom_content/3/checkpoint_questions/0"
-          },
-          {
-            "code": "PER_ARTEFACT_OFF_PERIOD",
-            "detail": "period 4's exit ticket names none of the concepts that period teaches (Coulomb's law, Dipole field falls off faster than monopole, Gauss's law); what the class copies down is not what the period was for",
-            "path": "/classroom_content/3/exit_ticket"
           },
           {
             "code": "PER_CHECKPOINT_OFF_PERIOD",
@@ -1022,9 +954,9 @@
             "path": "/classroom_content/4/checkpoint_questions/0"
           },
           {
-            "code": "PER_CHECKPOINT_OFF_PERIOD",
-            "detail": "period 5 checks a concept this period does not teach; the check reports on a lesson the class has not just had",
-            "path": "/classroom_content/4/checkpoint_questions/1"
+            "code": "PER_ARTEFACT_OFF_PERIOD",
+            "detail": "period 5's exit ticket names none of the concepts that period teaches (Continuous charge distributions (linear, surface, volume), Electric flux, Superposition principle, Torque on a dipole in a uniform field); what the class copies down is not what the period was for",
+            "path": "/classroom_content/4/exit_ticket"
           }
         ],
         "key": "period_integrity",
@@ -1034,13 +966,13 @@
           {
             "key": "checkpoints_on_period",
             "note": "6 period(s) with checkpoints",
-            "value": 0.5,
+            "value": 0.7778,
             "weight": 0.3
           },
           {
             "key": "artefacts_on_period",
             "note": "12 exit ticket(s) and board note block(s) checked against their own period's concepts",
-            "value": 0.75,
+            "value": 0.9167,
             "weight": 0.3
           },
           {
@@ -1057,20 +989,20 @@
           }
         ],
         "reason": "",
-        "score": 0.775,
+        "score": 0.9083,
         "weight": 0.05
       }
     ],
     "grade_band": "11-12",
     "judged": false,
     "llm_profile": "azure",
-    "overall": 0.9274,
-    "package_id": "5d18a35e-1b41-4670-ac75-5cb84fe2162b",
+    "overall": 0.933,
+    "package_id": "b5138b0c-295d-405e-bf4a-8348d0846724",
     "profile": "quantitative",
     "subject": "Physics",
     "transferable": true
   },
-  "run_id": "54887eb7-68e6-4a9e-be00-567b9bf20d40",
+  "run_id": "0b4927ea-6028-48e2-8c0f-bfbbdd1bb2d0",
   "stages": [
     {
       "confidence": 0.5,
@@ -1213,38 +1145,32 @@
           "confidence": 1.0,
           "evidence": [
             {
-              "observation": "{'subject': 0.95, 'grade_band': 0.8, 'difficulty': 0.8, 'topic': 0.95, 'chapter': 0.7, 'category': 0.9, 'language': 0.99, 'pedagogy_profile': 0.98, 'curriculum_alignment': 0.6}",
+              "observation": "{'subject': 0.95, 'grade_band': 0.7, 'difficulty': 0.8, 'topic': 0.95, 'chapter': 0.9, 'category': 0.9, 'language': 0.99, 'pedagogy_profile': 0.98, 'curriculum_alignment': 0.3}",
               "path": "/classification/confidences"
             }
           ],
           "key": "self_reported_confidence",
           "label": "Classifier's own confidence",
           "measurability": "measured",
-          "reasoning": "Mean self-reported confidence 0.85 across category, chapter, curriculum_alignment, difficulty, grade_band, language, pedagogy_profile, subject, topic. This is the classifier's own estimate, not an accuracy measurement.",
+          "reasoning": "Mean self-reported confidence 0.83 across category, chapter, curriculum_alignment, difficulty, grade_band, language, pedagogy_profile, subject, topic. This is the classifier's own estimate, not an accuracy measurement.",
           "recommendations": [],
-          "score": 85.22,
+          "score": 83.0,
           "weight": 0.5
         },
         {
           "confidence": 1.0,
           "evidence": [
             {
-              "observation": "[]",
+              "observation": "['curriculum_alignment']",
               "path": "/classification/low_confidence_fields"
             }
           ],
           "key": "low_confidence_declared",
           "label": "Low-confidence fields flagged for review",
           "measurability": "measured",
-          "reasoning": "1 field(s) scored below 0.7 without being flagged: curriculum_alignment.",
-          "recommendations": [
-            {
-              "action": "Derive low_confidence_fields from the confidences map rather than letting the model populate both independently.",
-              "impact": "A field the classifier doubted reaches teachers unflagged.",
-              "severity": "high"
-            }
-          ],
-          "score": 0.0,
+          "reasoning": "Every field scored below 0.7 is flagged for review.",
+          "recommendations": [],
+          "score": 100.0,
           "weight": 1.5
         },
         {
@@ -1261,7 +1187,7 @@
       ],
       "missing": [],
       "not_measurable": 1,
-      "score": 71.38,
+      "score": 98.45,
       "stage": "educational-classification"
     },
     {
@@ -1296,30 +1222,30 @@
           "confidence": 1.0,
           "evidence": [
             {
-              "observation": "quote not found in c_0001: 'like charges repel and unlike charges attract each other.'",
-              "path": "/knowledge/concepts/1/evidence"
+              "observation": "quote not found in c_0003: 'It is not possible to create or destroy net charge carried b'",
+              "path": "/knowledge/concepts/2/evidence"
             },
             {
-              "observation": "quote not found in c_0013: 'According to this, we say that the charge Q produces an elec'",
+              "observation": "quote not found in c_0003: 'Experimentally it is established that all free charges are i'",
+              "path": "/knowledge/concepts/3/evidence"
+            },
+            {
+              "observation": "quote not found in c_0009: 'Coulomb’s force law between two point charges q and q locate'",
               "path": "/knowledge/concepts/5/evidence"
             },
             {
-              "observation": "quote not found in c_0020: 'The number of field lines crossing the area element is propo'",
-              "path": "/knowledge/concepts/10/evidence"
+              "observation": "quote not found in c_0009: 'Equation (1.3) is valid for any sign of q and q whether posi'",
+              "path": "/knowledge/concepts/5/evidence"
             },
             {
-              "observation": "quote not found in c_0022: 'An electric dipole is a pair of equal and opposite point cha'",
-              "path": "/knowledge/concepts/11/evidence"
-            },
-            {
-              "observation": "quote not found in c_0022: 'For r >> a ... E p ( r >> a ) (1.15)'",
-              "path": "/knowledge/concepts/12/evidence"
+              "observation": "quote not found in c_0011: 'Experimentally, it is verified that force on any charge due\\n'",
+              "path": "/knowledge/concepts/6/evidence"
             }
           ],
           "key": "citation_integrity",
           "label": "Quotes appear in the chunks they cite",
           "measurability": "measured",
-          "reasoning": "26 of 39 evidence spans quote text that is present verbatim in the chunk they cite. 13 do not.",
+          "reasoning": "22 of 37 evidence spans quote text that is present verbatim in the chunk they cite. 15 do not.",
           "recommendations": [
             {
               "action": "Re-run extraction with the citation verifier rejecting spans whose quote is not substring-present in the cited chunk.",
@@ -1327,21 +1253,21 @@
               "severity": "high"
             }
           ],
-          "score": 66.67,
+          "score": 59.46,
           "weight": 3.0
         },
         {
           "confidence": 1.0,
           "evidence": [
             {
-              "observation": "levels: ['analyze', 'apply', 'understand']",
+              "observation": "levels: ['analyze', 'apply', 'remember', 'understand']",
               "path": "/knowledge/learning_objectives"
             }
           ],
           "key": "objective_bloom",
           "label": "Objectives carry a Bloom level",
           "measurability": "measured",
-          "reasoning": "6 of 6 objectives are tagged with a Bloom level; 3 distinct level(s) used.",
+          "reasoning": "7 of 7 objectives are tagged with a Bloom level; 4 distinct level(s) used.",
           "recommendations": [],
           "score": 100.0,
           "weight": 1.5
@@ -1352,7 +1278,7 @@
           "key": "graph_integrity",
           "label": "Concept graph resolves to real concepts",
           "measurability": "measured",
-          "reasoning": "9 edges over 22 nodes. Every endpoint resolves to an extracted concept.",
+          "reasoning": "8 edges over 22 nodes. Every endpoint resolves to an extracted concept.",
           "recommendations": [],
           "score": 100.0,
           "weight": 1.5
@@ -1360,7 +1286,7 @@
       ],
       "missing": [],
       "not_measurable": 0,
-      "score": 88.89,
+      "score": 86.49,
       "stage": "knowledge-extraction"
     },
     {
@@ -1391,7 +1317,7 @@
           "key": "prerequisite_order",
           "label": "Prerequisites are taught before what needs them",
           "measurability": "measured",
-          "reasoning": "9 of 9 prerequisite edges are respected by the period order.",
+          "reasoning": "8 of 8 prerequisite edges are respected by the period order.",
           "recommendations": [],
           "score": 100.0,
           "weight": 2.5
@@ -1450,14 +1376,14 @@
           "confidence": 1.0,
           "evidence": [
             {
-              "observation": "1163 words",
+              "observation": "1123 words",
               "path": "/classroom_content/0/teacher_script"
             }
           ],
           "key": "script_substance",
           "label": "Teacher scripts have enough to work from",
           "measurability": "measured",
-          "reasoning": "Teacher scripts average 1341 words per period against a 250-word working floor. This measures volume, not teaching quality.",
+          "reasoning": "Teacher scripts average 1343 words per period against a 250-word working floor. This measures volume, not teaching quality.",
           "recommendations": [],
           "score": 100.0,
           "weight": 0.5
@@ -1596,7 +1522,7 @@
           "key": "objective_coverage",
           "label": "Objectives are assessed",
           "measurability": "measured",
-          "reasoning": "6 of 6 learning objectives are reachable from at least one assessment item.",
+          "reasoning": "7 of 7 learning objectives are reachable from at least one assessment item.",
           "recommendations": [],
           "score": 100.0,
           "weight": 2.5
@@ -1605,14 +1531,14 @@
           "confidence": 1.0,
           "evidence": [
             {
-              "observation": "bloom levels: ['analyze', 'apply', 'understand']",
+              "observation": "bloom levels: ['analyze', 'apply', 'remember', 'understand']",
               "path": "/assessments/items"
             }
           ],
           "key": "bloom_spread",
           "label": "Items span more than recall",
           "measurability": "measured",
-          "reasoning": "3 distinct Bloom level(s) in the bank (analyze, apply, understand). Three or more is the point at which a paper distinguishes recall from reasoning.",
+          "reasoning": "4 distinct Bloom level(s) in the bank (analyze, apply, remember, understand). Three or more is the point at which a paper distinguishes recall from reasoning.",
           "recommendations": [],
           "score": 100.0,
           "weight": 1.5
@@ -1678,7 +1604,7 @@
           "key": "gap_concept_linkage",
           "label": "Gaps attach to real concepts",
           "measurability": "measured",
-          "reasoning": "7 of 7 predicted gaps name a concept that stage 3 extracted.",
+          "reasoning": "6 of 6 predicted gaps name a concept that stage 3 extracted.",
           "recommendations": [],
           "score": 100.0,
           "weight": 2.0
@@ -1689,7 +1615,7 @@
           "key": "remediation",
           "label": "Gaps carry a remediation",
           "measurability": "measured",
-          "reasoning": "7 of 7 gaps carry remediation.",
+          "reasoning": "6 of 6 gaps carry remediation.",
           "recommendations": [],
           "score": 100.0,
           "weight": 2.5
@@ -1700,7 +1626,7 @@
           "key": "diagnostics",
           "label": "Gaps carry a diagnostic question",
           "measurability": "measured",
-          "reasoning": "7 of 7 gaps carry diagnostic_questions.",
+          "reasoning": "6 of 6 gaps carry diagnostic_questions.",
           "recommendations": [],
           "score": 100.0,
           "weight": 2.0
@@ -1709,14 +1635,14 @@
           "confidence": 1.0,
           "evidence": [
             {
-              "observation": "14 diagnostic questions",
+              "observation": "12 diagnostic questions",
               "path": "/learning_gaps"
             }
           ],
           "key": "diagnostic_discrimination",
           "label": "Diagnostics predict the wrong answer",
           "measurability": "measured",
-          "reasoning": "14 of 14 diagnostic questions state the wrong answer the misconception produces, which is what makes them diagnostic rather than merely difficult.",
+          "reasoning": "12 of 12 diagnostic questions state the wrong answer the misconception produces, which is what makes them diagnostic rather than merely difficult.",
           "recommendations": [],
           "score": 100.0,
           "weight": 1.5
@@ -1725,22 +1651,22 @@
           "confidence": 1.0,
           "evidence": [
             {
-              "observation": "3 extracted misconceptions",
+              "observation": "2 extracted misconceptions",
               "path": "/knowledge/misconceptions"
             }
           ],
           "key": "misconception_alignment",
           "label": "Gaps trace to extracted misconceptions",
           "measurability": "measured",
-          "reasoning": "0 of 7 gaps restate a misconception stage 3 found in the source. The remainder are predicted rather than sourced, which is a legitimate output of this stage.",
+          "reasoning": "1 of 6 gaps restate a misconception stage 3 found in the source. The remainder are predicted rather than sourced, which is a legitimate output of this stage.",
           "recommendations": [],
-          "score": 0.0,
+          "score": 16.67,
           "weight": 0.5
         }
       ],
       "missing": [],
       "not_measurable": 0,
-      "score": 94.12,
+      "score": 95.1,
       "stage": "gap-analysis"
     },
     {
@@ -1753,19 +1679,11 @@
           "confidence": 1.0,
           "evidence": [
             {
-              "observation": "GROUNDING_UNSUPPORTED_CLAIM: claim at /knowledge/concepts/8 is not supported by its cited source (judge rated this unsupported)",
-              "path": "/validation/issues"
-            },
-            {
               "observation": "GROUNDING_UNSUPPORTED_CLAIM: claim at /knowledge/concepts/13 is not supported by its cited source (judge rated this unsupported)",
               "path": "/validation/issues"
             },
             {
-              "observation": "GROUNDING_UNSUPPORTED_CLAIM: claim at /knowledge/definitions/4 is not supported by its cited source (judge rated this unsupported)",
-              "path": "/validation/issues"
-            },
-            {
-              "observation": "GROUNDING_UNSUPPORTED_CLAIM: claim at /knowledge/formulae/7 is not supported by its cited source (judge rated this unsupported)",
+              "observation": "GROUNDING_UNSUPPORTED_CLAIM: claim at /knowledge/formulae/10 is not supported by its cited source (judge rated this unsupported)",
               "path": "/validation/issues"
             },
             {
@@ -1776,7 +1694,7 @@
           "key": "issue_resolution",
           "label": "No blocking issues remain",
           "measurability": "measured",
-          "reasoning": "Status 'fail' with 9 issue(s), 5 of them blocking.",
+          "reasoning": "Status 'fail' with 7 issue(s), 3 of them blocking.",
           "recommendations": [
             {
               "action": "Route the blocking issues back to their owning stage for repair.",
@@ -1784,7 +1702,7 @@
               "severity": "high"
             }
           ],
-          "score": 44.44,
+          "score": 57.14,
           "weight": 2.5
         },
         {
@@ -1818,38 +1736,38 @@
           "confidence": 1.0,
           "evidence": [
             {
-              "observation": "Electric field: Electric field is a vector field in space that characterises the electrical environment of a system of c",
+              "observation": "Gauss's law: Electric flux through a closed surface equals the total charge enclosed divided by ε0.",
               "path": "/validation/unsupported_claims"
             },
             {
-              "observation": "Superposition principle for electric fields: The net electric field due to a system of point charges at a point is the v",
+              "observation": "Torque on a dipole in a uniform field: A permanent dipole p in a uniform electric field E experiences a torque τ = p × E",
               "path": "/validation/unsupported_claims"
             },
             {
-              "observation": "Electric field lines: Field lines are curves whose tangent at any point gives the direction of the electric field there;",
+              "observation": "Continuous charge distributions (linear, surface, volume): Macroscopic charge distributions are described by linear (λ),",
               "path": "/validation/unsupported_claims"
             },
             {
-              "observation": "Gauss's law: Electric flux through a closed surface equals the total enclosed charge divided by epsilon_0.",
+              "observation": "Dipole far-field (axis) E (on axis, r>>a) = (1/4 pi epsilon_0) (2 p / r^3) along p",
               "path": "/validation/unsupported_claims"
             },
             {
-              "observation": "Torque on a dipole in a uniform electric field: A permanent electric dipole with dipole moment p in uniform field E expe",
+              "observation": "Dipole far-field (equatorial) E (on equatorial plane, r>>a) = -(1/4 pi epsilon_0) (p / r^3)",
               "path": "/validation/unsupported_claims"
             }
           ],
           "key": "grounding_score",
           "label": "Claims are supported by the source",
           "measurability": "measured",
-          "reasoning": "Stage 9 scored grounding at 0.87. 9 claim(s) were recorded as unsupported.",
+          "reasoning": "Stage 9 scored grounding at 0.91. 7 claim(s) were recorded as unsupported.",
           "recommendations": [],
-          "score": 86.54,
+          "score": 91.07,
           "weight": 2.5
         }
       ],
       "missing": [],
       "not_measurable": 0,
-      "score": 82.75,
+      "score": 87.05,
       "stage": "validation"
     },
     {
@@ -1862,7 +1780,7 @@
           "confidence": 1.0,
           "evidence": [
             {
-              "observation": "9 entries totalling 481424 ms",
+              "observation": "9 entries totalling 549444 ms",
               "path": "/provenance/stage_timings"
             }
           ],
@@ -1904,11 +1822,11 @@
               "path": "/provenance/decisions"
             },
             {
-              "observation": "knowledge-extraction: pedagogy pass reads 17 of 63 chunks — objectives and edges are document-level judgements, but the document is 28,244 tokens against a 12,000-token window; scope comes from the full 25-concept inventory, which is sent whole, and the text is narrowed to the passages those concepts cite plus a stride across the rest, so every claim still has a quotable source",
+              "observation": "knowledge-extraction: pedagogy pass reads 16 of 63 chunks — objectives and edges are document-level judgements, but the document is 28,244 tokens against a 12,000-token window; scope comes from the full 26-concept inventory, which is sent whole, and the text is narrowed to the passages those concepts cite plus a stride across the rest, so every claim still has a quotable source",
               "path": "/provenance/decisions"
             },
             {
-              "observation": "knowledge-extraction: 8 claims dropped — their quotes did not appear in the chunk they cited; an unverifiable citation is removed here rather than propagating into six later stages",
+              "observation": "knowledge-extraction: 5 claims dropped — their quotes did not appear in the chunk they cited; an unverifiable citation is removed here rather than propagating into six later stages",
               "path": "/provenance/decisions"
             },
             {
@@ -1951,7 +1869,7 @@
           "key": "cost_accounting",
           "label": "Cost and token usage are accounted for",
           "measurability": "measured",
-          "reasoning": "$0.0000 across 136,483 input and 96,255 output tokens.",
+          "reasoning": "$0.0000 across 165,079 input and 107,367 output tokens.",
           "recommendations": [],
           "score": 100.0,
           "weight": 0.5
@@ -2024,9 +1942,9 @@
     "band": "exemplary",
     "judged": false,
     "rubric_band": "exemplary",
-    "rubric_score": 92.74,
+    "rubric_score": 93.3,
     "stage_confidence": 0.9157,
-    "stage_score": 93.2,
+    "stage_score": 95.88,
     "stages_scored": 10,
     "stages_total": 11,
     "transferable": true
