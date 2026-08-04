@@ -253,6 +253,67 @@ def _classify_line(builder: _BlockBuilder, span: TextSpan, body_size: float | No
 # ───────────────────────────────────────────────────────────────────── PDF ───
 
 
+#: Adobe Symbol encoding: byte value -> the character it actually denotes.
+#:
+#: A PDF that sets Greek in the Symbol font stores λ as the byte for "l" and
+#: relies on the font to draw it. When the font carries no ToUnicode map — the
+#: NCERT physics chapter's does not — every extractor faithfully returns "l",
+#: and the Greek silently becomes Latin.
+#:
+#: This is not cosmetic. Measured on that chapter: "λ = ΔQ/Δl" reached the
+#: pipeline as "l = D Q l D l" and "q/ε₀" as "q/e". Stage 3 extracted the
+#: concepts correctly anyway — the surrounding prose still says what the symbols
+#: mean — but stage 9 then checked each claim against evidence whose symbols had
+#: been replaced, found the claim's λ absent from its own source passage, and
+#: ruled it unsupported. Five correct claims were reported as fabrications, and
+#: the package failed validation on the strength of it.
+#:
+#: The table is the published encoding, not a guess: it is why the corruption
+#: maps each Latin letter to one fixed Greek letter, and why it is reversible.
+_SYMBOL_ENCODING = {
+    "a": "α", "b": "β", "c": "χ", "d": "δ", "e": "ε", "f": "φ", "g": "γ",
+    "h": "η", "i": "ι", "j": "ϕ", "k": "κ", "l": "λ", "m": "μ", "n": "ν",
+    "o": "ο", "p": "π", "q": "θ", "r": "ρ", "s": "σ", "t": "τ", "u": "υ",
+    "v": "ϖ", "w": "ω", "x": "ξ", "y": "ψ", "z": "ζ",
+    "A": "Α", "B": "Β", "C": "Χ", "D": "Δ", "E": "Ε", "F": "Φ", "G": "Γ",
+    "H": "Η", "I": "Ι", "J": "ϑ", "K": "Κ", "L": "Λ", "M": "Μ", "N": "Ν",
+    "O": "Ο", "P": "Π", "Q": "Θ", "R": "Ρ", "S": "Σ", "T": "Τ", "U": "Υ",
+    "V": "ς", "W": "Ω", "X": "Ξ", "Y": "Ψ", "Z": "Ζ",
+    # The operators that share the encoding. Digits, brackets and "=" map to
+    # themselves and are deliberately absent: leaving them out means a word of
+    # pure punctuation passes through untouched.
+    '"': "∀", "$": "∃", "'": "∋", "*": "∗", "@": "≅", "\\": "∴",
+    "^": "⊥", "~": "∼", "»": "↔", "¬": "←", "­": "↑", "®": "→", "¯": "↓",
+    "×": "∝", "Ø": "≠", "£": "≤", "³": "≥", "Ê": "∅", "Ï": "∈",
+    "Ò": "⊃", "Í": "⊂", "Ç": "∩", "È": "∪", "å": "∑", "ò": "∫", "¥": "∞",
+    "Ö": "√", "±": "±", "·": "∙", "¸": "÷", "°": "°",
+}
+
+#: Subset fonts arrive with a six-letter tag: "JTSWAB+Symbol". Matching on the
+#: suffix rather than equality is what catches those.
+_SYMBOL_FONT_MARKERS = ("symbol", "mathematicalpi", "greek")
+
+
+def _is_symbol_font(fontname: str) -> bool:
+    """Whether this font's bytes need mapping through the Symbol encoding."""
+    name = fontname.lower()
+    # A tagged subset name is "ABCDEF+Symbol"; drop the tag before matching so a
+    # document that happens to contain "symbol" in a body font name is not caught.
+    _, _, base = name.rpartition("+")
+    return any(marker in base for marker in _SYMBOL_FONT_MARKERS)
+
+
+def decode_symbol_text(text: str, fontname: str) -> str:
+    """Recover the real characters from text set in a Symbol-encoded font.
+
+    Returns ``text`` unchanged for every ordinary font, so this costs one string
+    check per word and cannot corrupt a document that never used Symbol.
+    """
+    if not text or not _is_symbol_font(fontname):
+        return text
+    return "".join(_SYMBOL_ENCODING.get(ch, ch) for ch in text)
+
+
 def _pdf_spans(
     page: Any, page_no: int, table_boxes: list[tuple[float, float, float, float]]
 ) -> Iterator[TextSpan]:
@@ -284,7 +345,12 @@ def _pdf_spans(
 
     for key in sorted(rows):
         row = sorted(rows[key], key=lambda w: w["x0"])
-        text = " ".join(w["text"] for w in row)
+        # Decoded per word, which is safe because `extra_attrs=["fontname"]`
+        # makes pdfplumber split a word wherever the font changes — so every
+        # word here is single-font and the whole word shares one encoding.
+        text = " ".join(
+            decode_symbol_text(w["text"], str(w.get("fontname", ""))) for w in row
+        )
         sizes = [w.get("size") for w in row if w.get("size")]
         fonts = [str(w.get("fontname", "")) for w in row]
         yield TextSpan(

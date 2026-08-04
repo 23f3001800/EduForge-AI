@@ -978,3 +978,45 @@ async def test_the_bounded_read_stops_instead_of_buffering_the_whole_body() -> N
     with pytest.raises(_OverLimitError):
         await _read_bounded(body, 1024 * 1024)  # type: ignore[arg-type]
     assert body.served <= 1024 * 1024 + _CHUNK_BYTES
+
+
+def test_greek_set_in_a_symbol_font_is_recovered_not_flattened_to_latin() -> None:
+    """A Symbol-encoded PDF stores λ as the byte for 'l' and lets the font draw it.
+
+    With no ToUnicode map — the NCERT physics chapter has none — every extractor
+    returns 'l', so the Greek silently becomes Latin. Measured consequence: the
+    chapter reached the pipeline with 2 distinct Greek letters instead of 15,
+    'λ = ΔQ/Δl' arrived as 'l = D Q l D l', and stage 9 then judged five correct
+    claims unsupported because the λ in each claim was absent from its own cited
+    passage. The package failed validation on five false fabrications.
+    """
+    from stages.s1_document_intelligence.parsers import decode_symbol_text
+
+    # The exact corruption measured on that chapter, and its inverse.
+    assert decode_symbol_text("l", "JTSWAB+Symbol") == "λ"
+    assert decode_symbol_text("D", "Symbol") == "Δ"
+    assert decode_symbol_text("s", "ABCDEF+Symbol") == "σ"
+    assert decode_symbol_text("e", "Symbol") == "ε"
+
+
+def test_an_ordinary_font_is_never_remapped() -> None:
+    """The decoder must be inert everywhere else.
+
+    It runs on every word of every PDF, so a false positive would turn ordinary
+    English into Greek — a far worse corruption than the one being fixed.
+    """
+    from stages.s1_document_intelligence.parsers import decode_symbol_text
+
+    for fontname in ("EUPUOO+Bookman-Light", "Helvetica", "XMPTEC+CenturyGothic"):
+        assert decode_symbol_text("linear charge density", fontname) == "linear charge density"
+
+
+def test_a_body_font_merely_containing_symbol_is_not_treated_as_symbol() -> None:
+    """Matching is on the base name after the subset tag, not a substring of the
+    whole string, so a family that happens to be called 'SymbolicSans' body text
+    is not silently transliterated."""
+    from stages.s1_document_intelligence.parsers import _is_symbol_font
+
+    assert _is_symbol_font("JTSWAB+Symbol") is True
+    assert _is_symbol_font("ABCDEF+SymbolMT") is True
+    assert _is_symbol_font("Bookman-Light") is False
