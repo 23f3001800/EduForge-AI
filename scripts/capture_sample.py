@@ -30,6 +30,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 import time
 from pathlib import Path
@@ -39,6 +40,24 @@ import httpx
 
 ROOT = Path(__file__).resolve().parent.parent
 OUT = ROOT / "samples"
+
+
+def _key_from_env_file() -> str:
+    """The instance's ACCESS_KEY, read the way pydantic-settings reads it.
+
+    Case-insensitively: settings are loaded with ``case_sensitive=False``, so a
+    .env carrying ``Access_key=`` configures the server perfectly well, and a
+    case-sensitive reader here would silently send no key and 401 on the first
+    upload with nothing to explain why.
+    """
+    env = ROOT / ".env"
+    if not env.is_file():
+        return ""
+    for line in env.read_text(encoding="utf-8").splitlines():
+        name, sep, value = line.strip().partition("=")
+        if sep and name.strip().lower() == "access_key":
+            return value.strip().strip("'\"")
+    return ""
 
 #: Artifact kind -> filename on disk. Mirrors what the API serves.
 FILENAMES = {
@@ -197,7 +216,17 @@ def main() -> int:
     if args.language:
         options["output_language"] = args.language
 
-    with httpx.Client(base_url=args.base_url, timeout=args.timeout) as client:
+    # Upload and job creation are gated when the instance sets ACCESS_KEY, and
+    # this script drives exactly those two endpoints. Read from the environment
+    # or the local .env so capturing a sample against your own instance needs no
+    # extra argument — the key is already configured for the server it is
+    # talking to.
+    headers = {}
+    key = os.environ.get("ACCESS_KEY") or _key_from_env_file()
+    if key:
+        headers["X-Access-Key"] = key
+
+    with httpx.Client(base_url=args.base_url, timeout=args.timeout, headers=headers) as client:
         try:
             client.get("/healthz").raise_for_status()
         except httpx.HTTPError:
