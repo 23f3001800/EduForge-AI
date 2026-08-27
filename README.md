@@ -466,20 +466,8 @@ only one of them is a defect.
 | Provider | Adapter | Status |
 |---|---|---|
 | OpenRouter | `openrouter_provider.py` | Default. Hosted, open-weight `:free` models. Needs `Open_Router_API_KEY` |
+| Azure OpenAI | `azure_openai_provider.py` | What the deployed instance runs. Routes on deployment name rather than model id, and sends `max_completion_tokens` for the gpt-5/o-series families. Needs `AZURE_OPENAI_ENDPOINT` and `AZURE_OPENAI_KEY` |
 | Replay | `replay_provider.py` | Serves recorded cassettes keyed by a hash of (stage, model, prompt). A cache miss is a hard failure, never a live call. Used by CI |
-
-Groq, Ollama, Gemini, and Anthropic are not supported providers; all four
-adapters were removed. Groq and Ollama: see the local-hardware note below.
-Gemini was never selectable — its `gemini_dev` profile was absent from the
-`LLMProfile` literal — and Anthropic was gated off by default with no credit
-behind it; both were flagged in a README audit as advertised but unreachable,
-so maintaining them was dead weight once the operator standardised on
-OpenRouter (hosted, open-weight free models) and Azure OpenAI. A local Ollama
-profile was built and then withdrawn after measurement: on the target hardware
-(8 CPU cores, 7.6 GB RAM, no GPU) it sustained 3.5 output tokens/second, which
-is roughly 14 minutes for a single knowledge-extraction call against ~40 calls
-per chapter. All four are retained in git history rather than as a profile
-that cannot finish a run.
 
 **Model routing** lives in `config/models.yaml`, never as a constant inside a
 stage. A stage asks for a stage name and receives a `ModelSpec`; it never learns
@@ -489,6 +477,7 @@ individual fields of its profile's `default`, and anything omitted is inherited.
 | Profile in `models.yaml` | Provider | Selectable via `LLM_PROFILE`? |
 |---|---|---|
 | `production` | openrouter | Yes |
+| `azure` | azure_openai | Yes |
 | `dev` | openrouter | Yes |
 | `ci` | replay | Yes |
 
@@ -555,7 +544,7 @@ EduForge-AI/
 ├── config/models.yaml        Per-stage model routing
 ├── scripts/                  capture_sample.py, smoke_pipeline.py,
 │                             generate_schema.py, check_repo_hygiene.py
-├── docs/                     00-14 design set (see Section 16)
+├── docs/                     00-14 design set (see Section 15)
 ├── samples/                  Capture target — currently holds only README.md
 ├── Makefile  Dockerfile  docker-compose.yml  .env.example
 ```
@@ -826,33 +815,7 @@ sequenceDiagram
 
 ---
 
-## 12. Assignment Requirement Mapping
-
-| Requirement | Implementation | Where |
-|---|---|---|
-| Ingest educational documents | Four parsers behind one choke point, with archive-bomb and extraction ceilings | `backend/stages/s1_document_intelligence/parsers.py` |
-| Handle scanned pages | OCR port with three engines (Azure DI, Tesseract, EasyOCR); `auto` prefers the hosted reader then falls back through the local ones; per-word confidence carried into the contract; unread pages listed in `failed_pages` | `backend/stages/s1_document_intelligence/ocr/` |
-| Classify the material | Stage 2 emits subject, grade band, language, and `pedagogy_profile` | `backend/stages/s2_classification/` |
-| Extract structured knowledge | Objectives, concepts, definitions, formulae, examples, misconceptions, dependency graph — split into two model calls for failure isolation | `backend/stages/s3_knowledge/` |
-| Multi-period lesson planning | Period count derived from content load rather than fixed; concepts and objectives assigned per period | `backend/stages/s4_planner/` |
-| Classroom-ready content | Eight per-period artifacts: entry ticket, timed script, board notes, activity refs, checkpoints, exit ticket, homework, mentor moment | `backend/stages/s5_classroom_content/` |
-| Activities | Real materials, followable steps, success criteria observable while the activity runs | `backend/stages/s6_activities/` |
-| Assessments with answer key and rubrics | A blueprint fixes count, kind, Bloom level, marks and objective first; items are written to it and rebuilt against the contract; the answer key is a separate section | `backend/stages/s7_assessments/` |
-| Learning-gap analysis | Severity from transitive downstream load in the concept dependency graph, not from asking a model how serious it thinks something is | `backend/stages/s8_gaps/` |
-| Hallucination detection and traceability | `Grounded.evidence` `min_length=1` makes an ungrounded claim unconstructable; stage 3 verifies quotes verbatim against the cited chunk; stage 9 runs the semantic check with an LLM judge on the ambiguous band only | `contracts/primitives.py`, `s3_knowledge/grounding.py`, `s9_validation/grounding.py` |
-| Validation | Four rule classes in cost order — schema, coverage, consistency are pure computation and run before a single token is spent; grounding is the only one that calls a model | `backend/stages/s9_validation/` |
-| Publishing | TKP assembly plus three PDFs and a Markdown bundle | `backend/stages/s10_publishing/` |
-| Multi-agent orchestration | LangGraph `StateGraph`, ten nodes built from the stage roster so graph and roster cannot drift; per-stage checkpointing so a retry resumes rather than restarts | `backend/orchestration/graph.py` |
-| Subject versatility | Everything routes off `pedagogy_profile`; a test scans every stage file for subject-name conditionals and fails on any hit | `backend/pedagogy/profiles.yaml`, `test_no_stage_branches_on_a_subject_name` |
-| Curriculum alignment | Boards compose with the profile — a board multiplies the profile's assessment mix rather than overriding it; the form's options come from the same YAML the pipeline reads | `backend/pedagogy/curricula.yaml`, `api/routes/options.py` |
-| Real-time progress | SSE over a persisted event log with a monotonic cursor; a mid-run refresh resumes | `api/routes/events.py`, `core/progress/` |
-| Evaluation | Two independent systems, plus a 15-way adversarial test of the rubric itself | `backend/evals/` — Section 5 |
-| Observability | Prometheus counters and histograms at `/metrics`, structured JSON logs, request id propagated into every error as `trace_id`, `/stats` for per-instance activity | `backend/core/obs/`, `api/routes/stats.py` |
-| Deployed prototype | Single container, single origin, Azure App Service | `Dockerfile`, `docs/13-azure-deployment.md` |
-
----
-
-## 13. Testing & Validation
+## 12. Testing & Validation
 
 **Verified by running `../.venv/bin/python -m pytest -q` from `backend/`:**
 
@@ -905,7 +868,7 @@ rubric whose levels discriminate:
 
 ---
 
-## 14. Known Limitations
+## 13. Known Limitations
 
 These are real, and are stated because a reviewer will find them.
 
@@ -982,7 +945,7 @@ is also lost on restart unless it is pointed at a mounted volume.
 
 ---
 
-## 15. Future Work
+## 14. Future Work
 
 Ordered by how much each would change the system's standing, not by effort.
 
@@ -991,7 +954,7 @@ Ordered by how much each would change the system's standing, not by effort.
 | 1 | Postgres-backed `Store` behind the existing port, plus a real blob backend | Removes the single largest limitation. The port already exists, and the import-linter comment records exactly which `api → worker` edge disappears when the worker becomes its own process |
 | 2 | Authentication and per-user package ownership | Nothing can be shared safely until this exists |
 | 3 | A labelled evaluation corpus | Several metrics currently report `NOT_MEASURABLE` for want of ground truth, notably subject-classification accuracy and OCR accuracy. A corpus converts them from stated gaps into measured numbers |
-| 4 | Systematic latency and cost benchmarking across document sizes and profiles | The run-time figure in Section 14 is observed, not measured. It should be a table |
+| 4 | Systematic latency and cost benchmarking across document sizes and profiles | The run-time figure in Section 13 is observed, not measured. It should be a table |
 | 5 | Populate `samples/` from real runs and rewrite `samples/README.md` | The subject-versatility claim is best demonstrated by two captured packages, and the stale README currently overstates what is present |
 | 6 | Human evaluation with practising teachers | The rubric measures properties of the artifact. Whether teachers actually use the output is not derivable from the artifact, and is honestly reported as unmeasurable |
 | 7 | Wire the declared `EMBEDDINGS` setting to a real hybrid (BM25 + dense) retrieval path | Currently inert; would improve grounding on longer documents |
@@ -1000,7 +963,7 @@ Ordered by how much each would change the system's standing, not by effort.
 
 ---
 
-## 16. References
+## 15. References
 
 ### Project documents
 
